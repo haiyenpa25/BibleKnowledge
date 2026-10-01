@@ -1054,3 +1054,251 @@ def get_who_am_i_challenges():
     return challenges
 
 
+# ==============================================================================
+# Match Challenge (Nối Cặp / Ghép Đôi Thực Thể Kinh Thánh — §3)
+# ==============================================================================
+
+class MatchPairItem(BaseModel):
+    id: str
+    left_text: str
+    left_subtext: Optional[str] = None
+    right_text: str
+    right_subtext: Optional[str] = None
+    scripture: str
+    explanation: str
+
+
+class MatchChallengeItem(BaseModel):
+    id: str
+    title: str
+    topic: str
+    difficulty: int
+    description: str
+    pairs: List[MatchPairItem]
+
+
+@router.get("/match-challenges", response_model=List[MatchChallengeItem])
+def get_match_challenges():
+    """Retrieve Match Challenges pairing biblical characters, events, miracles, and original language terms (§3)."""
+    challenges = [
+        MatchChallengeItem(
+            id="match-1",
+            title="Nhân Vật Cựu Ước & Biến Cố Trọng Đại",
+            topic="Cựu Ước Lịch Sử",
+            difficulty=1,
+            description="Ghép đôi 5 vĩ nhân đức tin thời Cựu Ước với biến cố lịch sử gắn liền với cuộc đời họ.",
+            pairs=[
+                MatchPairItem(
+                    id="m1-1",
+                    left_text="A-bơ-ra-ham",
+                    left_subtext="Tổ Phụ Đức Tin",
+                    right_text="Rời quê hương U-rơ & Dâng Y-sác trên núi Mô-ri-a",
+                    right_subtext="Sáng-thế Ký 12; 22",
+                    scripture="Sáng-thế Ký 22:1-18",
+                    explanation="A-bơ-ra-ham vâng lời Chúa rời quê hương đi đến xứ hứa và sẵn sàng dâng con một Y-sác, minh chứng cho đức tin trọn vẹn nơi Đức Chúa Trời."
+                ),
+                MatchPairItem(
+                    id="m1-2",
+                    left_text="Môi-se",
+                    left_subtext="Người Giải Phóng Xuất Hành",
+                    right_text="Rẽ Biển Đỏ & Nhận 10 Điều Răn tại núi Si-na-i",
+                    right_subtext="Xuất Ê-díp-tô Ký 14; 20",
+                    scripture="Xuất Ê-díp-tô Ký 14:21-22",
+                    explanation="Đức Chúa Trời dùng cây gậy của Môi-se để rẽ đôi Biển Đỏ giải cứu tuyển dân và truyền ban Luật pháp trên đỉnh núi Si-na-i."
+                ),
+                MatchPairItem(
+                    id="m1-3",
+                    left_text="Đa-vít",
+                    left_subtext="Vị Vua Hợp Lòng Chúa",
+                    right_text="Hạ gục người khổng lồ Gô-li-át bằng trũng đá & hòn sỏi",
+                    right_subtext="I Sa-mu-ên 17",
+                    scripture="I Sa-mu-ên 17:45-50",
+                    explanation="Chàng trai chăn chiên Đa-vít nhờ cậy danh Đức Giê-hô-va vạn quân đã dùng ná bắn một hòn sỏi duy nhất hạ gục dũng sĩ Phi-li-tin Gô-li-át."
+                ),
+                MatchPairItem(
+                    id="m1-4",
+                    left_text="Tiên tri Ê-li",
+                    left_subtext="Tiên Tri Lửa",
+                    right_text="Lửa giáng trên núi Cạt-mên & Được cất lên trời bằng xe lửa",
+                    right_subtext="I Các Vua 18; II Các Vua 2",
+                    scripture="I Các Vua 18:36-39",
+                    explanation="Ê-li thách thức 450 tiên tri Ba-anh trên núi Cạt-mên; Chúa nhậm lời bằng cách giáng lửa thiêu đốt của lễ, khẳng định Giê-hô-va là Đức Chúa Trời."
+                ),
+                MatchPairItem(
+                    id="m1-5",
+                    left_text="Đa-ni-ên",
+                    left_subtext="Bậc Khôn Ngoan Tại Ba-by-lôn",
+                    right_text="Giữ lòng trung tín cầu nguyện trong hang sư tử đói",
+                    right_subtext="Đa-ni-ên 6",
+                    scripture="Đa-ni-ên 6:16-23",
+                    explanation="Đa-ni-ên không chịu ngừng cầu nguyện cùng Đức Chúa Trời nên bị quăng vào hang sư tử, nhưng Chúa sai thiên sứ bịt miệng sư tử gìn giữ ông an toàn."
+                )
+            ]
+        ),
+        MatchChallengeItem(
+            id="match-2",
+            title="Các Sứ Đồ Của Chúa Giê-xu & Dấu Ấn Mục Vụ",
+            topic="Tân Ước Phúc Âm",
+            difficulty=2,
+            description="Nối đúng 5 vị sứ đồ với những sự kiện quyết định trong hành trình theo Thầy.",
+            pairs=[
+                MatchPairItem(
+                    id="m2-1",
+                    left_text="Phi-e-rơ (Si-môn)",
+                    left_subtext="Trưởng Nhóm Môn Đồ",
+                    right_text="Đi bộ trên mặt nước, chối Chúa 3 lần và giảng ngày Ngũ Tuần",
+                    right_subtext="Ma-thi-ơ 14; 26; Công vụ 2",
+                    scripture="Công vụ các Sứ đồ 2:14-41",
+                    explanation="Phi-e-rơ đầy nhiệt huyết từng vấp ngã chối Chúa nhưng được phục hồi và trở thành trụ cột rao giảng làm 3.000 người tin Chúa trong ngày Ngũ Tuần."
+                ),
+                MatchPairItem(
+                    id="m2-2",
+                    left_text="Sứ đồ Giăng",
+                    left_subtext="Môn Đồ Được Chúa Yêu",
+                    right_text="Đứng bên chân thập tự giá & Viết sách Khải Huyền tại đảo Bát-mô",
+                    right_subtext="Giăng 19:26; Khải Huyền 1",
+                    scripture="Khải Huyền 1:9-19",
+                    explanation="Giăng là sứ đồ trẻ tuổi tựa lòng Chúa trong Lễ Vượt Qua, được Chúa phó thác săn sóc thân mẫu Ma-ri và nhận mặc khải khải huyền tại đảo Bát-mô."
+                ),
+                MatchPairItem(
+                    id="m2-3",
+                    left_text="Anh-rê",
+                    left_subtext="Người Dắt Đưa Linh Hồn",
+                    right_text="Dắt anh trai Phi-e-rơ & Cậu bé có 5 bánh 2 cá đến với Chúa",
+                    right_subtext="Giăng 1:40-42; 6:8-9",
+                    scripture="Giăng 1:41-42",
+                    explanation="Anh-rê có tinh thần mục vụ khiêm nhường, luôn chú ý quan sát và dẫn dắt người khác đến gặp Đấng Mê-si."
+                ),
+                MatchPairItem(
+                    id="m2-4",
+                    left_text="Thô-ma",
+                    left_subtext="Từ Nghi Ngờ Đến Xác Tín",
+                    right_text="Chạm vào vết đinh rồi tuyên xưng 'Lạy Chúa tôi và Đức Chúa Trời tôi!'",
+                    right_subtext="Giăng 20:24-29",
+                    scripture="Giăng 20:28",
+                    explanation="Thô-ma sau khi thấy tận mắt Đấng Phục Sinh đã cất lên lời xưng nhận thần học vĩ đại nhất về thần tính tuyệt đối của Chúa Giê-xu."
+                ),
+                MatchPairItem(
+                    id="m2-5",
+                    left_text="Phao-lô (Sau-lơ)",
+                    left_subtext="Sứ Đồ Của Dân Ngoại",
+                    right_text="Thấy ánh sáng chói lòa trên đường Đa-mách & Viết 13 thư tín",
+                    right_subtext="Công vụ 9; Rô-ma",
+                    scripture="Công vụ các Sứ đồ 9:3-6",
+                    explanation="Từ một người Pha-ri-si bắt bớ Hội Thánh, Sau-lơ được biến cải trở thành Sứ đồ truyền giáo vĩ đại vượt Địa Trung Hải đem Phúc Âm đến khắp thế giới La Mã."
+                )
+            ]
+        ),
+        MatchChallengeItem(
+            id="match-3",
+            title="Phép Lạ Của Chúa Giê-xu & Địa Danh Lịch Sử",
+            topic="Địa Lý Phúc Âm",
+            difficulty=2,
+            description="Ghép nối mỗi phép lạ vĩ đại của Chúa Giê-xu với địa danh xảy ra sự kiện đó.",
+            pairs=[
+                MatchPairItem(
+                    id="m3-1",
+                    left_text="Hóa nước thành rượu ngon tại tiệc cưới",
+                    left_subtext="Dấu lạ đầu tiên bày tỏ vinh hiển",
+                    right_text="Ca-na xứ Ga-li-lê",
+                    right_subtext="Vùng đồi phía bắc Na-xa-rét",
+                    scripture="Giăng 2:1-11",
+                    explanation="Tại tiệc cưới làng Ca-na, Chúa Giê-xu làm phép lạ đầu tiên biến 6 ché nước lã thành rượu hảo hạng, khiến các môn đồ tin nhận Ngài."
+                ),
+                MatchPairItem(
+                    id="m3-2",
+                    left_text="Kêu La-xa-rơ sống lại sau 4 ngày trong mộ",
+                    left_subtext="Chiến thắng sự chết thuộc thể",
+                    right_text="Làng Bê-tha-ni",
+                    right_subtext="Cách Giê-ru-sa-lem chừng 3 km",
+                    scripture="Giăng 11:1-44",
+                    explanation="Tại Bê-tha-ni, trước sự chứng kiến của nhiều người Do Thái, Chúa Giê-xu phán: 'La-xa-rơ, hãy ra!' và người chết liền bước ra khỏi mộ."
+                ),
+                MatchPairItem(
+                    id="m3-3",
+                    left_text="Chữa lành người bại liệt 38 năm",
+                    left_subtext="Tại hồ nước có năm vòm cửa",
+                    right_text="Hồ Bê-tết-đa (Giê-ru-sa-lem)",
+                    right_subtext="Gần Cửa Chiên",
+                    scripture="Giăng 5:1-9",
+                    explanation="Bên hồ Bê-tết-đa (Nhà Của Lòng Thương Xót), Chúa truyền cho người bại: 'Hãy đứng dậy, vác giường ngươi và đi!', chữa lành hoàn toàn một căn bệnh 38 năm."
+                ),
+                MatchPairItem(
+                    id="m3-4",
+                    left_text="Dẹp yên cơn bão tố cuồng phong dữ dội",
+                    left_subtext="Ngay cả gió và biển cũng vâng lệnh",
+                    right_text="Biển Ga-li-lê (Hồ Ti-bê-ri-át)",
+                    right_subtext="Vùng trũng 200m dưới mực nước biển",
+                    scripture="Ma-thi-ơ 8:23-27",
+                    explanation="Chúa Giê-xu quở gió và biển rằng: 'Hãy êm đi, lặng đi!', lập tức gió lặng như tờ, minh chứng Ngài là Đấng Tạo Hóa tể trị thiên nhiên."
+                ),
+                MatchPairItem(
+                    id="m3-5",
+                    left_text="Chúa Giê-xu giáng sinh trong máng cỏ chuồng chiên",
+                    left_subtext="Ứng nghiệm lời tiên tri Mi-chê",
+                    right_text="Bết-lê-hem xứ Giu-đê",
+                    right_subtext="Quê hương của Vua Đa-vít",
+                    scripture="Mi-chê 5:2; Lu-ca 2:1-7",
+                    explanation="Chúa Cứu Thế giáng sinh tại Bết-lê-hem ('Nhà Bánh') nghèo hèn, ứng nghiệm chính xác lời tiên tri Mi-chê đã chép hơn 700 năm trước."
+                )
+            ]
+        ),
+        MatchChallengeItem(
+            id="match-4",
+            title="Từ Ngữ Căn Nguyên Văn & Ý Nghĩa Thần Học",
+            topic="Nguyên Ngữ Strong",
+            difficulty=3,
+            description="Ghép nối từ ngữ căn Hy Lạp / Hê-bơ-rơ với định nghĩa cứu rỗi chính yếu.",
+            pairs=[
+                MatchPairItem(
+                    id="m4-1",
+                    left_text="Agape (ἀγάπη - G0026)",
+                    left_subtext="Tiếng Hy Lạp Tân Ước",
+                    right_text="Tình yêu hy sinh, tự nguyện vô điều kiện của Đức Chúa Trời",
+                    right_subtext="I Cô-rinh-tô 13; Giăng 3:16",
+                    scripture="I Giăng 4:8-10",
+                    explanation="Agape là tình yêu thần thượng xuất phát từ bản tính của Chúa, yêu thương và hy sinh chính Con Một vì kẻ có tội ngay khi họ còn là kẻ thù."
+                ),
+                MatchPairItem(
+                    id="m4-2",
+                    left_text="Charis (χάρις - G5485)",
+                    left_subtext="Tiếng Hy Lạp Tân Ước",
+                    right_text="Ân điển, ơn lành nhưng không mà con người không xứng đáng",
+                    right_subtext="Ê-phê-sô 2:8-9",
+                    scripture="Ê-phê-sô 2:8",
+                    explanation="Charis là ơn phước nhưng không, hoàn toàn bởi lòng rộng rãi của Thiên Chúa ban tặng cho con người mà không do công đức của bất kỳ ai."
+                ),
+                MatchPairItem(
+                    id="m4-3",
+                    left_text="Logos (λόγος - G3056)",
+                    left_subtext="Tiếng Hy Lạp Tân Ước",
+                    right_text="Ngôi Lời hằng sống, Đấng hiện hữu từ ban đầu hóa thành xác thịt",
+                    right_subtext="Giăng 1:1, 14",
+                    scripture="Giăng 1:1",
+                    explanation="Logos không chỉ là lời nói, mà là chính Ngôi Lời Thần Thượng - Chúa Cứu Thế Giê-xu, Đấng mặc khải trọn vẹn Đức Chúa Trời cho nhân loại."
+                ),
+                MatchPairItem(
+                    id="m4-4",
+                    left_text="Shalom (שָׁלוֹם - H7965)",
+                    left_subtext="Tiếng Hê-bơ-rơ Cựu Ước",
+                    right_text="Sự bình an trọn vẹn, trật tự, hòa thuận và an khang toàn diện",
+                    right_subtext="Dân-số Ký 6:26; Ê-sai 9:6",
+                    scripture="Ê-sai 26:3",
+                    explanation="Shalom vượt trên sự vắng bóng chiến tranh; đó là sự an khang thịnh vượng, lành lặn và hài hòa trọn vẹn trong mối liên hệ với Thiên Chúa."
+                ),
+                MatchPairItem(
+                    id="m4-5",
+                    left_text="Hesed (חֶסֶד - H2617)",
+                    left_subtext="Tiếng Hê-bơ-rơ Cựu Ước",
+                    right_text="Tình yêu giao ước kiên định, lòng thương xót và thành tín đời đời",
+                    right_subtext="Thi-thiên 136; Xuất 34:6",
+                    scripture="Thi-thiên 136:1",
+                    explanation="Hesed là tình yêu trung kiên trong giao ước của Đức Giê-hô-va đối với dân Ngài, không bao giờ thay đổi dẫu con người có bội ước."
+                )
+            ]
+        )
+    ]
+    return challenges
+
+
+

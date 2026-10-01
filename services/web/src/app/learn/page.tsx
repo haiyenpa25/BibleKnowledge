@@ -30,8 +30,28 @@ import {
   AlertCircle,
   UserCheck,
   Eye,
-  Compass
+  Compass,
+  Link2
 } from "lucide-react";
+
+interface MatchPair {
+  id: string;
+  left_text: string;
+  left_subtext?: string;
+  right_text: string;
+  right_subtext?: string;
+  scripture: string;
+  explanation: string;
+}
+
+interface MatchChallenge {
+  id: string;
+  title: string;
+  topic: string;
+  difficulty: number;
+  description: string;
+  pairs: MatchPair[];
+}
 
 interface WhoAmIClue {
   order: number;
@@ -121,7 +141,21 @@ interface TimelineChallenge {
 }
 
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
+
+  // Match Game Mode State (§3)
+  const [matchChallenges, setMatchChallenges] = useState<MatchChallenge[]>([]);
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchLeftItems, setMatchLeftItems] = useState<Array<{ id: string; text: string; subtext?: string }>>([]);
+  const [matchRightItems, setMatchRightItems] = useState<Array<{ id: string; text: string; subtext?: string; pairId: string }>>([]);
+  const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
+  const [selectedRightId, setSelectedRightId] = useState<string | null>(null);
+  const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
+  const [mismatchEffect, setMismatchEffect] = useState(false);
+  const [matchFinished, setMatchFinished] = useState(false);
+  const [matchRoundScore, setMatchRoundScore] = useState(0);
+  const [lastMatchedPair, setLastMatchedPair] = useState<MatchPair | null>(null);
 
   // User Profile Gamification State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -397,6 +431,125 @@ export default function LearnPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ points: 50, quiz_completed: true })
       }).then(() => fetchProfile());
+    }
+  };
+
+  // Helper to setup a round of match challenge with randomized right column
+  const setupMatchRound = (challenge: MatchChallenge) => {
+    const lefts = challenge.pairs.map((p) => ({
+      id: p.id,
+      text: p.left_text,
+      subtext: p.left_subtext
+    }));
+
+    const rights = challenge.pairs.map((p) => ({
+      id: `r-${p.id}`,
+      pairId: p.id,
+      text: p.right_text,
+      subtext: p.right_subtext
+    }));
+
+    const shuffledRights = [...rights].sort(() => Math.random() - 0.5);
+
+    setMatchLeftItems(lefts);
+    setMatchRightItems(shuffledRights);
+    setSelectedLeftId(null);
+    setSelectedRightId(null);
+    setMatchedPairIds([]);
+    setMismatchEffect(false);
+    setMatchFinished(false);
+    setLastMatchedPair(null);
+  };
+
+  // Fetch Match Challenges
+  const fetchMatchChallenges = async () => {
+    setMatchLoading(true);
+    setMatchIndex(0);
+    setMatchRoundScore(0);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/match-challenges`);
+      if (res.ok) {
+        const data: MatchChallenge[] = await res.json();
+        setMatchChallenges(data);
+        if (data.length > 0) {
+          setupMatchRound(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch match challenges:", err);
+    } finally {
+      setMatchLoading(false);
+    }
+  };
+
+  // Handle Match Selection
+  const handleSelectLeft = (leftId: string) => {
+    if (matchedPairIds.includes(leftId) || mismatchEffect) return;
+    setSelectedLeftId(leftId);
+
+    if (selectedRightId) {
+      checkMatch(leftId, selectedRightId);
+    }
+  };
+
+  const handleSelectRight = (rightId: string, pairId: string) => {
+    if (matchedPairIds.includes(pairId) || mismatchEffect) return;
+    setSelectedRightId(rightId);
+
+    if (selectedLeftId) {
+      checkMatch(selectedLeftId, rightId);
+    }
+  };
+
+  const checkMatch = async (leftId: string, rightId: string) => {
+    const rightItem = matchRightItems.find((r) => r.id === rightId);
+    if (!rightItem) return;
+
+    const currentChallenge = matchChallenges[matchIndex];
+    const isCorrect = leftId === rightItem.pairId;
+
+    if (isCorrect) {
+      const newMatched = [...matchedPairIds, leftId];
+      setMatchedPairIds(newMatched);
+      setSelectedLeftId(null);
+      setSelectedRightId(null);
+      setMatchRoundScore((prev) => prev + 150);
+
+      const pairDetail = currentChallenge?.pairs.find((p) => p.id === leftId);
+      if (pairDetail) {
+        setLastMatchedPair(pairDetail);
+      }
+
+      if (currentChallenge && newMatched.length >= currentChallenge.pairs.length) {
+        setMatchFinished(true);
+        try {
+          await fetch(`${apiUrl}/api/learn/profile/score`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ points: 250, quiz_completed: true })
+          });
+          fetchProfile();
+        } catch (err) {
+          console.error("Failed to submit match score:", err);
+        }
+      }
+    } else {
+      setMismatchEffect(true);
+      setTimeout(() => {
+        setSelectedLeftId(null);
+        setSelectedRightId(null);
+        setMismatchEffect(false);
+      }, 700);
+    }
+  };
+
+  const handleNextMatchChallenge = () => {
+    if (matchIndex + 1 < matchChallenges.length) {
+      const nextIdx = matchIndex + 1;
+      setMatchIndex(nextIdx);
+      setupMatchRound(matchChallenges[nextIdx]);
+    } else {
+      fetchMatchChallenges();
     }
   };
 
@@ -861,6 +1014,22 @@ export default function LearnPage() {
           <Zap className="w-4 h-4 text-amber-300 fill-amber-400" />
           <span>Đúng / Sai Phản Xạ</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400/30 text-amber-200 font-bold">15s Mới §3</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("match");
+            if (matchChallenges.length === 0) fetchMatchChallenges();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "match"
+              ? "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Link2 className="w-4 h-4 text-teal-300" />
+          <span>Ghép Đôi (Match)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 font-bold">Mới §3</span>
         </button>
 
         <button
@@ -1458,6 +1627,231 @@ export default function LearnPage() {
           ) : (
             <div className="p-12 text-center text-slate-500">
               Không tìm thấy câu hỏi Đúng / Sai nào. Vui lòng thử lại.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 1.75 MATCH GAME MODE (§3 Nối Cặp / Ghép Đôi Thực Thể)                */}
+      {/* ===================================================================== */}
+      {activeTab === "match" && (
+        <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
+          {/* Header Stats Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl glass-panel border border-slate-800 text-xs md:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Chủ đề:</span>
+              <span className="font-bold text-teal-300 bg-teal-500/10 px-3 py-1 rounded-xl border border-teal-500/20">
+                {matchChallenges[matchIndex]?.title || "Ghép Đôi Thực Thể"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Progress Count */}
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800/80 border border-slate-700/60 font-semibold text-slate-300">
+                <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                <span>
+                  {matchedPairIds.length} / {matchChallenges[matchIndex]?.pairs.length || 5} cặp
+                </span>
+              </div>
+
+              {/* Round Score */}
+              <div className="flex items-center gap-1 px-3 py-1 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span>+{matchRoundScore} đ</span>
+              </div>
+            </div>
+          </div>
+
+          {matchLoading ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+              <p className="text-sm font-medium">Đang chuẩn bị bộ thẻ ghép đôi Kinh Thánh...</p>
+            </div>
+          ) : matchFinished ? (
+            /* Round Finished Victory Card */
+            <div className="p-8 md:p-12 rounded-3xl glass-panel border border-teal-500/30 text-center flex flex-col items-center gap-5 animate-in fade-in zoom-in-95">
+              <div className="w-16 h-16 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center border border-teal-500/40">
+                <Award className="w-8 h-8" />
+              </div>
+
+              <div>
+                <h3 className="text-2xl md:text-3xl font-extrabold text-white">Xuất Sắc! Hoàn Thành Vòng Ghép Đôi!</h3>
+                <p className="text-sm text-slate-400 mt-1 max-w-lg">
+                  Bạn đã nối chính xác tất cả {matchChallenges[matchIndex]?.pairs.length || 5} cặp nhân vật và biến cố lịch sử Kinh Thánh.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-2">
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xs text-slate-400">Điểm thưởng vòng này</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">+{matchRoundScore + 250} đ</div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xs text-slate-400">Tổng số cặp hoàn thành</div>
+                  <div className="text-2xl font-black text-teal-400 mt-1">
+                    {matchedPairIds.length} / {matchChallenges[matchIndex]?.pairs.length || 5}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={handleNextMatchChallenge}
+                  className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-teal-600/30"
+                >
+                  <span>{matchIndex + 1 < matchChallenges.length ? "Vòng Thử Thách Tiếp Theo" : "Chơi Lại Từ Đầu"}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <Link
+                  href="/explore"
+                  className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm flex items-center gap-2 transition-colors border border-slate-700"
+                >
+                  <Compass className="w-4 h-4" /> Mở Đồ Thị Tri Thức
+                </Link>
+              </div>
+            </div>
+          ) : matchChallenges.length > 0 && matchChallenges[matchIndex] ? (
+            /* Interactive Match Game Board */
+            <div className="flex flex-col gap-6">
+              {/* Progress Line */}
+              <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-500"
+                  style={{
+                    width: `${(matchedPairIds.length / (matchChallenges[matchIndex].pairs.length || 5)) * 100}%`
+                  }}
+                />
+              </div>
+
+              {/* Instructions */}
+              <div className="text-center text-xs text-slate-400">
+                Nhấp chọn một mục ở cột <strong className="text-teal-300">Bên Trái</strong>, sau đó chọn mục tương ứng ở cột <strong className="text-emerald-300">Bên Phải</strong> để ghép đôi.
+              </div>
+
+              {/* Two Column Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Column A: Left Items */}
+                <div className="flex flex-col gap-3">
+                  <div className="text-xs uppercase font-bold tracking-wider text-teal-400 px-2 flex items-center gap-1.5">
+                    <span>Cột A: Thực Thể / Nhân Vật</span>
+                  </div>
+                  {matchLeftItems.map((item) => {
+                    const isMatched = matchedPairIds.includes(item.id);
+                    const isSelected = selectedLeftId === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        disabled={isMatched}
+                        onClick={() => handleSelectLeft(item.id)}
+                        className={`p-4 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
+                          isMatched
+                            ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-200 cursor-default opacity-85 shadow-sm"
+                            : isSelected
+                            ? "bg-teal-600 text-white border-teal-300 ring-4 ring-teal-500/30 scale-[1.02] shadow-lg shadow-teal-600/30 font-semibold"
+                            : mismatchEffect && isSelected
+                            ? "bg-rose-900/60 border-rose-500 text-white"
+                            : "bg-slate-900/80 border-slate-800 text-slate-200 hover:border-teal-500/50 hover:bg-slate-800/80"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold text-sm md:text-base">{item.text}</div>
+                          {item.subtext && (
+                            <div className={`text-[11px] mt-0.5 ${isSelected ? "text-teal-100" : "text-teal-400"}`}>
+                              {item.subtext}
+                            </div>
+                          )}
+                        </div>
+                        {isMatched ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                        ) : (
+                          <div
+                            className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors ${
+                              isSelected ? "border-white bg-white" : "border-slate-600"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Column B: Right Items (Shuffled) */}
+                <div className="flex flex-col gap-3">
+                  <div className="text-xs uppercase font-bold tracking-wider text-emerald-400 px-2 flex items-center gap-1.5">
+                    <span>Cột B: Biến Cố / Địa Danh / Câu Gốc</span>
+                  </div>
+                  {matchRightItems.map((item) => {
+                    const isMatched = matchedPairIds.includes(item.pairId);
+                    const isSelected = selectedRightId === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        disabled={isMatched}
+                        onClick={() => handleSelectRight(item.id, item.pairId)}
+                        className={`p-4 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
+                          isMatched
+                            ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-200 cursor-default opacity-85 shadow-sm"
+                            : isSelected
+                            ? "bg-teal-600 text-white border-teal-300 ring-4 ring-teal-500/30 scale-[1.02] shadow-lg shadow-teal-600/30 font-semibold"
+                            : mismatchEffect && isSelected
+                            ? "bg-rose-900/60 border-rose-500 text-white"
+                            : "bg-slate-900/80 border-slate-800 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-800/80"
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="text-xs md:text-sm font-medium leading-relaxed">{item.text}</div>
+                          {item.subtext && (
+                            <div className={`text-[11px] mt-0.5 font-serif italic ${isSelected ? "text-teal-100" : "text-slate-400"}`}>
+                              {item.subtext}
+                            </div>
+                          )}
+                        </div>
+                        {isMatched ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                        ) : (
+                          <div
+                            className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors ${
+                              isSelected ? "border-white bg-white" : "border-slate-600"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Real-time Theological Explanation when Pair is Matched */}
+              {lastMatchedPair && (
+                <div className="p-5 rounded-2xl glass-panel border border-emerald-500/40 flex flex-col gap-2.5 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] uppercase font-bold text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Đã ghép đúng: {lastMatchedPair.left_text} ↔ {lastMatchedPair.right_text}</span>
+                    </span>
+                    <Link
+                      href={`/bible?ref=${encodeURIComponent(lastMatchedPair.scripture)}`}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>{lastMatchedPair.scripture} →</span>
+                    </Link>
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed font-sans pt-1 border-t border-slate-800">
+                    {lastMatchedPair.explanation}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-12 text-center text-slate-500">
+              Không tìm thấy thử thách nối cặp nào. Vui lòng thử lại.
             </div>
           )}
         </div>
