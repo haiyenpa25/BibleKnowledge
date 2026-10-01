@@ -189,10 +189,16 @@ export default function Home() {
               <BookOpen className="w-4 h-4" /> Đọc Kinh Thánh (66 Sách) →
             </a>
             <a 
+              href="/learn"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-sm transition-all shadow-lg shadow-amber-600/30"
+            >
+              <GraduationCap className="w-4 h-4" /> Học Tập & Đố Vui (Learn) →
+            </a>
+            <a 
               href="/research"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
             >
-              <BrainCircuit className="w-4 h-4" /> Nghiên Cứu Thần Học AI (RAG) →
+              <BrainCircuit className="w-4 h-4" /> Nghiên Cứu AI (RAG) →
             </a>
             <a 
               href="http://localhost:8000/docs" 
@@ -200,7 +206,7 @@ export default function Home() {
               rel="noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-slate-300 hover:text-white font-medium text-sm transition-all"
             >
-              <Server className="w-4 h-4" /> FastAPI Swagger Docs <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+              <Server className="w-4 h-4" /> Swagger Docs <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </a>
           </div>
         </div>
@@ -217,21 +223,23 @@ export default function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Layer 1: Learn */}
-          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-amber-500">
+          <a href="/learn" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Tầng 1</div>
-              <h4 className="text-lg font-bold text-white mt-1">Học Tập (Learn)</h4>
+              <h4 className="text-lg font-bold text-white mt-1 group-hover:text-amber-300 transition-colors flex items-center justify-between">
+                Học Tập (Learn) <span>→</span>
+              </h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Trắc nghiệm ABCD, Đố vui nhân vật (Who am I?), Thử thách thuộc lòng câu gốc, Flashcards thuật toán lặp lại ngắt quãng (SM-2 / FSRS).
+                Trắc nghiệm ABCD, Đố vui nhân vật (Who am I?), Thử thách thuộc lòng câu gốc, Flashcards thuật toán lặp lại ngắt quãng (SM-2).
               </p>
             </div>
-            <div className="pt-3 border-t border-slate-800 text-xs text-slate-400 font-medium">
-              Chế độ Gamification & Tiến độ
+            <div className="pt-3 border-t border-slate-800 text-xs text-amber-400/80 font-medium">
+              Chế độ Gamification & Tiến độ →
             </div>
-          </div>
+          </a>
 
           {/* Layer 2: Explore */}
           <a href="/bible" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-blue-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
