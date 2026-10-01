@@ -27,8 +27,64 @@ import {
   Check,
   Zap,
   HelpCircle,
-  X
+  X,
+  Download,
+  Copy,
+  Printer,
+  FileDown,
+  Scroll,
+  Share2
 } from "lucide-react";
+
+interface ExpositoryPoint {
+  point_number: number;
+  title: string;
+  scripture_ref: string;
+  verse_text: string;
+  original_language_key?: string;
+  exposition: string;
+  illustration?: string;
+}
+
+interface ExpositoryCitation {
+  source_title: string;
+  author?: string;
+  quote: string;
+}
+
+interface SermonBuilderResult {
+  passage_ref: string;
+  title: string;
+  key_verse: string;
+  key_verse_text: string;
+  big_idea: string;
+  introduction_and_hook: string;
+  historical_context: string;
+  points: ExpositoryPoint[];
+  practical_applications: string[];
+  conclusion_and_call: string;
+  theological_citations: ExpositoryCitation[];
+  markdown_manuscript: string;
+  saved_project_id?: string;
+}
+
+interface SermonPreset {
+  id: string;
+  passage_ref: string;
+  title: string;
+  theme: string;
+  audience: string;
+  summary: string;
+}
+
+interface StudyBundleData {
+  summary: {
+    total_notes: number;
+    total_bookmarks: number;
+    total_projects: number;
+  };
+  markdown_bundle: string;
+}
 
 interface LexiconItem {
   id: string;
@@ -94,7 +150,25 @@ interface StudyProject {
 }
 
 export default function StudyPage() {
-  const [activeTab, setActiveTab] = useState<"lexicon" | "passage" | "notes" | "projects">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "sermon" | "lexicon" | "passage" | "notes">("projects");
+
+  // Sermon Builder State (§50)
+  const [sermonPresets, setSermonPresets] = useState<SermonPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("preset-romans-8");
+  const [sermonPassageRef, setSermonPassageRef] = useState<string>("Rô-ma 8:31-39");
+  const [sermonAudience, setSermonAudience] = useState<string>("Hội Thánh Chúa Nhật");
+  const [sermonTheme, setSermonTheme] = useState<string>("");
+  const [sermonResult, setSermonResult] = useState<SermonBuilderResult | null>(null);
+  const [loadingSermon, setLoadingSermon] = useState<boolean>(false);
+  const [sermonError, setSermonError] = useState<string | null>(null);
+  const [copiedSermon, setCopiedSermon] = useState<boolean>(false);
+  const [savedSermonMsg, setSavedSermonMsg] = useState<string | null>(null);
+
+  // Study Bundle Export Modal State (§50)
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
+  const [bundleData, setBundleData] = useState<StudyBundleData | null>(null);
+  const [loadingBundle, setLoadingBundle] = useState<boolean>(false);
+  const [copiedBundle, setCopiedBundle] = useState<boolean>(false);
 
   // Lexicon State
   const [lexiconList, setLexiconList] = useState<LexiconItem[]>([]);
@@ -200,11 +274,136 @@ export default function StudyPage() {
     }
   };
 
+  // Fetch Sermon Presets
+  const fetchSermonPresets = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermon-presets`);
+      if (res.ok) {
+        const data = await res.json();
+        setSermonPresets(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sermon presets:", err);
+    }
+  };
+
   useEffect(() => {
     fetchLexicon();
     fetchNotes();
     fetchProjects();
+    fetchSermonPresets();
   }, [apiUrl]);
+
+  // Build Sermon
+  const handleBuildSermon = async (overrideRef?: string, overrideAudience?: string, overrideTheme?: string, saveProj: boolean = false) => {
+    const targetRef = overrideRef || sermonPassageRef;
+    if (!targetRef.trim()) return;
+    setLoadingSermon(true);
+    setSermonError(null);
+    setSavedSermonMsg(null);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermon-builder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passage_ref: targetRef.trim(),
+          audience: overrideAudience || sermonAudience,
+          theme_topic: overrideTheme !== undefined ? overrideTheme : sermonTheme,
+          save_as_project: saveProj
+        })
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Không thể khởi tạo đề cương bài giảng.");
+      }
+
+      const data: SermonBuilderResult = await res.json();
+      setSermonResult(data);
+      if (saveProj && data.saved_project_id) {
+        setSavedSermonMsg("Đã lưu bản thảo bài giảng thành dự án nghiên cứu mới!");
+        fetchProjects();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi gọi AI soạn bài giảng.";
+      setSermonError(msg);
+    } finally {
+      setLoadingSermon(false);
+    }
+  };
+
+  // Select Preset
+  const handleSelectPreset = (p: SermonPreset) => {
+    setSelectedPresetId(p.id);
+    setSermonPassageRef(p.passage_ref);
+    setSermonAudience(p.audience);
+    setSermonTheme(p.title);
+    handleBuildSermon(p.passage_ref, p.audience, p.title, false);
+  };
+
+  // Copy Sermon
+  const handleCopySermon = () => {
+    if (!sermonResult) return;
+    navigator.clipboard.writeText(sermonResult.markdown_manuscript);
+    setCopiedSermon(true);
+    setTimeout(() => setCopiedSermon(false), 2500);
+  };
+
+  // Download Sermon Markdown
+  const handleDownloadSermon = () => {
+    if (!sermonResult) return;
+    const blob = new Blob([sermonResult.markdown_manuscript], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const cleanName = (sermonResult.title || "Bai_Giang").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+    link.download = `${cleanName}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Print Sermon
+  const handlePrintSermon = () => {
+    window.print();
+  };
+
+  // Open Bundle Export
+  const handleOpenBundleExport = async () => {
+    setIsBundleModalOpen(true);
+    setLoadingBundle(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/export-bundle`);
+      if (res.ok) {
+        const data = await res.json();
+        setBundleData(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch study bundle:", err);
+    } finally {
+      setLoadingBundle(false);
+    }
+  };
+
+  // Download Bundle File
+  const handleDownloadBundle = () => {
+    if (!bundleData) return;
+    const blob = new Blob([bundleData.markdown_bundle], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `So_Tay_Nghien_Cuu_Kinh_Thanh_${new Date().toISOString().slice(0, 10)}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Copy Bundle
+  const handleCopyBundle = () => {
+    if (!bundleData) return;
+    navigator.clipboard.writeText(bundleData.markdown_bundle);
+    setCopiedBundle(true);
+    setTimeout(() => setCopiedBundle(false), 2500);
+  };
 
   // Passage Study Submit
   const handlePassageStudy = async () => {
@@ -504,13 +703,22 @@ export default function StudyPage() {
               Xưởng Nghiên Cứu Thần Học (Study Workspace)
             </h1>
             <p className="text-xs text-slate-400">
-              Dự án nghiên cứu chuyên đề • Từ điển Strong Hy Lạp/Hê-bơ-rơ • Phân tích giải kinh • Sổ tay cá nhân
+              Dự án nghiên cứu chuyên đề • Soạn bài giảng giải kinh • Từ điển Strong Hy Lạp/Hê-bơ-rơ • Sổ tay cá nhân
             </p>
           </div>
         </div>
 
-        {/* Tab Badges */}
+        {/* Action Controls & Tab Badges */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Workspace Bundle Exporter (§48, §50) */}
+          <button
+            onClick={handleOpenBundleExport}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-600/30 to-amber-700/20 hover:from-amber-600/40 hover:to-amber-700/30 text-amber-300 border border-amber-500/40 shadow-sm transition-all hover:scale-105 mr-1"
+            title="Xuất toàn bộ ghi chú, câu đánh dấu và dự án nghiên cứu thành tệp Markdown"
+          >
+            <FileDown className="w-4 h-4 text-amber-400" /> Xuất Sổ Tay (.MD)
+          </button>
+
           <button
             onClick={() => setActiveTab("projects")}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
@@ -519,7 +727,22 @@ export default function StudyPage() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
             }`}
           >
-            <FolderGit2 className="w-4 h-4" /> Dự Án Nghiên Cứu ({projects.length})
+            <FolderGit2 className="w-4 h-4" /> Dự Án ({projects.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("sermon");
+              if (!sermonResult && sermonPresets.length > 0) {
+                handleSelectPreset(sermonPresets[0]);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "sermon"
+                ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" /> Soạn Bài Giảng (§50)
           </button>
           <button
             onClick={() => setActiveTab("lexicon")}
@@ -529,7 +752,7 @@ export default function StudyPage() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
             }`}
           >
-            <Languages className="w-4 h-4" /> Từ Điển Nguyên Ngữ
+            <Languages className="w-4 h-4" /> Từ Điển Strong
           </button>
           <button
             onClick={() => setActiveTab("passage")}
@@ -539,7 +762,7 @@ export default function StudyPage() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
             }`}
           >
-            <BookOpen className="w-4 h-4" /> Phân Tích Đoạn Văn
+            <BookOpen className="w-4 h-4" /> Giải Kinh Đoạn Văn
           </button>
           <button
             onClick={() => setActiveTab("notes")}
@@ -549,7 +772,7 @@ export default function StudyPage() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
             }`}
           >
-            <FileText className="w-4 h-4" /> Sổ Tay Ghi Chú ({notes.length})
+            <FileText className="w-4 h-4" /> Sổ Tay ({notes.length})
           </button>
         </div>
       </header>
@@ -684,6 +907,23 @@ export default function StudyPage() {
                       >
                         {exportingFlashcards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-emerald-400" />}
                         <span>Xuất Flashcard</span>
+                      </button>
+
+                      {/* Convert to Sermon Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const firstV = selectedProject.pinned_verses?.[0]?.reference || selectedProject.title;
+                          setSermonPassageRef(firstV);
+                          setSermonTheme(selectedProject.title);
+                          setActiveTab("sermon");
+                          handleBuildSermon(firstV, sermonAudience, selectedProject.title, false);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/40 text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="Tạo đề cương bài giảng giải kinh từ dự án này"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Soạn Bài Giảng</span>
                       </button>
                     </div>
                   </div>
@@ -938,7 +1178,383 @@ export default function StudyPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* 2. STRONG LEXICON (ORIGINAL LANGUAGES) */}
+      {/* 2. EXPOSITORY PREACHING & SERMON BUILDER (§50) */}
+      {/* ===================================================================== */}
+      {activeTab === "sermon" && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner / Introduction */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-rose-950/40 via-purple-950/30 to-slate-900/60 p-5 rounded-3xl border border-rose-900/40 shadow-xl">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  Expository Homiletics Engine §50
+                </span>
+                <span className="text-xs text-slate-400">• Chuẩn 66 Sách Chính Kinh 1925</span>
+              </div>
+              <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" /> Công Cụ Soạn Bài Giảng & Bài Dạy Giải Kinh
+              </h2>
+              <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                Thiết kế cấu trúc bài giảng giải kinh chuẩn mực: Câu gốc, Ý niệm cốt lõi (Big Idea), Dẫn nhập bối cảnh lịch sử, 
+                các luận điểm phân tích nguyên văn Hy Lạp/Hê-bơ-rơ, minh họa thực tế, ứng dụng và trích dẫn tài liệu thần học.
+              </p>
+            </div>
+            {sermonResult && (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopySermon}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700 shadow-sm"
+                  title="Sao chép toàn bộ bản thảo định dạng Markdown"
+                >
+                  {copiedSermon ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                  <span>{copiedSermon ? "Đã Sao Chép!" : "Sao Chép MD"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadSermon}
+                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/30"
+                  title="Tải tệp Markdown (.md) về máy"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Tải Tệp .MD</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintSermon}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all border border-slate-700"
+                  title="In bản thảo bài giảng hoặc xuất PDF"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Classical Blueprints Carousel / Preset Cards */}
+          <div className="flex flex-col gap-2.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Scroll className="w-4 h-4 text-amber-400" /> Mẫu Giảng Giải Kinh Kinh Điển (Chọn để tải ngay đề cương):
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {sermonPresets.map((p) => {
+                const isSelected = selectedPresetId === p.id && sermonResult?.passage_ref === p.passage_ref;
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectPreset(p)}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between gap-2 text-left ${
+                      isSelected
+                        ? "bg-rose-950/40 border-rose-500/70 shadow-lg shadow-rose-950/50"
+                        : "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">
+                          {p.passage_ref}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{p.audience}</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-white line-clamp-1 mt-1">{p.title}</h4>
+                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{p.summary}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-amber-400 font-medium">
+                      <span>{p.theme}</span>
+                      <span className="text-slate-500">Xem ngay →</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Custom Input Form */}
+          <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col gap-4 shadow-md">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-400" /> Phân đoạn Kinh Thánh (Passage Reference) *
+                </label>
+                <input
+                  type="text"
+                  value={sermonPassageRef}
+                  onChange={(e) => setSermonPassageRef(e.target.value)}
+                  placeholder="Ví dụ: Rô-ma 8:31-39, Giăng 15:1-8, Thi-thiên 23..."
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 font-semibold"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-emerald-400" /> Đối tượng người nghe (Audience)
+                </label>
+                <select
+                  value={sermonAudience}
+                  onChange={(e) => setSermonAudience(e.target.value)}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500 font-semibold"
+                >
+                  <option value="Hội Thánh Chúa Nhật">Hội Thánh Chúa Nhật (Toàn thể)</option>
+                  <option value="Ban Thanh Niên & Tráng Niên">Ban Thanh Niên & Tráng Niên</option>
+                  <option value="Lớp Học Kinh Thánh & Điểm Nhóm">Lớp Học Kinh Thánh & Điểm Nhóm</option>
+                  <option value="Ban Phụ Nữ / Tráng Niên">Ban Phụ Nữ / Tráng Niên</option>
+                  <option value="Hội Thảo Thần Học & Mục Vụ">Hội Thảo Thần Học & Mục Vụ</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Chủ đề / Tiêu đề gợi ý (Tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  value={sermonTheme}
+                  onChange={(e) => setSermonTheme(e.target.value)}
+                  placeholder="Để trống để AI tự động trích xuất theo bối cảnh..."
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+              <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                <span>💡 Gợi ý nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => { setSermonPassageRef("Rô-ma 8:31-39"); setSermonTheme("Đắc Thắng Vượt Trội"); }}
+                  className="underline text-rose-400 hover:text-rose-300"
+                >
+                  Rô-ma 8:31-39
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => { setSermonPassageRef("Giăng 15:1-8"); setSermonTheme("Cứ Ở Trong Gốc Nho"); }}
+                  className="underline text-blue-400 hover:text-blue-300"
+                >
+                  Giăng 15:1-8
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => { setSermonPassageRef("Thi-thiên 23:1-6"); setSermonTheme("Đấng Chăn Giữ Tôi"); }}
+                  className="underline text-amber-400 hover:text-amber-300"
+                >
+                  Thi-thiên 23
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => { setSermonPassageRef("Gia-cơ 1:2-12"); setSermonTheme("Đức Tin Trưởng Thành"); }}
+                  className="underline text-emerald-400 hover:text-emerald-300"
+                >
+                  Gia-cơ 1:2-12
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  disabled={loadingSermon || !sermonPassageRef.trim()}
+                  onClick={() => handleBuildSermon(sermonPassageRef, sermonAudience, sermonTheme, false)}
+                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-600/30 disabled:opacity-50"
+                >
+                  {loadingSermon ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+                  <span>{loadingSermon ? "Đang Khảo Luận Giải Kinh..." : "Lập Đề Cương Bài Giảng"}</span>
+                </button>
+              </div>
+            </div>
+
+            {sermonError && (
+              <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                <X className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{sermonError}</span>
+              </div>
+            )}
+            {savedSermonMsg && (
+              <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{savedSermonMsg}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Results: Expository Sermon Display */}
+          {sermonResult && (
+            <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+              {/* Big Idea & Key Verse Hero */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-rose-950/40 via-purple-950/30 to-slate-900 border border-rose-500/40 shadow-xl flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-300 px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/30">
+                      Ý Niệm Cốt Lõi (The Big Idea)
+                    </span>
+                    <h3 className="text-lg md:text-xl font-black text-white mt-1">
+                      {sermonResult.title}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleBuildSermon(sermonPassageRef, sermonAudience, sermonTheme, true)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                      title="Lưu bản thảo này vào danh sách Dự Án Nghiên Cứu"
+                    >
+                      <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Lưu Vào Dự Án</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-black/40 border border-rose-500/30 text-rose-200 text-xs md:text-sm font-serif italic leading-relaxed">
+                  &ldquo;{sermonResult.big_idea}&rdquo;
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-medium">Câu gốc trọng tâm:</span>
+                    <span className="font-bold text-amber-400">{sermonResult.key_verse}</span>
+                  </div>
+                  <p className="text-slate-300 italic font-serif line-clamp-1">
+                    &ldquo;{sermonResult.key_verse_text}&rdquo;
+                  </p>
+                </div>
+              </div>
+
+              {/* Section I: Introduction & Historical Context */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Dẫn Nhập & Cầu Nối Cảm Xúc (Introduction & Hook)
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line">
+                    {sermonResult.introduction_and_hook}
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5" /> Bối Cảnh Lịch Sử & Thần Học (Occasion & Setting)
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line">
+                    {sermonResult.historical_context}
+                  </p>
+                </div>
+              </div>
+
+              {/* Section II: Expository Points */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-amber-400" /> Các Luận Điểm Giảng Giải Chi Tiết ({sermonResult.points.length} Điểm):
+                  </h4>
+                  <span className="text-[10px] text-slate-400">Phân tích văn mạch & ngữ nghĩa nguyên ngữ</span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {sermonResult.points.map((pt) => (
+                    <div
+                      key={pt.point_number}
+                      className="p-5 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-3.5 shadow-md hover:border-slate-700 transition-all"
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-full bg-rose-600/30 text-rose-300 border border-rose-500/40 flex items-center justify-center font-bold text-xs shrink-0">
+                            {pt.point_number}
+                          </span>
+                          <h5 className="text-sm font-bold text-white">{pt.title}</h5>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-blue-300 border border-slate-700">
+                            {pt.scripture_ref}
+                          </span>
+                          {pt.original_language_key && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/60">
+                              {pt.original_language_key}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Scripture Verse Text */}
+                      <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs text-slate-300 font-serif italic leading-relaxed">
+                        &ldquo;{pt.verse_text}&rdquo;
+                      </div>
+
+                      {/* Exposition */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Giải Kinh:</span>
+                        <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                          {pt.exposition}
+                        </p>
+                      </div>
+
+                      {/* Real Life Illustration */}
+                      {pt.illustration && (
+                        <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-900/40 text-xs text-amber-200 flex items-start gap-2">
+                          <span className="font-bold text-[10px] uppercase text-amber-400 shrink-0 mt-0.5">Minh Họa:</span>
+                          <span className="font-sans leading-relaxed">{pt.illustration}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section III: Practical Applications & Spiritual Call */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Practical Applications */}
+                <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Ứng Dụng Thực Tiễn Cho Đời Sống Cơ Đốc
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    {sermonResult.practical_applications.map((app, idx) => (
+                      <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
+                        <span className="w-5 h-5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed font-sans">{app}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Conclusion & Call */}
+                <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between gap-3">
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-rose-400" /> Kết Luận & Lời Kêu Gọi Đáp Ứng
+                    </h4>
+                    <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line p-3.5 rounded-2xl bg-black/30 border border-slate-800/80">
+                      {sermonResult.conclusion_and_call}
+                    </p>
+                  </div>
+
+                  {/* Commentary Citations */}
+                  <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Trích dẫn học thuật từ 275 sách giải kinh:
+                    </span>
+                    <div className="flex flex-col gap-1.5">
+                      {sermonResult.theological_citations.slice(0, 2).map((cit, i) => (
+                        <div key={i} className="text-[11px] text-slate-400 leading-relaxed">
+                          <span className="text-slate-200 font-semibold">• {cit.source_title} ({cit.author}): </span>
+                          <span className="italic">{cit.quote}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 3. STRONG LEXICON (ORIGINAL LANGUAGES) */}
       {/* ===================================================================== */}
       {activeTab === "lexicon" && (
         <div className="flex flex-col gap-6">
@@ -1423,6 +2039,82 @@ export default function StudyPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Study Workspace Bundle Export (§48, §50) */}
+      {isBundleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-slate-700 max-w-2xl w-full rounded-3xl p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <FileDown className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Xuất Sổ Tay & Không Gian Nghiên Cứu (.MD)</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsBundleModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {loadingBundle ? (
+              <div className="p-12 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                <span>Đang tổng hợp toàn bộ ghi chú cá nhân, các câu đánh dấu và đề cương dự án nghiên cứu...</span>
+              </div>
+            ) : bundleData ? (
+              <div className="flex flex-col gap-4">
+                {/* Metric Summary */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Ghi Chú Cá Nhân</span>
+                    <p className="text-base font-bold text-emerald-400">{bundleData.summary.total_notes}</p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Câu Đã Đánh Dấu</span>
+                    <p className="text-base font-bold text-blue-400">{bundleData.summary.total_bookmarks}</p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-center">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Dự Án Nghiên Cứu</span>
+                    <p className="text-base font-bold text-amber-400">{bundleData.summary.total_projects}</p>
+                  </div>
+                </div>
+
+                {/* Markdown Preview Box */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-slate-300">Xem trước văn bản Markdown tổng hợp:</span>
+                  <div className="p-3.5 rounded-2xl bg-black/60 border border-slate-800 max-h-60 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
+                    {bundleData.markdown_bundle}
+                  </div>
+                </div>
+
+                {/* Modal Actions */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={handleCopyBundle}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5"
+                  >
+                    {copiedBundle ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedBundle ? "Đã Sao Chép!" : "Sao Chép Markdown"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadBundle}
+                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-600/30"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Tải Tệp Markdown (.md)</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-rose-400">Không thể tải dữ liệu nghiên cứu.</div>
+            )}
           </div>
         </div>
       )}

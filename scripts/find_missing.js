@@ -279,13 +279,17 @@ async function main() {
   let journeysCount = 0;
   let challengePacksCount = 0;
   let flashcardsExportOk = false;
+  let sermonPresetsCount = 0;
+  let studyBundleExportOk = false;
 
   try {
-    const [hRes, jRes, cpRes, feRes] = await Promise.all([
+    const [hRes, jRes, cpRes, feRes, spRes, sbRes] = await Promise.all([
       fetch('http://localhost:8000/api/bible/harmony-events', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/graph/journeys', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/learn/challenge-packs', { signal: AbortSignal.timeout(4000) }),
-      fetch('http://localhost:8000/api/learn/flashcards/export?format=anki', { signal: AbortSignal.timeout(4000) })
+      fetch('http://localhost:8000/api/learn/flashcards/export?format=anki', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/study/sermon-presets', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/study/export-bundle', { signal: AbortSignal.timeout(4000) })
     ]);
     if (hRes.ok) {
       const hData = await hRes.json();
@@ -305,8 +309,15 @@ async function main() {
     if (feRes.ok) {
       flashcardsExportOk = true;
     }
+    if (spRes.ok) {
+      const spData = await spRes.json();
+      sermonPresetsCount = Array.isArray(spData) ? spData.length : 0;
+    }
+    if (sbRes.ok) {
+      studyBundleExportOk = true;
+    }
   } catch (e) {
-    warnings.push(`Không thể kiểm tra /api/bible/harmony-events hoặc journeys/packs: ${e.message}`);
+    warnings.push(`Không thể kiểm tra /api/bible/harmony-events hoặc study/sermon endpoints: ${e.message}`);
   }
 
   if (journeysCount < 9) {
@@ -314,6 +325,9 @@ async function main() {
   }
   if (challengePacksCount < 5) {
     warnings.push(`Số gói thử thách là ${challengePacksCount} (kỳ vọng ít nhất 5 gói).`);
+  }
+  if (sermonPresetsCount < 4) {
+    warnings.push(`Số mẫu bài giảng giải kinh là ${sermonPresetsCount} (kỳ vọng ít nhất 4 mẫu).`);
   }
 
   try {
@@ -454,6 +468,8 @@ async function main() {
   console.log(`   • Câu hỏi trắc nghiệm:    ${quizCount} câu hỏi đa cấp độ`);
   console.log(`   • Thẻ ghi nhớ Spaced-Rep:  ${flashcardsCount} thẻ SM-2 (Xuất Anki/CSV: ${flashcardsExportOk ? '✔ Sẵn sàng' : '✖ Lỗi'})`);
   console.log(`   • Gói thử thách chủ đề:   ${challengePacksCount} gói bài tập chuyên đề (§46) ${challengePacksCount >= 5 ? '✔' : '⚠'}`);
+  console.log(`   • Mẫu bài giảng giải kinh: ${sermonPresetsCount} mẫu đề cương chuẩn mực (§50) ${sermonPresetsCount >= 4 ? '✔' : '⚠'}`);
+  console.log(`   • Xuất Sổ tay nghiên cứu:  ${studyBundleExportOk ? '✔ Sẵn sàng (.MD / Bundle)' : '✖ Lỗi'} (§48, §50)`);
   console.log(`   • Từ vựng Strong Hy-Hê:    ${strongCount} mục từ nguyên ngữ`);
   console.log(`   • Hồ sơ Nghiên Cứu Lớn:    ${studyProjectsCount} dự án chuyên sâu`);
   console.log('');
