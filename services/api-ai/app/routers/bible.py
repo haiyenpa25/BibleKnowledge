@@ -253,3 +253,109 @@ def search_bible(
             for r in rows
         ]
     }
+
+
+@router.get("/daily-insight")
+def get_daily_insight(db: Session = Depends(get_db)):
+    """
+    Get Daily Verse, Person of the Day, Event of the Day, and system overview metrics.
+    Reference: ROADMAP1.md Section 53
+    """
+    # 1. Verse of the Day (Curated pool)
+    curated_refs = [
+        "Giăng 3:16",
+        "Thi-thiên 23:1",
+        "Rô-ma 8:28",
+        "Phi-líp 4:13",
+        "Châm-ngôn 3:5-6",
+        "Ê-sai 40:31",
+        "Giê-rê-mi 29:11"
+    ]
+    import random
+    selected_ref = random.choice(curated_refs)
+
+    # Fetch verse text
+    v_row = db.execute(
+        text("""
+        SELECT b.name_vi, v.chapter, v.verse, v.text, v.verse_code
+        FROM bible_verses v
+        JOIN bible_books b ON b.id = v.book_id
+        WHERE v.search_vector @@ plainto_tsquery('simple', :ref_q)
+        LIMIT 1
+        """),
+        {"ref_q": selected_ref}
+    ).fetchone()
+
+    verse_data = None
+    if v_row:
+        verse_data = {
+            "reference": selected_ref,
+            "book": v_row.name_vi,
+            "chapter": v_row.chapter,
+            "verse": v_row.verse,
+            "text": v_row.text,
+            "verse_code": v_row.verse_code
+        }
+    else:
+        verse_data = {
+            "reference": "Giăng 3:16",
+            "book": "Giăng",
+            "chapter": 3,
+            "verse": 16,
+            "text": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
+            "verse_code": 43003016
+        }
+
+    # 2. Person of the Day
+    p_row = db.execute(
+        text("SELECT slug, name_vi, name_en, title_or_role, summary, timeline_period, metadata FROM people ORDER BY RANDOM() LIMIT 1")
+    ).fetchone()
+
+    person_data = None
+    if p_row:
+        person_data = {
+            "slug": p_row.slug,
+            "name_vi": p_row.name_vi,
+            "name_en": p_row.name_en,
+            "title_or_role": p_row.title_or_role,
+            "summary": p_row.summary,
+            "timeline_period": p_row.timeline_period,
+            "key_verse": (p_row.metadata or {}).get("key_verse")
+        }
+
+    # 3. Event of the Day
+    e_row = db.execute(
+        text("SELECT slug, title, approximate_date, period, description, metadata FROM events ORDER BY RANDOM() LIMIT 1")
+    ).fetchone()
+
+    event_data = None
+    if e_row:
+        event_data = {
+            "slug": e_row.slug,
+            "title": e_row.title,
+            "approximate_date": e_row.approximate_date,
+            "period": e_row.period,
+            "description": e_row.description,
+            "scripture": (e_row.metadata or {}).get("scripture")
+        }
+
+    # 4. System Counts
+    total_verses = db.execute(text("SELECT count(*) FROM bible_verses")).scalar() or 0
+    total_chunks = db.execute(text("SELECT count(*) FROM document_chunks")).scalar() or 0
+    total_flashcards = db.execute(text("SELECT count(*) FROM flashcards")).scalar() or 0
+    total_notes = db.execute(text("SELECT count(*) FROM user_study_notes")).scalar() or 0
+    total_nodes = db.execute(text("SELECT count(*) FROM knowledge_nodes")).scalar() or 0
+
+    return {
+        "verse_of_the_day": verse_data,
+        "person_of_the_day": person_data,
+        "event_of_the_day": event_data,
+        "metrics": {
+            "total_verses": total_verses,
+            "total_chunks": total_chunks,
+            "total_flashcards": total_flashcards,
+            "total_notes": total_notes,
+            "total_nodes": total_nodes
+        }
+    }
+

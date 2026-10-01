@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   BookOpen, 
   BrainCircuit, 
@@ -16,7 +17,14 @@ import {
   ExternalLink,
   Layers,
   Loader2,
-  Bookmark
+  Bookmark,
+  Calendar,
+  Clock,
+  Quote,
+  Copy,
+  Check,
+  ChevronRight,
+  BookMarked
 } from "lucide-react";
 
 interface HealthStatus {
@@ -45,9 +53,49 @@ interface VerseRangeResponse {
   verses: VerseItem[];
 }
 
+interface DailyInsight {
+  verse_of_the_day: {
+    reference: string;
+    book: string;
+    chapter: number;
+    verse: number;
+    text: string;
+    verse_code: number;
+  };
+  person_of_the_day: {
+    slug: string;
+    name_vi: string;
+    name_en?: string;
+    title_or_role?: string;
+    summary?: string;
+    timeline_period?: string;
+    key_verse?: string;
+  };
+  event_of_the_day: {
+    slug: string;
+    title: string;
+    approximate_date?: string;
+    period?: string;
+    description?: string;
+    scripture?: string;
+  };
+  metrics: {
+    total_verses: number;
+    total_chunks: number;
+    total_flashcards: number;
+    total_notes: number;
+    total_nodes: number;
+  };
+}
+
 export default function Home() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(true);
+
+  // Daily Insight State
+  const [dailyInsight, setDailyInsight] = useState<DailyInsight | null>(null);
+  const [loadingDaily, setLoadingDaily] = useState(true);
+  const [copiedVerse, setCopiedVerse] = useState(false);
 
   // Verse Query State
   const [searchRef, setSearchRef] = useState("Ma-thi-ơ 14:22 - 15:5");
@@ -74,8 +122,23 @@ export default function Home() {
       }
     }
 
+    async function fetchDaily() {
+      try {
+        const res = await fetch(`${apiUrl}/api/bible/daily-insight`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setDailyInsight(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch daily insight:", err);
+      } finally {
+        setLoadingDaily(false);
+      }
+    }
+
     checkHealth();
-    const interval = setInterval(checkHealth, 10000);
+    fetchDaily();
+    const interval = setInterval(checkHealth, 15000);
     return () => clearInterval(interval);
   }, [apiUrl]);
 
@@ -108,36 +171,37 @@ export default function Home() {
     handleFetchVerses("Giăng 3:16-18");
   }, []);
 
+  const handleCopyVerse = (textToCopy: string) => {
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedVerse(true);
+    setTimeout(() => setCopiedVerse(false), 2000);
+  };
+
   return (
     <main className="min-h-screen px-4 py-8 md:px-12 lg:px-20 max-w-7xl mx-auto flex flex-col gap-10">
-      {/* Top Navigation / Status Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              BibleKnowledge <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Phase 0 Ready</span>
-            </h1>
-            <p className="text-xs text-slate-400">Hệ thống Nghiên cứu Thần học & Khám phá Kinh Thánh AI</p>
-          </div>
+      {/* Top Status & Metrics Pill Bar */}
+      <section className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-800/80">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            BibleKnowledge <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Alpha 5-Layer Ready</span>
+          </h1>
+          <p className="text-xs text-slate-400">Nền tảng Học tập, Đồ thị Tri thức & Nghiên cứu Thần học AI</p>
         </div>
 
         {/* Live Service Indicator Badges */}
         <div className="flex items-center gap-2 text-xs flex-wrap">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel">
             <Database className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-slate-300">Postgres + pgvector:</span>
+            <span className="text-slate-300">PostgreSQL + pgvector:</span>
             {loadingHealth ? (
-              <span className="text-slate-500">Đang kiểm tra...</span>
+              <span className="text-slate-500">...</span>
             ) : health?.database === "connected" ? (
               <span className="text-emerald-400 font-medium flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Sẵn sàng
               </span>
             ) : (
               <span className="text-amber-400 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Đang kết nối
+                <AlertCircle className="w-3 h-3" /> Kết nối...
               </span>
             )}
           </div>
@@ -158,71 +222,191 @@ export default function Home() {
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel">
             <Server className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-slate-300">FastAPI Engine:</span>
+            <span className="text-slate-300">FastAPI:</span>
             {health?.api === "online" ? (
-              <span className="text-emerald-400 font-medium">Online (:8000)</span>
+              <span className="text-emerald-400 font-medium">:8000 Online</span>
             ) : (
               <span className="text-slate-400">Offline</span>
             )}
           </div>
         </div>
-      </header>
+      </section>
 
       {/* Hero Section */}
       <section className="relative overflow-hidden rounded-3xl p-8 md:p-12 glass-panel border border-slate-700/50 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-blue-950/40">
         <div className="max-w-3xl flex flex-col gap-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 w-fit">
-            <Sparkles className="w-3.5 h-3.5" /> Khởi tạo thành công Nền tảng Phase 0
+            <Sparkles className="w-3.5 h-3.5" /> Nền tảng Học Thuật & Nghiên Cứu Đã Sẵn Sàng
           </div>
           <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
             Khám phá & Nghiên cứu Kinh Thánh Với <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-sky-400 bg-clip-text text-transparent">Trí Tuệ Nhân Tạo Bản Địa</span>
           </h2>
           <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-            Hạ tầng Docker tích hợp hoàn chỉnh: <strong>66 sách Kinh Thánh Bản dịch 1925</strong> (31.081 câu đã nạp vào PostgreSQL), kho tàng <strong>275 tài liệu nghiên cứu thần học</strong> (Wiersbe 50 tập, Zondervan), cùng công nghệ trích dẫn nghiêm ngặt có cơ sở (Grounded Citations).
+            Hạ tầng tích hợp toàn diện: <strong>66 sách Kinh Thánh Bản 1925</strong> (31.081 câu), kho <strong>275 tài liệu nghiên cứu thần học</strong> với vector embeddings BGE-M3 1024D, <strong>Từ điển nguyên ngữ Strong</strong> Hy Lạp/Hê-bơ-rơ, và <strong>Đồ thị tri thức</strong> tương tác.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <a 
+            <Link 
               href="/bible"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30"
             >
               <BookOpen className="w-4 h-4" /> Đọc Kinh Thánh (66 Sách) →
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/learn"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-sm transition-all shadow-lg shadow-amber-600/30"
             >
               <GraduationCap className="w-4 h-4" /> Học Tập & Đố Vui (Learn) →
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/explore"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-600/30"
             >
               <Network className="w-4 h-4" /> Khám Phá & Đồ Thị (Explore) →
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/study"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-600/30"
             >
-              <BookOpen className="w-4 h-4" /> Tra Cứu Strong & Giải Kinh (/study) →
-            </a>
-            <a 
+              <BookMarked className="w-4 h-4" /> Tra Cứu Strong & Giải Kinh (/study) →
+            </Link>
+            <Link 
               href="/research"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
             >
               <BrainCircuit className="w-4 h-4" /> Nghiên Cứu AI (RAG) →
-            </a>
-            <a 
-              href="http://localhost:8000/docs" 
-              target="_blank" 
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-slate-300 hover:text-white font-medium text-sm transition-all"
-            >
-              <Server className="w-4 h-4" /> Swagger Docs <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-            </a>
+            </Link>
           </div>
         </div>
       </section>
+
+      {/* ===================================================================== */}
+      {/* DAILY INSIGHT HUB (ROADMAP1.md Section 53) */}
+      {/* ===================================================================== */}
+      {dailyInsight && (
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-amber-400" /> Linh Lực & Khám Phá Hằng Ngày (Daily Insight)
+            </h3>
+            <span className="text-xs text-slate-400 font-mono">ROADMAP1.md §53</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 1. Verse of the Day */}
+            <div className="md:col-span-1 rounded-3xl glass-card border border-blue-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-blue-950/40 relative overflow-hidden">
+              <Quote className="w-16 h-16 text-blue-500/10 absolute -right-2 -bottom-2 pointer-events-none" />
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Câu Gốc Trong Ngày
+                  </span>
+                  <button
+                    onClick={() => handleCopyVerse(`${dailyInsight.verse_of_the_day.reference} - "${dailyInsight.verse_of_the_day.text}"`)}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title="Sao chép câu gốc"
+                  >
+                    {copiedVerse ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                <h4 className="text-base font-bold text-white">
+                  {dailyInsight.verse_of_the_day.reference}
+                </h4>
+                <p className="text-xs text-slate-200 leading-relaxed font-serif italic pt-1">
+                  "{dailyInsight.verse_of_the_day.text}"
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                <Link
+                  href={`/bible?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
+                  className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Đọc Cả Đoạn →
+                </Link>
+                <Link
+                  href={`/study?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
+                  className="text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
+                >
+                  Giải Kinh →
+                </Link>
+              </div>
+            </div>
+
+            {/* 2. Person of the Day */}
+            <div className="md:col-span-1 rounded-3xl glass-card border border-indigo-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-indigo-950/40">
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    Nhân Vật Trong Ngày
+                  </span>
+                  {dailyInsight.person_of_the_day.key_verse && (
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {dailyInsight.person_of_the_day.key_verse}
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-base font-bold text-white">
+                  {dailyInsight.person_of_the_day.name_vi}
+                  {dailyInsight.person_of_the_day.name_en && (
+                    <span className="text-xs font-normal text-slate-400 ml-1.5">
+                      ({dailyInsight.person_of_the_day.name_en})
+                    </span>
+                  )}
+                </h4>
+                {dailyInsight.person_of_the_day.title_or_role && (
+                  <span className="text-xs text-indigo-300 font-medium">
+                    👑 {dailyInsight.person_of_the_day.title_or_role}
+                  </span>
+                )}
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">
+                  {dailyInsight.person_of_the_day.summary}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                <span className="text-slate-500 text-[11px]">{dailyInsight.person_of_the_day.timeline_period}</span>
+                <Link
+                  href="/explore"
+                  className="text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"
+                >
+                  Mở Đồ Thị →
+                </Link>
+              </div>
+            </div>
+
+            {/* 3. Event of the Day */}
+            <div className="md:col-span-1 rounded-3xl glass-card border border-amber-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-amber-950/40">
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    Biến Cố Lịch Sử
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-amber-400">
+                    {dailyInsight.event_of_the_day.approximate_date}
+                  </span>
+                </div>
+                <h4 className="text-base font-bold text-white">
+                  {dailyInsight.event_of_the_day.title}
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-3 font-serif">
+                  {dailyInsight.event_of_the_day.description}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                <span className="text-slate-500 text-[11px]">{dailyInsight.event_of_the_day.period}</span>
+                <Link
+                  href="/explore"
+                  className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1"
+                >
+                  Xem Timeline →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 4-Layer Product Architecture Grid */}
       <section className="flex flex-col gap-4">
@@ -235,7 +419,7 @@ export default function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Layer 1: Learn */}
-          <a href="/learn" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
+          <Link href="/learn" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
                 <GraduationCap className="w-5 h-5" />
@@ -251,10 +435,10 @@ export default function Home() {
             <div className="pt-3 border-t border-slate-800 text-xs text-amber-400/80 font-medium">
               Chế độ Gamification & Tiến độ →
             </div>
-          </a>
+          </Link>
 
           {/* Layer 2: Explore */}
-          <a href="/bible" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-blue-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
+          <Link href="/bible" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-blue-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3">
                 <BookOpen className="w-5 h-5" />
@@ -270,10 +454,10 @@ export default function Home() {
             <div className="pt-3 border-t border-slate-800 text-xs text-blue-400/80 font-medium">
               66 Sách • 1.189 Đoạn • 31.081 Câu →
             </div>
-          </a>
+          </Link>
 
           {/* Layer 3: Connect */}
-          <a href="/explore" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-indigo-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
+          <Link href="/explore" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-indigo-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3">
                 <Network className="w-5 h-5" />
@@ -289,10 +473,10 @@ export default function Home() {
             <div className="pt-3 border-t border-slate-800 text-xs text-indigo-400/80 font-medium">
               Mạng lưới Đồ thị & Timeline →
             </div>
-          </a>
+          </Link>
 
           {/* Layer 4: Research */}
-          <a href="/research" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
+          <Link href="/research" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
                 <BrainCircuit className="w-5 h-5" />
@@ -308,7 +492,7 @@ export default function Home() {
             <div className="pt-3 border-t border-slate-800 text-xs text-emerald-400/80 font-medium">
               Grounded AI • 275 Nguồn Sách →
             </div>
-          </a>
+          </Link>
         </div>
       </section>
 

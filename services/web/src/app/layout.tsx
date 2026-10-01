@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "BibleKnowledge — Nền tảng Nghiên cứu & Khám phá Kinh Thánh AI",
@@ -13,8 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="dark">
-      <body className="antialiased selection:bg-blue-600 selection:text-white">
-        {children}
+      <body className="antialiased selection:bg-blue-600 selection:text-white flex flex-col min-h-screen">
+        <Navbar />
+        <div className="flex-1">
+          {children}
+        </div>
       </body>
     </html>
   );
