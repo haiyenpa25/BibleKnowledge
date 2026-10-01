@@ -70,6 +70,58 @@ interface ContextPresetOption {
   brief: string;
 }
 
+// --- Passage Study Interfaces (ROADMAP1.md §13) ---
+interface PassageVerseItem {
+  verse: number;
+  text: string;
+  section_title?: string;
+  cross_references: string[];
+}
+
+interface PassageOutlinePoint {
+  section_title: string;
+  verse_range: string;
+  summary: string;
+  key_truth: string;
+}
+
+interface PassageKeywordItem {
+  word: string;
+  strong_number?: string;
+  original_lemma?: string;
+  meaning: string;
+}
+
+interface PassageStudyData {
+  reference: string;
+  book_name: string;
+  chapter_range: string;
+  total_verses: number;
+  verses: PassageVerseItem[];
+  historical_context: string;
+  literary_genre: string;
+  author_and_date: string;
+  people: string[];
+  locations: string[];
+  events: string[];
+  structure_outline: PassageOutlinePoint[];
+  keywords: PassageKeywordItem[];
+  cross_references: string[];
+  theological_themes: string[];
+  reflection_questions: string[];
+  scholarly_commentary_citations: Citation[];
+  hermeneutical_takeaway: string;
+}
+
+interface PassagePresetItem {
+  id: string;
+  reference: string;
+  title: string;
+  theme: string;
+  genre: string;
+  brief: string;
+}
+
 // --- Types ---
 interface BibleEvidence {
   reference: string;
@@ -317,7 +369,15 @@ export default function ResearchPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Active Research Mode Tab
-  const [activeTab, setActiveTab] = useState<"agent" | "context" | "lexicon" | "qa" | "character" | "theme">("agent");
+  const [activeTab, setActiveTab] = useState<"agent" | "passage" | "context" | "lexicon" | "qa" | "character" | "theme">("agent");
+
+  // --- Tab: Passage Exegesis Study States (ROADMAP1.md §13) ---
+  const [passagePresets, setPassagePresets] = useState<PassagePresetItem[]>([]);
+  const [passageRefInput, setPassageRefInput] = useState("Ma-thi-ơ 14:22-33");
+  const [passageLoading, setPassageLoading] = useState(false);
+  const [passageData, setPassageData] = useState<PassageStudyData | null>(null);
+  const [passageError, setPassageError] = useState<string | null>(null);
+  const [copiedPassageText, setCopiedPassageText] = useState(false);
 
   // --- Tab 1: AI Agent Research States (§51) ---
   const [agentQuery, setAgentQuery] = useState(PRESET_AGENT_QUERIES[0]);
@@ -368,9 +428,10 @@ export default function ResearchPage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const [themeRes, presetRes] = await Promise.all([
+        const [themeRes, presetRes, passPresetRes] = await Promise.all([
           fetch(`${apiUrl}/api/rag/themes`),
-          fetch(`${apiUrl}/api/rag/context-preset-options`)
+          fetch(`${apiUrl}/api/rag/context-preset-options`),
+          fetch(`${apiUrl}/api/rag/passage-presets`)
         ]);
         if (themeRes.ok) {
           const tData = await themeRes.json();
@@ -380,20 +441,31 @@ export default function ResearchPage() {
           const pData = await presetRes.json();
           setContextPresets(pData);
         }
+        if (passPresetRes.ok) {
+          const passData = await passPresetRes.json();
+          setPassagePresets(passData);
+        }
       } catch (e) {
         console.error("Failed to load initial presets:", e);
       }
     }
     loadInitialData();
 
-    // Check URL parameters (?q=... or ?tab=...)
+    // Check URL parameters (?q=... or ?tab=... or ?passage=...)
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const urlQ = params.get("q");
       const urlTab = params.get("tab");
-      if (urlTab && ["agent", "context", "lexicon", "qa", "character", "theme"].includes(urlTab)) {
+      const urlPassage = params.get("passage") || params.get("ref");
+
+      if (urlPassage && urlPassage.trim()) {
+        setPassageRefInput(urlPassage.trim());
+        setActiveTab("passage");
+        handlePassageStudy(urlPassage.trim());
+      } else if (urlTab && ["agent", "passage", "context", "lexicon", "qa", "character", "theme"].includes(urlTab)) {
         setActiveTab(urlTab as any);
       }
+
       if (urlQ && urlQ.trim()) {
         setAgentQuery(urlQ.trim());
         setActiveTab("agent");
@@ -401,6 +473,39 @@ export default function ResearchPage() {
       }
     }
   }, [apiUrl]);
+
+  // Load Passage Study when Passage tab is selected
+  useEffect(() => {
+    if (activeTab === "passage" && !passageData && !passageLoading) {
+      handlePassageStudy(passageRefInput);
+    }
+  }, [activeTab]);
+
+  const handlePassageStudy = async (targetRef?: string) => {
+    const refToUse = targetRef || passageRefInput;
+    if (!refToUse.trim()) return;
+    setPassageLoading(true);
+    setPassageError(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/rag/passage-study`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: refToUse.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPassageData(data);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setPassageError(errJson.detail || "Không thể phân tích phân đoạn Kinh Thánh này.");
+      }
+    } catch (e: any) {
+      setPassageError(e.message || "Lỗi kết nối máy chủ nghiên cứu phân đoạn.");
+    } finally {
+      setPassageLoading(false);
+    }
+  };
+
 
   // Load Context Study when Context tab is selected
   useEffect(() => {
@@ -664,6 +769,24 @@ export default function ResearchPage() {
           <Bot className="w-4 h-4 text-purple-200" />
           <span>AI Agent Nghiên Cứu Đa Tầng</span>
           <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-400/20 text-purple-300 uppercase tracking-wider">Mới §51</span>
+        </button>
+
+        {/* Mode: Passage Study (§13) */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("passage");
+            if (!passageData && !passageLoading) handlePassageStudy(passageRefInput);
+          }}
+          className={`px-4 py-2 rounded-2xl flex items-center gap-2 font-bold transition-all whitespace-nowrap ${
+            activeTab === "passage"
+              ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-600/30 border border-amber-400/40"
+              : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-amber-200" />
+          <span>Giải Kinh Phân Đoạn</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-300 uppercase tracking-wider">11 Chiều §13</span>
         </button>
 
         {/* Mode 2: Multi-Dimensional Context Study (§15) */}
@@ -1106,6 +1229,414 @@ export default function ResearchPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB: PASSAGE EXEGESIS STUDY (§13)                        */}
+      {/* ======================================================== */}
+      {activeTab === "passage" && (
+        <div className="flex flex-col gap-6">
+          {/* Header Banner & Preset Pills */}
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-orange-950/30 border border-amber-800/40 shadow-xl flex flex-col gap-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 tracking-wider">
+                    Passage Exegesis Engine • ROADMAP1.md §13
+                  </span>
+                  <span className="text-xs text-slate-400">11 Lớp Phân Tích Chuyên Sâu</span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-white mt-1.5 flex items-center gap-2">
+                  <BookOpen className="w-6 h-6 text-amber-400" />
+                  Khảo Cứu &amp; Giải Kinh Phân Đoạn Toàn Diện
+                </h2>
+                <p className="text-xs text-slate-300 max-w-3xl leading-relaxed mt-1">
+                  Phân tích cấu trúc phân đoạn Kinh Thánh chi tiết: Văn bản nguyên ngữ • Bối cảnh lịch sử • Nhân vật • Địa danh • Đề cương giải kinh • Căn ngữ Strong&apos;s • Đối chiếu liên văn bản • Câu hỏi suy ngẫm • Chú giải 275 sách.
+                </p>
+              </div>
+
+              <Link
+                href="/bible"
+                className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all self-start md:self-auto shrink-0"
+              >
+                <span>Mở Trong Trình Đọc</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* Presets List */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold text-slate-400">Phân đoạn nền tảng tiêu biểu:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {(passagePresets.length > 0 ? passagePresets : [
+                  { id: "mat-14", reference: "Ma-thi-ơ 14:22-33", title: "Chúa Giê-xu & Phi-e-rơ Đi Trên Biển", genre: "Tin Lành Tự Sự", brief: "Đức tin vượt qua bão tố" },
+                  { id: "jhn-3", reference: "Giăng 3:1-16", title: "Đối Thoại Ban Đêm Với Ni-cô-đem", genre: "Đối Thoại Thần Học", brief: "Sự tái sinh & Tình yêu cứu chuộc" },
+                  { id: "rom-8", reference: "Rô-ma 8:28-39", title: "Đắc Thắng Trong Đấng Christ", genre: "Thư Tín Luận Thuyết", brief: "Tình yêu không gì phân rẽ" },
+                  { id: "gen-22", reference: "Sáng-thế Ký 22:1-19", title: "Áp-ra-ham Dâng Y-sác Trên Núi Mô-ri-a", genre: "Ký Thuật Tổ Phụ", brief: "Hình bóng Chiên Con chuộc tội" },
+                  { id: "eph-2", reference: "Ê-phê-sô 2:1-10", title: "Sống Lại Nhờ Ân Điển Qua Đức Tin", genre: "Thư Tín Khuyên Răn", brief: "Kiệt tác của Đức Chúa Trời" },
+                  { id: "psa-23", reference: "Thi Thiên 23:1-6", title: "Đức Giê-hô-va Là Đấng Chăn Giữ Tôi", genre: "Thi Ca Tín Thác", brief: "Bình an trong trũng bóng chết" }
+                ]).map((preset) => {
+                  const isSelected = passageRefInput.toLowerCase().includes(preset.reference.toLowerCase()) || preset.reference.toLowerCase().includes(passageRefInput.toLowerCase());
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setPassageRefInput(preset.reference);
+                        handlePassageStudy(preset.reference);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1 ${
+                        isSelected
+                          ? "bg-amber-500/20 border-amber-500/60 shadow-lg shadow-amber-500/10 text-white"
+                          : "glass-card border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300">{preset.reference}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+                          {preset.genre}
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-slate-200 line-clamp-1">{preset.title}</span>
+                      <span className="text-[11px] text-slate-400 line-clamp-1">{preset.brief}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Input Search Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handlePassageStudy();
+              }}
+              className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-slate-800/80"
+            >
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={passageRefInput}
+                  onChange={(e) => setPassageRefInput(e.target.value)}
+                  placeholder="Nhập bất kỳ sách, chương, câu... (VD: Ma-thi-ơ 14:22-33, Giăng 3:1-16, Rô-ma 8:28-39, Thi Thiên 23)"
+                  className="w-full bg-slate-950/80 border border-slate-700 text-xs text-white rounded-2xl pl-10 pr-4 py-3 focus:outline-none focus:border-amber-500 transition-colors shadow-inner"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={passageLoading}
+                className="px-6 py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-600/30 shrink-0"
+              >
+                {passageLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang Giải Kinh...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-200" />
+                    <span>Nghiên Cứu Phân Đoạn</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Loading or Error */}
+          {passageLoading && (
+            <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-4 text-slate-400 shadow-xl">
+              <Loader2 className="w-10 h-10 animate-spin text-amber-400" />
+              <div className="text-center">
+                <h3 className="text-sm font-bold text-white">Đang tổng hợp 11 lớp nghiên cứu phân đoạn...</h3>
+                <p className="text-xs text-slate-500 mt-1">Truy vấn văn bản Kinh Thánh • Bối cảnh lịch sử • Lập đề cương giải kinh • Tra cứu căn ngữ Strong&apos;s</p>
+              </div>
+            </div>
+          )}
+
+          {passageError && !passageLoading && (
+            <div className="p-6 rounded-3xl bg-rose-950/30 border border-rose-800/50 flex items-start gap-3 text-xs text-rose-200 shadow-xl">
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-1">
+                <span className="font-bold text-rose-300">Không thể tải phân đoạn:</span>
+                <p>{passageError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Result Content */}
+          {passageData && !passageLoading && (
+            <div className="flex flex-col gap-6">
+              {/* Row 1: Exegetical Highlights Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">Phân Đoạn &amp; Sách</span>
+                  <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-amber-400" />
+                    {passageData.reference}
+                  </span>
+                  <span className="text-[11px] text-amber-300 font-medium">{passageData.chapter_range}</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">Thể Loại Văn Học</span>
+                  <span className="text-sm font-bold text-white line-clamp-1">{passageData.literary_genre}</span>
+                  <span className="text-[11px] text-slate-400">Quy chuẩn giải kinh</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">Tác Giả &amp; Thời Kỳ</span>
+                  <span className="text-sm font-bold text-white line-clamp-1">{passageData.author_and_date}</span>
+                  <span className="text-[11px] text-slate-400">Chính kinh 66 sách</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">Dung Lượng Phân Đoạn</span>
+                  <span className="text-sm font-bold text-emerald-400 font-mono">{passageData.total_verses} Câu Kinh Thánh</span>
+                  <span className="text-[11px] text-slate-400">Bản dịch 1925 bảo chứng</span>
+                </div>
+              </div>
+
+              {/* Row 2: Dual Grid: Scripture Text vs Context & Entities */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left 7 cols: Canonical Scripture Text */}
+                <div className="lg:col-span-7 rounded-3xl glass-panel border border-slate-800 p-6 flex flex-col gap-4 shadow-xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-sm font-bold text-white">Văn Bản Kinh Thánh (Bản Dịch Truyền Thống 1925)</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const fullText = passageData.verses.map(v => `${v.verse}. ${v.text}`).join("\n");
+                        navigator.clipboard.writeText(`${passageData.reference}\n${fullText}`);
+                        setCopiedPassageText(true);
+                        setTimeout(() => setCopiedPassageText(false), 2000);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors"
+                    >
+                      {copiedPassageText ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedPassageText ? "Đã sao chép" : "Sao chép"}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 max-h-[540px] overflow-y-auto pr-2 font-serif text-sm leading-relaxed">
+                    {passageData.verses.map((v) => (
+                      <div key={v.verse} className="p-2.5 rounded-xl hover:bg-slate-800/40 transition-colors">
+                        {v.section_title && (
+                          <div className="text-xs font-sans font-bold text-amber-400 mb-1.5 border-b border-slate-800 pb-1">
+                            {v.section_title}
+                          </div>
+                        )}
+                        <p className="text-slate-200">
+                          <span className="font-sans font-bold text-xs text-amber-400/90 mr-2 bg-slate-800/60 px-1.5 py-0.5 rounded">
+                            {v.verse}
+                          </span>
+                          {v.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right 5 cols: Historical Context & Entities */}
+                <div className="lg:col-span-5 flex flex-col gap-5">
+                  {/* Context Card */}
+                  <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5 shadow-xl">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5" /> Bối Cảnh Lịch Sử &amp; Thần Học
+                    </span>
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                      {passageData.historical_context}
+                    </p>
+                  </div>
+
+                  {/* Entities & Locations */}
+                  <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-xl">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-blue-400 font-bold flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5" /> Nhân Vật &amp; Địa Danh Xuất Hiện
+                    </span>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-[11px] text-slate-400 block mb-1">Nhân vật:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {passageData.people.map((p, idx) => (
+                            <span key={idx} className="px-2.5 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium">
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-400 block mb-1">Địa danh:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {passageData.locations.map((loc, idx) => (
+                            <span key={idx} className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium">
+                              {loc}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: Exegetical Outline & Structure */}
+              <div className="p-6 md:p-8 rounded-3xl glass-panel border border-slate-800 flex flex-col gap-4 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base font-bold text-white">Cấu Trúc Đề Cương Giải Kinh Phân Đoạn (Exegetical Outline)</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {passageData.structure_outline.map((out, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between gap-2.5">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-bold text-amber-300">{out.section_title}</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                            {out.verse_range}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">{out.summary}</p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">Lẽ Thật Cốt Lõi:</span>
+                        <p className="text-xs text-amber-100 italic leading-snug">{out.key_truth}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 4: Keywords & Strong's Lexicon */}
+              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-4 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <Languages className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-sm font-bold text-white">Từ Khóa Thần Học &amp; Căn Ngữ Nguyên Ngữ (Strong&apos;s Lexicon)</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {passageData.keywords.map((kw, idx) => (
+                    <div key={idx} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">{kw.word}</span>
+                        {kw.strong_number && (
+                          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40">
+                            {kw.strong_number}
+                          </span>
+                        )}
+                      </div>
+                      {kw.original_lemma && (
+                        <span className="text-[11px] font-serif text-cyan-300 italic">{kw.original_lemma}</span>
+                      )}
+                      <p className="text-[11px] text-slate-400 leading-snug mt-1">{kw.meaning}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 5: Cross-References & Themes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-xl">
+                  <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <ArrowRight className="w-4 h-4 text-indigo-400" /> Các Câu Đối Chiếu Liên Văn Bản (Cross-References)
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {passageData.cross_references.map((cr, idx) => (
+                      <Link
+                        key={idx}
+                        href={`/bible?ref=${encodeURIComponent(cr)}`}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-indigo-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                      >
+                        <BookOpen className="w-3 h-3 text-indigo-400" />
+                        <span>{cr}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-xl">
+                  <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-400" /> Chủ Đề Thần Học Trọng Tâm
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {passageData.theological_themes.map((th, idx) => (
+                      <span key={idx} className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs font-medium">
+                        {th}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 6: Devotional & Reflection Questions */}
+              <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-slate-900/90 via-slate-900 to-indigo-950/20 border border-slate-800 flex flex-col gap-4 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-base font-bold text-white">Câu Hỏi Suy Ngẫm &amp; Tĩnh Nguyện Thực Hành</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {passageData.reflection_questions.map((rq, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col gap-2">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-bold flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans">{rq}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 7: Commentary Citations from 275 Books */}
+              {passageData.scholarly_commentary_citations.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-4 shadow-xl">
+                  <div className="flex items-center gap-2">
+                    <Library className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-sm font-bold text-white">Trích Dẫn Chú Giải Từ Thư Viện 275 Sách Chuyên Khảo</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {passageData.scholarly_commentary_citations.map((c, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-emerald-300 block">{c.source_title}</span>
+                          <span className="text-[10px] text-slate-400">{c.chapter}</span>
+                          <p className="text-xs text-slate-300 italic leading-relaxed mt-2 border-l-2 border-emerald-500/40 pl-2.5">
+                            &ldquo;{c.quote}&rdquo;
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Row 8: Hermeneutical Takeaway & Action Bridges */}
+              <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 border border-amber-800/40 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+                <div className="flex flex-col gap-1.5 max-w-2xl">
+                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Kết Luận Giải Kinh (Hermeneutical Takeaway)
+                  </span>
+                  <p className="text-xs text-amber-100/90 leading-relaxed font-serif italic">
+                    {passageData.hermeneutical_takeaway}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                  <Link
+                    href={`/study?passage=${encodeURIComponent(passageData.reference)}`}
+                    className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-amber-600/20"
+                  >
+                    <span>Soạn Bài Giảng →</span>
+                  </Link>
+                  <Link
+                    href="/learn?tab=memorize"
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors"
+                  >
+                    <span>Học Thuộc Lòng Câu Gốc</span>
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
         </div>

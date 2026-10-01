@@ -1134,6 +1134,36 @@ export default function BibleReaderPage() {
                   </>
                 )}
               </div>
+
+              {/* Quick Study & Exegesis Bridges */}
+              <div className="flex items-center justify-center gap-2 pt-3 flex-wrap">
+                <Link
+                  href={`/research?passage=${encodeURIComponent(`${currentBook?.name_vi} ${currentChapter}`)}`}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  title="Nghiên cứu phân đoạn chuyên sâu 11 chiều (dàn ý, bối cảnh, từ khóa Strong's, chú giải)"
+                >
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Giải Kinh 11 Chiều (§13)</span>
+                </Link>
+
+                <Link
+                  href={`/research?context=${encodeURIComponent(`${currentBook?.name_vi} ${currentChapter}`)}`}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  title="Khám phá 6 chiều kích bối cảnh lịch sử, địa lý, chính trị"
+                >
+                  <Compass className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Bối Cảnh Đa Chiều (§15)</span>
+                </Link>
+
+                <Link
+                  href="/learn?tab=plans"
+                  className="px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  title="Theo dõi tiến độ kế hoạch đọc Kinh Thánh"
+                >
+                  <BookMarked className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Kế Hoạch Đọc (§3)</span>
+                </Link>
+              </div>
             </div>
 
             {/* View Mode 1: VERSE BY VERSE MODE */}
@@ -1809,12 +1839,12 @@ export default function BibleReaderPage() {
                   </button>
 
                   <Link
-                    href={`/study?ref=${encodeURIComponent(`${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-xs font-semibold text-purple-300 flex items-center gap-1.5 transition-colors shadow-sm"
-                    title="Mở phân tích giải kinh sâu đoạn văn này"
+                    href={`/research?passage=${encodeURIComponent(`${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-xs font-semibold text-amber-300 flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Giải Kinh Phân Đoạn 11 Chiều (§13) với Dàn Ý La Mã, Từ Khóa Strong's và Chú Giải 275 Sách"
                   >
-                    <Layers className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Phân Tích Giải Kinh</span>
+                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Giải Kinh 11 Chiều (§13)</span>
                   </Link>
 
                   <Link
