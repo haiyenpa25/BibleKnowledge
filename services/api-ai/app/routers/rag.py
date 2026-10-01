@@ -2770,6 +2770,122 @@ HEBREW_MORPHOLOGY_PRESETS: Dict[str, Dict[str, Any]] = {
         "related_lemmas": [
             {"strong_number": "H2623", "lemma": "חָסִיד", "transliteration": "chasid", "gloss": "Người tin kính, người trung tín trong giao ước (Tính từ)"}
         ]
+    },
+    "H1984": {
+        "grammatical_category": "Động từ Căn bản (Verb Root)",
+        "morphological_parsing": {
+            "root_pattern": "ה-ל-ל (He-Lamed-Lamed)",
+            "binyan_stems": {
+                "qal": "הָלַל (Halal - Chiếu sáng rạng ngời, phát quang vinh hiển)",
+                "piel": "הִלֵּל (Hillel - Ca tụng hết lòng, chúc tán quyền năng Đức Giê-hô-va)",
+                "pual": "הֻלַּל (Hullal - Được tôn vinh xứng đáng)",
+                "hitpael": "הִתְהַלֵּל (Hithallel - Hân hoan khoe mình nơi Đức Chúa Trời)"
+            },
+            "theological_aspect": "Căn nguyên của thánh ca Ha-lê-lu-gia (Praise the Lord). Trong Thi Thiên, ca ngợi không phải là cảm xúc nhất thời mà là mệnh lệnh giao ước của toàn thể tạo vật hướng về Đấng Tạo Hóa."
+        },
+        "exegetical_insight": "Xuất hiện hơn 165 lần trong Cựu Ước, kết thúc toàn bộ Thánh Vịnh trong Thi Thiên 150:6: 'Mọi vật chi thở hãy ngợi khen Đức Giê-hô-va! Ha-lê-lu-gia!'",
+        "related_lemmas": [
+            {"strong_number": "H8416", "lemma": "תְּהִלָּה", "transliteration": "tehillah", "gloss": "Khúc ca ngợi khen, Thánh Vịnh (Danh từ)"},
+            {"strong_number": "H1974", "lemma": "הִלּוּל", "transliteration": "hillul", "gloss": "Lễ hội vui mừng ngợi khen (Danh từ)"}
+        ]
+    },
+    "H2451": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "root_pattern": "ח-כ-ם (Chet-Khaf-Mem)",
+            "nominal_form": "Qotlah abstract pattern (Kỹ năng sống đạo đức và thông sáng tâm linh)",
+            "theological_aspect": "Chokmah trong tư tưởng Hê-bơ-rơ không phải là suy lý triết học Hy Lạp trừu tượng, mà là nghệ thuật và kỹ năng sống chính trực, kính sợ Chúa và bước đi theo trật tự sáng tạo của Ngài."
+        },
+        "exegetical_insight": "Xuất hiện 153 lần, đặc biệt trong Châm Ngôn 1-9 và Gióp 28. Sự khôn ngoan được nhân cách hóa như một sứ giả mời gọi nhân loại đến sự sống, tiên trưng về Đấng Christ là sự khôn ngoan của Đức Chúa Trời (1 Cô-rinh-tô 1:24, 30).",
+        "related_lemmas": [
+            {"strong_number": "H2450", "lemma": "חָכָם", "transliteration": "chakam", "gloss": "Người khôn ngoan, bậc hiền triết (Tính từ/Danh từ)"},
+            {"strong_number": "H2449", "lemma": "חָכַם", "transliteration": "chakam", "gloss": "Trở nên khôn ngoan, học hỏi sự thông sáng (Động từ)"}
+        ]
+    },
+    "H3374": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "root_pattern": "י-ר-א (Yod-Resh-Aleph)",
+            "nominal_form": "Qitlah pattern (Trạng thái kính ngưỡng giao ước)",
+            "theological_aspect": "Sự kính sợ Chúa (Fear of the LORD) không phải nỗi sợ hãi kinh khiếp của kẻ nô lệ (terror), mà là tâm thế kính phục, ngưỡng mộ sâu xa trước sự thánh khiết tuyệt đối và uy quyền vô biên của Đức Chúa Trời."
+        },
+        "exegetical_insight": "Châm Ngôn 1:7 và Gióp 28:28 xác quyết 'Kính sợ Đức Giê-hô-va, ấy là khởi đầu sự khôn ngoan (Reshit Chokmah Yirat Adonai)'. Đây là kim chỉ nam cho toàn bộ Văn chương Khôn ngoan Hê-bơ-rơ.",
+        "related_lemmas": [
+            {"strong_number": "H3372", "lemma": "יָרֵא", "transliteration": "yare", "gloss": "Kính sợ, tôn thờ, kiêng nể (Động từ)"},
+            {"strong_number": "H3373", "lemma": "יָרֵא", "transliteration": "yare", "gloss": "Người kính sợ Đức Chúa Trời (Tính từ)"}
+        ]
+    },
+    "H0835": {
+        "grammatical_category": "Danh từ Nam tính Số nhiều (Noun Masculine Plural Absolute)",
+        "morphological_parsing": {
+            "root_pattern": "א-ש-ר (Aleph-Shin-Resh)",
+            "grammatical_form": "Construct plural expressing state of blessedness (Đa phước hạnh)",
+            "theological_aspect": "Diễn tả trạng thái hạnh phúc tràn đầy, mãn nguyện và được Đức Chúa Trời phê chuẩn. Khác với 'Baruch' (được Chúa chúc phước), 'Ashrei' nhấn mạnh niềm vui nội tâm sâu xa của người bước đi trong đường lối Lời Chúa."
+        },
+        "exegetical_insight": "Từ mở đầu cho toàn bộ sách Thi Thiên (Thi Thiên 1:1: 'Phước cho người chẳng theo mưu kế kẻ dữ') và Thi Thiên 32:1-2 ('Phước thay người nào được tha sự vi phạm'), được Sứ đồ Phao-lô dẫn giải trong Rô-ma 4:7-8 về sự xưng công bình bởi đức tin.",
+        "related_lemmas": [
+            {"strong_number": "H0833", "lemma": "אָשַׁר", "transliteration": "ashar", "gloss": "Đi ngay thẳng, được gọi là phước (Động từ)"}
+        ]
+    },
+    "H7462": {
+        "grammatical_category": "Động từ Căn bản (Verb Root)",
+        "morphological_parsing": {
+            "root_pattern": "ר-ע-ה (Resh-Ayin-He)",
+            "binyan_stems": {
+                "qal": "רָעָה (Ra'ah - Chăn dắt bầy, dẫn đàn chiên đến đồng cỏ xanh tươi, bảo vệ chiên khỏi nanh thú dữ)",
+                "hiphil": "הִרְעָה (Hir'ah - Dẫn đi ăn cỏ)"
+            },
+            "theological_aspect": "Hình tượng Người Chăn Chiên (The Divine Shepherd) diễn tả mối quan hệ yêu thương, tận tụy và bảo tồn từng cá nhân trong giao ước. Đức Chúa Trời không ở xa xôi nhưng là Đấng trực tiếp săn sóc, vỗ về và bảo vệ linh hồn."
+        },
+        "exegetical_insight": "Thi Thiên 23:1 mở đầu bằng lời tuyên xưng bất hủ: 'Adonai Rohi, lo echsar' (Đức Giê-hô-va là Đấng Chăn Giữ tôi, tôi chẳng thiếu thốn gì). Khái niệm này tìm thấy sự ứng nghiệm trọn vẹn nơi Đức Chúa Jêsus Christ trong Giăng 10:11 ('Ta là người chăn hiền lành').",
+        "related_lemmas": [
+            {"strong_number": "H7468", "lemma": "רְעוּת", "transliteration": "reut", "gloss": "Sự đồng hành, bạn hữu gắn kết (Danh từ)"},
+            {"strong_number": "H4829", "lemma": "מִרְעֶה", "transliteration": "mireh", "gloss": "Đồng cỏ tươi tốt cho bầy chiên (Danh từ)"}
+        ]
+    },
+    "H1350": {
+        "grammatical_category": "Động từ Phân từ Danh từ hóa (Verb Participle as Noun)",
+        "morphological_parsing": {
+            "root_pattern": "ג-א-l (Gimel-Aleph-Lamed)",
+            "binyan_stems": {
+                "qal": "גָּאַל (Ga'al - Mua chuộc lại, cứu vớt khỏi cảnh nô lệ, chuộc lại sản nghiệp bị cầm cố)",
+                "niphal": "נִגְאַל (Nig'al - Được chuộc lại tự do)"
+            },
+            "theological_aspect": "Luật lệ 'Kinsman-Redeemer' (Người chuộc sản nghiệp bà con gần) trong Cựu Ước đòi hỏi: phải có quan hệ huyết thống, có khả năng tài chính và có lòng tự nguyện chuộc. Đây là bức tranh tiên trưng sống động về Đấng Christ nhập thể để chuộc chuộc tội nhân."
+        },
+        "exegetical_insight": "Gióp 19:25 cất lên tiếng reo đức tin vĩ đại giữa nỗi thống khổ tột cùng: 'Tôi biết rằng Đấng Cứu Chuộc tôi hằng sống (Go'ali chai), đến ngày sau rốt Ngài sẽ đứng trên đất'. Sách Ru-tơ minh họa vai trò Go'el qua nhân vật Bô-ô đối với Ru-tơ.",
+        "related_lemmas": [
+            {"strong_number": "H1353", "lemma": "גְּאֻלָּה", "transliteration": "geullah", "gloss": "Quyền chuộc sản nghiệp, giá chuộc (Danh từ)"}
+        ]
+    },
+    "H0982": {
+        "grammatical_category": "Động từ Căn bản (Verb Root)",
+        "morphological_parsing": {
+            "root_pattern": "ב-ט-ח (Bet-Tet-Chet)",
+            "binyan_stems": {
+                "qal": "בָּטַח (Batach - Tin cậy vững chãi, phó thác an toàn, an lòng không sợ hãi)",
+                "hiphil": "הִבְטִיחַ (Hivtiach - Khiến cho tin tưởng, ban sự vững tâm)"
+            },
+            "theological_aspect": "Bày tỏ hành động nằm dài thư thái hoặc tựa vào một thành lũy kiên cố mà không mảy may hoài nghi hay bất an. Đức tin trong Châm Ngôn là từ bỏ sự tự mãn nơi trí khôn loài người để hoàn toàn trao phó cho sự khôn ngoan của Chúa."
+        },
+        "exegetical_insight": "Châm Ngôn 3:5: 'Hãy hết lòng tin cậy (Betach) Đức Giê-hô-va, chớ nương cậy nơi sự thông sáng của con'. Thi Thiên 91:2: 'Ngài là nơi nương náu tôi, là đồn lũy tôi, cũng là Đức Chúa Trời tôi, tôi tin cậy nơi Ngài'.",
+        "related_lemmas": [
+            {"strong_number": "H0986", "lemma": "בִּטָּחוֹן", "transliteration": "bittachon", "gloss": "Sự tin cậy vững chắc, niềm hy vọng kiên định (Danh từ)"},
+            {"strong_number": "H0987", "lemma": "בַּטֻּחוֹת", "transliteration": "battuchot", "gloss": "Nơi an toàn tuyệt đối (Danh từ)"}
+        ]
+    },
+    "H6666": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "root_pattern": "צ-ד-ק (Tsade-Dalet-Qof)",
+            "nominal_form": "Qitlah pattern (Bản chất công chính theo giao ước)",
+            "theological_aspect": "Tzedakah là sự tương thích trọn vẹn với tiêu chuẩn thánh khiết của Đức Chúa Trời. Không chỉ là sự công lý pháp lý (judicial justice), Tzedakah còn là lòng nhân từ, hành động bảo vệ kẻ thế cô và duy trì hòa khí giao ước trong cộng đồng."
+        },
+        "exegetical_insight": "Sáng-thế Ký 15:6: 'Áp-ram tin Đức Giê-hô-va, thì Ngài kể điều đó là sự công bình (tzedakah) cho người'. Thi Thiên 15:2 và Châm Ngôn 14:34: 'Sự công bình làm cho nước được cao trọng'.",
+        "related_lemmas": [
+            {"strong_number": "H6664", "lemma": "צֶדֶק", "transliteration": "tzedek", "gloss": "Lẽ công bằng, sự ngay thẳng (Danh từ Nam tính)"},
+            {"strong_number": "H6662", "lemma": "צַדִּיק", "transliteration": "tzaddik", "gloss": "Người công bình, người ngay lành (Tính từ/Danh từ)"}
+        ]
     }
 }
 

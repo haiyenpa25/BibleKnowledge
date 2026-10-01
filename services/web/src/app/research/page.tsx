@@ -382,6 +382,14 @@ const PRESET_CHARACTERS = [
   { slug: "su-do-giang", name: "Giăng", role: "Môn đồ được Chúa yêu" }
 ];
 
+const SAMPLE_QUESTIONS = [
+  "Tại sao Chúa Giê-xu chịu phép báp-tem trong Ma-thi-ơ 3?",
+  "Ý nghĩa của Giao Ước Mới trong Hê-bơ-rơ 8 là gì?",
+  "Phao-lô và Gia-cơ có mâu thuẫn về sự xưng công bình không?",
+  "Biểu tượng Chiên Con Lễ Vượt Qua trong Xuất Ê-díp-tô Ký 12 chỉ về điều gì?",
+  "Bối cảnh văn hóa của người Sa-ma-ri trong Giăng 4 là gì?"
+];
+
 export default function ResearchPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -631,6 +639,27 @@ export default function ResearchPage() {
 
   function handleOpenConcordance(strongNumber: string, item: LexiconItem) {
     handleOpenLexiconDetail(item, "concordance");
+  }
+
+  function handleLookupConcordance(strongNumber: string, lemma: string, definition: string) {
+    const existing = lexiconList.find((l) => l.strong_number === strongNumber);
+    if (existing) {
+      handleOpenLexiconDetail(existing, "concordance");
+    } else {
+      const syntheticItem: LexiconItem = {
+        strong_number: strongNumber,
+        language: strongNumber.startsWith("H") ? "hebrew" : "greek",
+        lemma: lemma,
+        transliteration: "",
+        pronunciation: "",
+        part_of_speech: "",
+        definition: definition,
+        theological_significance: "",
+        occurrences_count: 0,
+        key_verses: []
+      };
+      handleOpenLexiconDetail(syntheticItem, "concordance");
+    }
   }
 
   // Tab 1: AI Agent Research Handler (§51)

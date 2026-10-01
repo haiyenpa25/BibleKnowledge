@@ -164,8 +164,17 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 
 ### 3.7 Original Language Morphological Parser & Concordance (§37, §49)
 - **Endpoint**: `GET /api/rag/morphology?code={strong_code}` (Aliased: `GET /api/bible/morphology`)
-- **Parameters**: `code` (e.g., `G4102` for Greek *Pistis*, `H7965` for Hebrew *Shalom*, `G0026` for *Agape*).
+- **Parameters**: `code` (e.g., `G4102` for Greek *Pistis*, `H7965` for Hebrew *Shalom*, `G0026` for *Agape*, `H2451` for *Chokmah*, `H1984` for *Halal*).
 - **Description**: Returns seminary-grade grammatical parsing (declensions, gender, stems, case inflections for Greek; Binyanim verbal stems, root, affix analysis for Hebrew), theological synthesis, exegetical nuances, resolved Vietnamese 1925 key Scriptures, and related lemmas.
+- **Extended Hebrew Poetic & Wisdom Suite (§14, §49)**: Pre-compiled comprehensive morphological and theological analyses for foundational roots across Psalms, Job, and Proverbs:
+  - `H1984` (*Halal* - Ca ngợi, cội nguồn Ha-lê-lu-gia & Tehillim)
+  - `H2451` (*Chokmah* - Sự khôn ngoan thiên thượng trong Châm Ngôn & Gióp)
+  - `H3374` (*Yirah* - Kính sợ Đức Giê-hô-va là khởi đầu khôn ngoan)
+  - `H0835` (*Ashrei* - Phước thay người gắn bó Lời Chúa, Thi Thiên 1:1)
+  - `H7462` (*Ra'ah / Rohi* - Đấng Chăn Giữ tôi, Thi Thiên 23:1)
+  - `H1350` (*Go'el* - Đấng Cứu Chuộc tôi hằng sống, Gióp 19:25)
+  - `H0982` (*Batach* - Hết lòng tin cậy Đức Giê-hô-va, Châm Ngôn 3:5)
+  - `H6666` (*Tzedakah* - Sự công bình và chính trực theo giao ước)
 - **Response Structure**:
   ```json
   {
@@ -296,6 +305,23 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 ### 6.7 Citation Formatter
 - **Endpoint**: `GET /api/study/citation-formats?source_id={id}&format={sbl|chicago|apa|mla|bibtex}`
 - **Description**: Formats citations according to 5 academic publication standards.
+
+### 6.8 Study Projects & Entity Pinning (§50)
+- **Endpoints**:
+  - `POST /api/study/projects`: Create a named study project (e.g. "Đời Sống Cầu Nguyện Của Chúa Giê-xu").
+  - `POST /api/study/projects/{project_id}/pin-verse`: Pin a canonical Bible verse to the workspace.
+  - `POST /api/study/projects/{project_id}/pin-entity`: Pin a knowledge graph entity (`person`, `place`, `event`, `topic`) to the project.
+  - `POST /api/study/projects/{project_id}/generate-outline`: AI analyzes pinned verses and entities to synthesize a 3-part study outline.
+  - `POST /api/study/projects/{project_id}/generate-questions`: AI generates 4-5 deep theological and practical discussion questions.
+  - `POST /api/study/projects/{project_id}/generate-summary`: AI generates a comprehensive grounded research synthesis note.
+  - `POST /api/study/projects/{project_id}/export-flashcards`: Exports project insights and scriptures directly into SM-2 flashcard deck.
+
+### 6.9 Homiletical Slide Deck Exporter & Presentation Engine (§50)
+- **Component**: `/study` Homiletical Workspace (`sermon` tab)
+- **Description**: Transforms expository sermon manuscripts and blueprints into interactive, fullscreen presentation slides:
+  - **Slide Architecture**: Slide 0 (Title & Golden Verse), Slide 1 (Big Idea & Expository Setting), Slides 2..N (Expository Points with Scripture Text, Original Language Insights, Exposition, and Illustrations), Slide N+1 (Practical Life Applications), Slide N+2 (Conclusion, Call to Faith & Theological Citations).
+  - **Interaction**: Keyboard navigation (`ArrowRight` / `Space` for next, `ArrowLeft` for previous, `Esc` to exit), progress dots, and slide counter.
+  - **Slide Deck Markdown Export**: One-click generation and download of Marp / Slidev compliant Markdown files (`.md`) with slide separators (`---`), typography classes, and presenter notes.
 
 ---
 

@@ -33,7 +33,9 @@ import {
   Printer,
   FileDown,
   Scroll,
-  Share2
+  Share2,
+  MonitorPlay,
+  ChevronLeft
 } from "lucide-react";
 
 interface ExpositoryPoint {
@@ -217,6 +219,16 @@ export default function StudyPage() {
   const [newProjectNoteContent, setNewProjectNoteContent] = useState("");
   const [savingProjectNote, setSavingProjectNote] = useState(false);
 
+  // Entity Pinning State (§50)
+  const [pinEntityName, setPinEntityName] = useState("");
+  const [pinEntityType, setPinEntityType] = useState<"person" | "place" | "event" | "topic">("person");
+  const [pinningEntity, setPinningEntity] = useState(false);
+
+  // Slide Deck Presentation Mode State (§50)
+  const [isSlideDeckOpen, setIsSlideDeckOpen] = useState(false);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [copiedSlides, setCopiedSlides] = useState(false);
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Fetch Lexicon
@@ -368,6 +380,108 @@ export default function StudyPage() {
     window.print();
   };
 
+  // Generate Slide Deck Markdown (Marp / Slidev format)
+  const generateSlideDeckMarkdown = () => {
+    if (!sermonResult) return "";
+    let md = `---
+marp: true
+theme: gaia
+_class: lead
+paginate: true
+backgroundColor: #0f172a
+color: #f8fafc
+---
+
+# ${sermonResult.title}
+### ${sermonResult.passage_ref}
+
+**Câu Gốc:** "${sermonResult.key_verse_text}" (${sermonResult.key_verse})  
+*Đối tượng:* ${sermonAudience}  
+*Soạn bởi:* BibleKnowledge Expository Engine (§50)
+
+---
+
+# Ý Niệm Cốt Lõi (Big Idea)
+
+> "${sermonResult.big_idea}"
+
+### Bối Cảnh Lịch Sử & Thần Học
+${sermonResult.historical_context}
+
+### Dẫn Nhập
+${sermonResult.introduction_and_hook}
+`;
+
+    sermonResult.points.forEach((pt, i) => {
+      md += `\n---\n\n# Luận Điểm ${i + 1}: ${pt.title}\n\n`;
+      md += `**Kinh Thánh:** *${pt.scripture_ref}*\n\n`;
+      md += `> "${pt.verse_text}"\n\n`;
+      if (pt.original_language_key) {
+        md += `*Nguyên văn Hy Lạp / Hê-bơ-rơ:* \`${pt.original_language_key}\`\n\n`;
+      }
+      md += `### Giải Nghĩa:\n${pt.exposition}\n\n`;
+      if (pt.illustration) {
+        md += `💡 **Minh Họa:** ${pt.illustration}\n\n`;
+      }
+    });
+
+    md += `\n---\n\n# Ứng Dụng Đời Sống Thực Tế\n\n`;
+    sermonResult.practical_applications.forEach((app, i) => {
+      md += `${i + 1}. ${app}\n`;
+    });
+
+    md += `\n---\n\n# Kết Luận & Lời Kêu Gọi\n\n`;
+    md += `${sermonResult.conclusion_and_call}\n\n`;
+    if (sermonResult.theological_citations?.length > 0) {
+      md += `\n---\n\n### Tài Liệu & Chú Giải Tham Khảo\n\n`;
+      sermonResult.theological_citations.forEach((c) => {
+        md += `- **${c.source_title}** ${c.author ? `(${c.author})` : ""}: "${c.quote}"\n`;
+      });
+    }
+
+    return md;
+  };
+
+  const handleCopySlideDeck = () => {
+    const md = generateSlideDeckMarkdown();
+    if (!md) return;
+    navigator.clipboard.writeText(md);
+    setCopiedSlides(true);
+    setTimeout(() => setCopiedSlides(false), 2500);
+  };
+
+  const handleDownloadSlideDeck = () => {
+    const md = generateSlideDeckMarkdown();
+    if (!md) return;
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const cleanName = (sermonResult?.title || "Bai_Giang").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+    link.download = `${cleanName}_SlideDeck.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const totalSlides = sermonResult ? 3 + (sermonResult.points?.length || 0) : 0;
+
+  useEffect(() => {
+    if (!isSlideDeckOpen || !sermonResult) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "Space") {
+        e.preventDefault();
+        setCurrentSlideIndex(prev => Math.min(prev + 1, totalSlides - 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === "Escape") {
+        setIsSlideDeckOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSlideDeckOpen, totalSlides, sermonResult]);
+
   // Open Bundle Export
   const handleOpenBundleExport = async () => {
     setIsBundleModalOpen(true);
@@ -429,6 +543,32 @@ export default function StudyPage() {
       setPassageError(msg);
     } finally {
       setLoadingPassage(false);
+    }
+  };
+
+  // Save Passage Study to Personal Notes
+  const handleSavePassageToNotes = async () => {
+    if (!passageResult) return;
+    try {
+      const outlineText = passageResult.structural_outline?.map((o) => `${o.section}: ${o.theme}`).join("\n") || "";
+      const content = `### Bối Cảnh Lịch Sử & Thần Học\n${passageResult.literary_context}\n\n### Dàn Ý Phân Đoạn\n${outlineText}\n\n### Từ Ngữ Gốc Hy Lạp / Hê-bơ-rơ\n${passageResult.original_language_insights}`;
+      const res = await fetch(`${apiUrl}/api/study/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `Khảo Luận: ${passageResult.reference}`,
+          scripture_ref: passageResult.reference,
+          content,
+          tags: ["passage_study", "exegesis", ...(passageResult.theological_themes || [])]
+        })
+      });
+      if (res.ok) {
+        fetchNotes();
+        setNoteSuccess("Đã lưu khảo luận đoạn văn vào sổ tay cá nhân!");
+        setTimeout(() => setNoteSuccess(null), 3000);
+      }
+    } catch (e) {
+      console.error("Failed to save passage study note:", e);
     }
   };
 
@@ -634,6 +774,32 @@ export default function StudyPage() {
       console.error(err);
     } finally {
       setPinningVerse(false);
+    }
+  };
+
+  // Pin Entity to Project (§50)
+  const handlePinEntity = async (projectId: string, type: string, slug: string, name: string) => {
+    if (!name.trim() || !slug.trim()) return;
+    setPinningEntity(true);
+    setProjectMessage(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/pin-entity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, slug, name: name.trim() })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSelectedProject(updated);
+        setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+        setPinEntityName("");
+        setProjectMessage(`Đã ghim thực thể "${name.trim()}" vào dự án thành công!`);
+        setTimeout(() => setProjectMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to pin entity:", err);
+    } finally {
+      setPinningEntity(false);
     }
   };
 
@@ -984,6 +1150,71 @@ export default function StudyPage() {
                     </button>
                   </form>
 
+                  {/* Quick Pin Entity Input (§50) */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!pinEntityName.trim()) return;
+                      const slug = pinEntityName.trim().toLowerCase().replace(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/g, '-');
+                      handlePinEntity(selectedProject.id, pinEntityType, slug, pinEntityName.trim());
+                    }}
+                    className="flex flex-col gap-2 bg-slate-950/60 p-3 rounded-2xl border border-slate-800"
+                  >
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={pinEntityType}
+                        onChange={(e) => setPinEntityType(e.target.value as any)}
+                        className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-400 font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 shrink-0"
+                      >
+                        <option value="person">👤 Nhân vật</option>
+                        <option value="place">📍 Địa danh</option>
+                        <option value="event">📜 Sự kiện</option>
+                        <option value="topic">🕊️ Chủ đề</option>
+                      </select>
+                      <div className="relative flex-1">
+                        <Users className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={pinEntityName}
+                          onChange={(e) => setPinEntityName(e.target.value)}
+                          placeholder="Ghim nhân vật, địa danh, sự kiện hoặc chủ đề thần học..."
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={pinningEntity || !pinEntityName.trim()}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 shrink-0"
+                      >
+                        {pinningEntity ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                        <span>Ghim Thực Thể</span>
+                      </button>
+                    </div>
+                    {/* Quick Entity Suggestion Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] pt-1">
+                      <span className="text-slate-500 shrink-0">Gợi ý nhanh:</span>
+                      {[
+                        { name: "Chúa Giê-xu", slug: "chua-gie-xu", type: "person" },
+                        { name: "Phi-e-rơ", slug: "phi-e-ro", type: "person" },
+                        { name: "Phao-lô", slug: "phao-lo", type: "person" },
+                        { name: "Đa-vít", slug: "da-vit", type: "person" },
+                        { name: "Giê-ru-sa-lem", slug: "gie-ru-sa-lem", type: "place" },
+                        { name: "Bết-lê-hem", slug: "bet-le-hem", type: "place" },
+                        { name: "Thập Tự Giá & Phục Sinh", slug: "su-chuoc-toi-thap-tu-gia", type: "event" },
+                        { name: "Ân Điển & Đức Tin", slug: "an-dien-va-duc-tin", type: "topic" }
+                      ].map((sug, sIdx) => (
+                        <button
+                          key={sIdx}
+                          type="button"
+                          onClick={() => handlePinEntity(selectedProject.id, sug.type, sug.slug, sug.name)}
+                          className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 whitespace-nowrap transition-colors"
+                        >
+                          + {sug.name}
+                        </button>
+                      ))}
+                    </div>
+                  </form>
+
                   {/* Section 1: Pinned Scriptures */}
                   <div className="flex flex-col gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
@@ -1200,7 +1431,19 @@ export default function StudyPage() {
               </p>
             </div>
             {sermonResult && (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentSlideIndex(0);
+                    setIsSlideDeckOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-purple-600/30"
+                  title="Mở chế độ trình chiếu Slide toàn màn hình"
+                >
+                  <MonitorPlay className="w-3.5 h-3.5" />
+                  <span>Trình Chiếu Slide</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleCopySermon}
@@ -2115,6 +2358,283 @@ export default function StudyPage() {
             ) : (
               <div className="p-8 text-center text-xs text-rose-400">Không thể tải dữ liệu nghiên cứu.</div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Modal: Slide Deck Presentation Mode (§50) */}
+      {isSlideDeckOpen && sermonResult && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 md:p-8 animate-in fade-in">
+          {/* Top Control Bar */}
+          <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <span className="text-xs uppercase font-bold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
+                <MonitorPlay className="w-3.5 h-3.5 text-purple-400" />
+                <span>Trình Chiếu Slide Bài Giảng • §50</span>
+              </span>
+              <span className="text-xs font-mono text-slate-400">
+                Slide {currentSlideIndex + 1} / {totalSlides}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopySlideDeck}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
+                title="Sao chép toàn bộ Slide Deck dưới định dạng Marp / Slidev Markdown"
+              >
+                {copiedSlides ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                <span>{copiedSlides ? "Đã Sao Chép!" : "Sao Chép MD Slide"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadSlideDeck}
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-purple-600/30"
+                title="Tải tệp trình chiếu Slide Deck (.md)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Tải Slide .MD</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSlideDeckOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                title="Đóng trình chiếu (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Central Slide Display Frame */}
+          <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col justify-center my-4">
+            <div className="w-full min-h-[26rem] md:min-h-[32rem] p-8 md:p-14 rounded-3xl bg-slate-900/90 border border-slate-700/80 shadow-2xl flex flex-col justify-between transition-all">
+              {/* SLIDE 0: TITLE SLIDE */}
+              {currentSlideIndex === 0 && (
+                <div className="flex flex-col justify-center h-full gap-6 my-auto text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-[11px] uppercase font-bold tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      BÀI GIẢNG GIẢI KINH • EXPOSITORY HOMILETICS
+                    </span>
+                  </div>
+                  <h1 className="text-3xl md:text-5xl font-black text-white leading-tight">
+                    {sermonResult.title}
+                  </h1>
+                  <span className="text-lg md:text-2xl font-bold text-amber-400 font-serif">
+                    {sermonResult.passage_ref}
+                  </span>
+                  <blockquote className="p-4 md:p-6 rounded-2xl bg-black/40 border border-slate-800 max-w-3xl mx-auto italic text-slate-300 text-sm md:text-base leading-relaxed">
+                    &ldquo;{sermonResult.key_verse_text}&rdquo;
+                    <span className="block mt-2 font-bold text-amber-300/90 not-italic text-xs">
+                      — {sermonResult.key_verse}
+                    </span>
+                  </blockquote>
+                  <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
+                    <span>Thính giả: <strong className="text-slate-200">{sermonAudience}</strong></span>
+                    <span>•</span>
+                    <span>Kinh Thánh: <strong className="text-slate-200">Bản Truyền Thống 1925</strong></span>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 1: BIG IDEA & CONTEXT */}
+              {currentSlideIndex === 1 && (
+                <div className="flex flex-col justify-center h-full gap-6 my-auto">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
+                    Ý NIỆM CỐT LÕI (BIG IDEA)
+                  </span>
+                  <div className="p-6 rounded-3xl bg-rose-950/30 border border-rose-800/40">
+                    <blockquote className="text-xl md:text-2xl font-serif text-rose-100 font-bold leading-relaxed italic">
+                      &ldquo;{sermonResult.big_idea}&rdquo;
+                    </blockquote>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div className="p-4 rounded-2xl bg-black/40 border border-slate-800 flex flex-col gap-2">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wide">
+                        🏛️ Bối Cảnh Lịch Sử &amp; Thần Học
+                      </span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {sermonResult.historical_context}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-black/40 border border-slate-800 flex flex-col gap-2">
+                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">
+                        🎣 Lời Mở Đầu &amp; Dẫn Nhập
+                      </span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {sermonResult.introduction_and_hook}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDES 2 .. (1 + points.length): EXPOSITORY POINTS */}
+              {currentSlideIndex >= 2 && currentSlideIndex < 2 + (sermonResult.points?.length || 0) && (
+                (() => {
+                  const ptIndex = currentSlideIndex - 2;
+                  const pt = sermonResult.points[ptIndex];
+                  if (!pt) return null;
+                  return (
+                    <div className="flex flex-col justify-center h-full gap-5 my-auto">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Luận Điểm {ptIndex + 1} / {sermonResult.points.length}
+                        </span>
+                        <span className="text-sm font-bold text-amber-400 font-serif">
+                          {pt.scripture_ref}
+                        </span>
+                      </div>
+
+                      <h2 className="text-2xl md:text-3xl font-extrabold text-white">
+                        {pt.title}
+                      </h2>
+
+                      {/* Scripture Anchor */}
+                      <blockquote className="p-4 rounded-2xl bg-amber-950/20 border-l-4 border-amber-500 pl-4 italic text-slate-300 text-xs md:text-sm leading-relaxed">
+                        &ldquo;{pt.verse_text}&rdquo;
+                      </blockquote>
+
+                      {/* Greek / Hebrew Original Language Insight */}
+                      {pt.original_language_key && (
+                        <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-800/40 text-xs text-blue-300 flex items-center gap-2">
+                          <Languages className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span><strong>Khảo sát nguyên văn gốc:</strong> {pt.original_language_key}</span>
+                        </div>
+                      )}
+
+                      {/* Exposition Text */}
+                      <div className="p-4 rounded-2xl bg-black/40 border border-slate-800">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Giải Nghĩa Trực Diện Phân Đoạn:
+                        </h4>
+                        <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                          {pt.exposition}
+                        </p>
+                      </div>
+
+                      {/* Practical Illustration */}
+                      {pt.illustration && (
+                        <div className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-200 flex items-start gap-2.5">
+                          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-emerald-300">Minh họa thực tế: </span>
+                            <span className="text-emerald-200/90">{pt.illustration}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
+
+              {/* SLIDE: PRACTICAL APPLICATIONS */}
+              {currentSlideIndex === 2 + (sermonResult.points?.length || 0) && (
+                <div className="flex flex-col justify-center h-full gap-6 my-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      ÁP DỤNG THỰC HÀNH
+                    </span>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-white">
+                    Ứng Dụng Đời Sống Cơ Đốc
+                  </h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-2">
+                    {sermonResult.practical_applications.map((app, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-2xl bg-black/40 border border-slate-800 flex items-start gap-3 text-xs md:text-sm text-slate-200"
+                      >
+                        <span className="w-6 h-6 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed font-sans">{app}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE: CONCLUSION & CALL */}
+              {currentSlideIndex === 3 + (sermonResult.points?.length || 0) && (
+                <div className="flex flex-col justify-center h-full gap-6 my-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      KẾT LUẬN &amp; LỜI KÊU GỌI
+                    </span>
+                  </div>
+
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-white">
+                    Cam Kết Đức Tin &amp; Bước Theo Chúa
+                  </h2>
+
+                  <div className="p-6 md:p-8 rounded-3xl bg-amber-950/30 border border-amber-800/40">
+                    <p className="text-sm md:text-base text-slate-200 leading-relaxed font-serif whitespace-pre-line">
+                      {sermonResult.conclusion_and_call}
+                    </p>
+                  </div>
+
+                  {sermonResult.theological_citations && sermonResult.theological_citations.length > 0 && (
+                    <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                      <span>Chú giải thần học tham chiếu: </span>
+                      {sermonResult.theological_citations.map((c, i) => (
+                        <span key={i} className="text-slate-300 font-semibold mr-3">
+                          • {c.source_title} {c.author ? `(${c.author})` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Navigation & Pagination Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800/80">
+            <span className="text-xs text-slate-500">
+              Mẹo: Dùng phím mũi tên <strong>← →</strong> hoặc <strong>Phím cách</strong> để chuyển slide • <strong>Esc</strong> để thoát
+            </span>
+
+            {/* Slide Dots */}
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: totalSlides }).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setCurrentSlideIndex(i)}
+                  className={`h-2 rounded-full transition-all ${
+                    currentSlideIndex === i ? "w-6 bg-purple-500" : "w-2 bg-slate-700 hover:bg-slate-500"
+                  }`}
+                  title={`Chuyển đến Slide ${i + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Next / Prev Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentSlideIndex === 0}
+                onClick={() => setCurrentSlideIndex(prev => Math.max(prev - 1, 0))}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white text-xs font-semibold flex items-center gap-1 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Trước</span>
+              </button>
+              <button
+                type="button"
+                disabled={currentSlideIndex === totalSlides - 1}
+                onClick={() => setCurrentSlideIndex(prev => Math.min(prev + 1, totalSlides - 1))}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-30 text-white text-xs font-bold flex items-center gap-1 transition-all shadow-md shadow-purple-600/30"
+              >
+                <span>Tiếp</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -108,7 +108,9 @@
 ---
 
 ## Future Horizon & Continuous Enhancement
-- [ ] Mobile PWA offline reading pack for local Scripture caching.
-- [ ] Seasonal reading challenge tracks (Easter, Advent, Reformation).
-- [ ] Extended Hebrew grammatical parsing for Old Testament poetic books (Psalms, Job, Proverbs).
+- [x] Mobile PWA offline reading pack with service worker pre-caching and network-first fallback (`/manifest.json`, `sw.js`).
+- [x] Seasonal reading challenge tracks (Easter/Passion Week 7, Advent 25, Reformation 30).
+- [x] Extended Hebrew grammatical parsing for Old Testament poetic books (Psalms, Job, Proverbs) covering `H1984` (Halal), `H2451` (Chokmah), `H3374` (Yirah), `H0835` (Ashrei), `H7462` (Ra'ah/Rohi), `H1350` (Go'el), `H0982` (Batach), `H6666` (Tzedakah).
+- [x] Homiletical Slide Deck Exporter & Presentation Engine (§50) with keyboard navigation and Marp/Slidev Markdown downloads.
+- [x] Bidirectional Entity Pinning into Study Projects (§50) bridging Knowledge Graph nodes into research workspaces.
 - [ ] Community sermon sharing and collaborative peer review workflows.

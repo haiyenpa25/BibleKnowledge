@@ -45,7 +45,8 @@ import {
   EyeOff,
   CheckSquare,
   Square,
-  ListChecks
+  ListChecks,
+  AlertCircle
 } from "lucide-react";
 
 interface MemorizeVerseItem {
