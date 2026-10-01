@@ -204,6 +204,11 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Endpoint**: `GET /api/graph/entities`
 - **Description**: Returns all indexed entities with descriptions, Scripture references, and relationship counts.
 
+### 4.3 Biblical Chronological Timeline (§6, §44)
+- **Endpoint**: `GET /api/graph/timeline`
+- **Description**: Returns 22 chronological redemptive history milestones covering the entire narrative from Creation to Revelation.
+- **Payload Structure**: Each event item contains `id`, `slug`, `title`, `approximate_date`, `date_type` (`exact`, `approximate`, `range`, `disputed`, `unknown`), `period`, `description`, `scripture`, `era_order`, `people` (array of historical figures), `places` (geographic settings), and `theological_significance` (Christological typology and redemptive impact).
+
 ---
 
 ## 5. Learning & Memorization Engine (`/api/learn`)

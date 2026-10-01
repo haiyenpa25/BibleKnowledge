@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { 
   Network, 
@@ -117,6 +117,9 @@ interface TimelineEvent {
   description?: string;
   scripture?: string;
   era_order: number;
+  people?: string[];
+  places?: string[];
+  theological_significance?: string;
 }
 
 interface BiblicalPlace {
@@ -238,6 +241,43 @@ export default function ExplorePage() {
   // Timeline State
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
+  const [selectedTimelineEra, setSelectedTimelineEra] = useState<string>("all");
+  const [selectedTimelineEvent, setSelectedTimelineEvent] = useState<TimelineEvent | null>(null);
+  const [timelineSearch, setTimelineSearch] = useState<string>("");
+
+  const filteredTimeline = useMemo(() => {
+    return timeline.filter((ev) => {
+      // Era filter
+      if (selectedTimelineEra === "primeval_patriarch") {
+        if (!["Creation & Primeval", "Patriarchs"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "exodus_conquest") {
+        if (!["Exodus & Wilderness", "Conquest & Settlement", "Judges"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "monarchy") {
+        if (!["United Kingdom", "Divided Kingdom"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "exile_restoration") {
+        if (!["Exile", "Return & Restoration", "Intertestamental"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "christ") {
+        if (!["Life of Christ"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "church") {
+        if (!["Early Church", "Apostolic & Revelation"].includes(ev.period || "")) return false;
+      }
+
+      // Search keyword filter
+      if (timelineSearch.trim()) {
+        const q = timelineSearch.toLowerCase();
+        const matchesTitle = ev.title.toLowerCase().includes(q);
+        const matchesDesc = (ev.description || "").toLowerCase().includes(q);
+        const matchesRef = (ev.scripture || "").toLowerCase().includes(q);
+        const matchesPeople = (ev.people || []).some(p => p.toLowerCase().includes(q));
+        const matchesPlaces = (ev.places || []).some(p => p.toLowerCase().includes(q));
+        if (!matchesTitle && !matchesDesc && !matchesRef && !matchesPeople && !matchesPlaces) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [timeline, selectedTimelineEra, timelineSearch]);
 
   // Map & Journeys State
   const [places, setPlaces] = useState<BiblicalPlace[]>([]);
@@ -1084,11 +1124,70 @@ export default function ExplorePage() {
       {/* ===================================================================== */}
       {activeTab === "timeline" && (
         <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
+          {/* Header & Description */}
           <div className="text-center flex flex-col gap-2">
+            <div className="inline-flex items-center justify-center gap-2 self-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] font-semibold text-blue-400">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Dòng Chảy Lịch Sử Cứu Chuộc • 22 Mốc Biến Cố Trọng Đại (§6, §44)</span>
+            </div>
             <h2 className="text-2xl font-extrabold text-white">Dòng Thời Gian Lịch Sử Kinh Thánh (Biblical Timeline)</h2>
-            <p className="text-xs text-slate-400">
-              Trình tự các biến cố cứu chuộc từ thuở Sáng tạo đến Hội Thánh thời kỳ các Sứ Đồ
+            <p className="text-xs text-slate-400 max-w-xl mx-auto">
+              Trình tự niên biểu các biến cố cứu rỗi từ thuở Sáng tạo, thời kỳ Tổ phụ, Vương triều, Lưu đày đến Đấng Christ và Trời Mới Đất Mới
             </p>
+          </div>
+
+          {/* Era Filter Bar & Search */}
+          <div className="flex flex-col gap-3 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={timelineSearch}
+                  onChange={(e) => setTimelineSearch(e.target.value)}
+                  placeholder="Tìm biến cố, nhân vật, địa danh, câu gốc..."
+                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+                {timelineSearch && (
+                  <button
+                    onClick={() => setTimelineSearch("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="text-[11px] text-slate-400">
+                Hiển thị <span className="font-bold text-white">{filteredTimeline.length}</span> / {timeline.length} biến cố
+              </div>
+            </div>
+
+            {/* Era Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              {[
+                { id: "all", label: `Tất Cả (${timeline.length})` },
+                { id: "primeval_patriarch", label: "Sáng Tạo & Tổ Phụ" },
+                { id: "exodus_conquest", label: "Xuất Hành & Quan Xét" },
+                { id: "monarchy", label: "Vương Triều & Tiên Tri" },
+                { id: "exile_restoration", label: "Lưu Đày & Hồi Hương" },
+                { id: "christ", label: "Chúa Giê-xu Giáng Thế" },
+                { id: "church", label: "Hội Thánh & Khải Huyền" }
+              ].map((era) => (
+                <button
+                  key={era.id}
+                  onClick={() => setSelectedTimelineEra(era.id)}
+                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs font-medium ${
+                    selectedTimelineEra === era.id
+                      ? "bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/30"
+                      : "bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/40"
+                  }`}
+                >
+                  {era.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loadingTimeline ? (
@@ -1096,38 +1195,189 @@ export default function ExplorePage() {
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
               <p className="text-xs">Đang tải dòng thời gian...</p>
             </div>
+          ) : filteredTimeline.length === 0 ? (
+            <div className="p-12 rounded-3xl glass-panel text-center text-slate-400 text-xs">
+              Không tìm thấy biến cố phù hợp với từ khóa &ldquo;{timelineSearch}&rdquo;.
+            </div>
           ) : (
-            <div className="relative border-l-2 border-slate-800 ml-4 md:ml-32 flex flex-col gap-8 py-4">
-              {timeline.map((ev) => (
+            <div className="relative border-l-2 border-slate-800 ml-4 md:ml-36 flex flex-col gap-8 py-4">
+              {filteredTimeline.map((ev) => (
                 <div key={ev.id} className="relative pl-6 md:pl-8 group">
+                  {/* Timeline Node Point */}
                   <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-slate-900 border-2 border-blue-500 group-hover:border-amber-400 group-hover:scale-125 transition-all"></div>
-                  <div className="md:absolute md:-left-36 md:top-1 text-xs font-mono font-bold text-amber-400/90 whitespace-nowrap">
-                    {ev.approximate_date}
+                  
+                  {/* Date Label on Left Side */}
+                  <div className="md:absolute md:-left-40 md:top-1 flex flex-col md:items-end">
+                    <span className="text-xs font-mono font-bold text-amber-400 whitespace-nowrap">
+                      {ev.approximate_date}
+                    </span>
+                    {ev.date_type && (
+                      <span className="text-[9px] uppercase tracking-wider text-slate-500 font-sans">
+                        {ev.date_type === "exact" ? "Chính xác" : ev.date_type === "range" ? "Thời kỳ" : ev.date_type === "disputed" ? "Tranh luận" : "Ước tính"}
+                      </span>
+                    )}
                   </div>
-                  <div className="p-5 rounded-2xl glass-card border border-slate-800 hover:border-slate-700 transition-all flex flex-col gap-2">
+
+                  {/* Card Container */}
+                  <div 
+                    onClick={() => setSelectedTimelineEvent(ev)}
+                    className="p-5 rounded-2xl glass-card border border-slate-800 hover:border-blue-500/50 hover:bg-slate-900/60 transition-all flex flex-col gap-3 cursor-pointer group shadow-sm hover:shadow-lg hover:shadow-blue-950/30"
+                  >
                     <div className="flex flex-wrap justify-between items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30">
                         {ev.period}
                       </span>
                       {ev.scripture && (
                         <Link 
                           href={`/bible?ref=${encodeURIComponent(ev.scripture)}`}
-                          className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 hover:underline"
                         >
                           <BookOpen className="w-3.5 h-3.5" />
                           <span>{ev.scripture}</span>
                         </Link>
                       )}
                     </div>
+
                     <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition-colors">
                       {ev.title}
                     </h3>
+
                     <p className="text-xs text-slate-300 leading-relaxed font-serif">
                       {ev.description}
                     </p>
+
+                    {/* Metadata Tags: People & Places */}
+                    {((ev.people && ev.people.length > 0) || (ev.places && ev.places.length > 0)) && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        {ev.people?.map((p, idx) => (
+                          <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-300 flex items-center gap-1">
+                            <Users className="w-2.5 h-2.5" />
+                            <span>{p}</span>
+                          </span>
+                        ))}
+                        {ev.places?.map((pl, idx) => (
+                          <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex items-center gap-1">
+                            <MapPin className="w-2.5 h-2.5" />
+                            <span>{pl}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="text-[11px] text-blue-400/80 font-medium pt-1 flex items-center justify-between border-t border-slate-800/60 mt-1">
+                      <span>Xem ý nghĩa cứu chuộc &amp; khảo cứu sâu →</span>
+                      <span className="text-[10px] text-slate-500">#{ev.era_order}</span>
+                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Selected Event Detail Modal */}
+          {selectedTimelineEvent && (
+            <div 
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+              onClick={() => setSelectedTimelineEvent(null)}
+            >
+              <div 
+                className="max-w-xl w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex justify-between items-start pb-2 border-b border-slate-800">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        {selectedTimelineEvent.period}
+                      </span>
+                      <span className="text-xs font-mono font-semibold text-amber-400">
+                        {selectedTimelineEvent.approximate_date}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mt-1">
+                      {selectedTimelineEvent.title}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTimelineEvent(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className="text-xs text-slate-300 leading-relaxed font-serif">
+                    {selectedTimelineEvent.description}
+                  </div>
+
+                  {/* Theological Significance Block */}
+                  {selectedTimelineEvent.theological_significance && (
+                    <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-800/50 flex flex-col gap-1.5">
+                      <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        Ý Nghĩa Thần Học &amp; Mặc Khải Cứu Chuộc:
+                      </span>
+                      <p className="text-xs text-amber-100/90 leading-relaxed font-serif">
+                        {selectedTimelineEvent.theological_significance}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Key People */}
+                  {selectedTimelineEvent.people && selectedTimelineEvent.people.length > 0 && (
+                    <div className="flex flex-col gap-1 pt-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" /> Nhân vật then chốt:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTimelineEvent.people.map((p, idx) => (
+                          <Link
+                            key={idx}
+                            href={`/explore?tab=graph&search=${encodeURIComponent(p)}`}
+                            onClick={() => setSelectedTimelineEvent(null)}
+                            className="px-2.5 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 text-xs font-medium flex items-center gap-1 transition-colors"
+                          >
+                            <span>{p}</span>
+                            <ExternalLink className="w-2.5 h-2.5 text-purple-400" />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key Places */}
+                  {selectedTimelineEvent.places && selectedTimelineEvent.places.length > 0 && (
+                    <div className="flex flex-col gap-1 pt-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" /> Địa danh &amp; Bối cảnh:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTimelineEvent.places.map((pl, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs font-medium"
+                          >
+                            {pl}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scripture Link Button */}
+                  {selectedTimelineEvent.scripture && (
+                    <Link
+                      href={`/bible?ref=${encodeURIComponent(selectedTimelineEvent.scripture)}`}
+                      className="mt-2 p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Đọc Phân Đoạn Kinh Thánh ({selectedTimelineEvent.scripture}) →</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -45,12 +45,15 @@ class TimelineEventItem(BaseModel):
     id: str
     slug: str
     title: str
-    approximate_date: Optional[str]
-    date_type: Optional[str]
-    period: Optional[str]
-    description: Optional[str]
-    scripture: Optional[str]
+    approximate_date: Optional[str] = None
+    date_type: Optional[str] = None
+    period: Optional[str] = None
+    description: Optional[str] = None
+    scripture: Optional[str] = None
     era_order: int
+    people: Optional[List[str]] = []
+    places: Optional[List[str]] = []
+    theological_significance: Optional[str] = None
 
 
 # ==============================================================================
@@ -160,7 +163,10 @@ def get_biblical_timeline(db: Session = Depends(get_db)):
             period=r.period,
             description=r.description,
             scripture=meta.get("scripture"),
-            era_order=int(meta.get("era_order", 99))
+            era_order=int(meta.get("era_order", 99)),
+            people=meta.get("people", []),
+            places=meta.get("places", []),
+            theological_significance=meta.get("theological_significance")
         ))
     return timeline
 
