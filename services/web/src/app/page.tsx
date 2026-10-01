@@ -86,12 +86,46 @@ interface DailyInsight {
     description?: string;
     scripture?: string;
   };
+  daily_quiz?: {
+    id: string;
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation: string;
+    scripture_ref: string;
+    difficulty_level: number;
+  };
+  featured_sermon?: {
+    id: string;
+    title: string;
+    passage_ref: string;
+    theme: string;
+    summary: string;
+  };
+  featured_challenge_pack?: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    total_questions: number;
+    badge_label: string;
+  };
+  featured_journey?: {
+    id: string;
+    title: string;
+    period: string;
+    waypoints_count: number;
+    description: string;
+  };
   metrics: {
     total_verses: number;
     total_chunks: number;
     total_flashcards: number;
     total_notes: number;
     total_nodes: number;
+    total_journeys?: number;
+    total_challenge_packs?: number;
+    total_sermon_presets?: number;
   };
 }
 
@@ -104,10 +138,15 @@ export default function Home() {
   const [loadingDaily, setLoadingDaily] = useState(true);
   const [copiedVerse, setCopiedVerse] = useState(false);
 
+  // Daily Quiz Interactive State (§53)
+  const [selectedQuizIdx, setSelectedQuizIdx] = useState<number | null>(null);
+  const [hasAnsweredQuiz, setHasAnsweredQuiz] = useState<boolean>(false);
+
   // Verse Query State
   const [searchRef, setSearchRef] = useState("Ma-thi-ơ 14:22 - 15:5");
   const [rangeData, setRangeData] = useState<VerseRangeResponse | null>(null);
   const [queryLoading, setQueryLoading] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
   const router = useRouter();
   const [aiResearchInput, setAiResearchInput] = useState("");
 
@@ -424,6 +463,157 @@ export default function Home() {
                 </Link>
               </div>
             </div>
+          </div>
+
+          {/* Row 2: Interactive Daily Quiz + Featured Journey + Featured Expository Sermon (§9, §46, §50, §53) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 4. Interactive Daily Quiz Card */}
+            {dailyInsight.daily_quiz && (
+              <div className="md:col-span-1 rounded-3xl glass-card border border-emerald-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-emerald-950/40">
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                      <GraduationCap className="w-3 h-3" /> Đố Vui Hôm Nay (§3, §53)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Cấp độ: {dailyInsight.daily_quiz.difficulty_level}/5
+                    </span>
+                  </div>
+
+                  <h4 className="text-xs md:text-sm font-bold text-white leading-relaxed">
+                    {dailyInsight.daily_quiz.question}
+                  </h4>
+
+                  {/* Options */}
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    {dailyInsight.daily_quiz.options.map((opt, idx) => {
+                      const isSelected = selectedQuizIdx === idx;
+                      const isCorrect = idx === dailyInsight.daily_quiz?.correct_index;
+                      let btnStyle = "bg-slate-900/80 border-slate-700/60 text-slate-300 hover:border-emerald-500/50 hover:bg-slate-800/80";
+                      if (hasAnsweredQuiz) {
+                        if (isCorrect) {
+                          btnStyle = "bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold";
+                        } else if (isSelected) {
+                          btnStyle = "bg-rose-950/80 border-rose-500 text-rose-300";
+                        } else {
+                          btnStyle = "bg-slate-900/40 border-slate-800 text-slate-500";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={hasAnsweredQuiz}
+                          onClick={() => {
+                            setSelectedQuizIdx(idx);
+                            setHasAnsweredQuiz(true);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl border text-xs transition-all flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span className="font-sans line-clamp-1">{opt}</span>
+                          {hasAnsweredQuiz && isCorrect && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                          {hasAnsweredQuiz && isSelected && !isCorrect && <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Explanation feedback */}
+                  {hasAnsweredQuiz && (
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] flex flex-col gap-1 animate-in fade-in">
+                      <span className={selectedQuizIdx === dailyInsight.daily_quiz.correct_index ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                        {selectedQuizIdx === dailyInsight.daily_quiz.correct_index ? "✔ Chính xác! (+20 XP)" : "✖ Chưa chính xác!"}
+                      </span>
+                      <p className="text-slate-300 leading-relaxed font-sans">{dailyInsight.daily_quiz.explanation}</p>
+                      {dailyInsight.daily_quiz.scripture_ref && (
+                        <span className="text-slate-400 font-mono pt-0.5">Kinh văn: {dailyInsight.daily_quiz.scripture_ref}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 text-[11px]">30 câu hỏi đa dạng</span>
+                  <Link
+                    href="/learn"
+                    className="text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1"
+                  >
+                    Vào Học Tập & Gói Đề →
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* 5. Featured Biblical Journey Card */}
+            {dailyInsight.featured_journey && (
+              <div className="md:col-span-1 rounded-3xl glass-card border border-cyan-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-cyan-950/40">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-1">
+                      <Compass className="w-3 h-3" /> Hành Trình Kinh Thánh (§9)
+                    </span>
+                    <span className="text-[11px] font-mono text-cyan-300">
+                      {dailyInsight.featured_journey.waypoints_count} Trạm Dừng
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white">
+                    {dailyInsight.featured_journey.title}
+                  </h4>
+                  <span className="text-xs text-cyan-300 font-medium">
+                    Thời kỳ: {dailyInsight.featured_journey.period}
+                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed line-clamp-3 font-sans">
+                    {dailyInsight.featured_journey.description}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 text-[11px]">9 Tuyến Không Gian</span>
+                  <Link
+                    href="/explore"
+                    className="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1"
+                  >
+                    Xem Bản Đồ & Tour →
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* 6. Featured Expository Sermon Blueprint Card */}
+            {dailyInsight.featured_sermon && (
+              <div className="md:col-span-1 rounded-3xl glass-card border border-rose-500/30 p-6 flex flex-col justify-between gap-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-rose-950/40">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-amber-300" /> Bài Giảng Giải Kinh (§50)
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-rose-300">
+                      {dailyInsight.featured_sermon.passage_ref}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white line-clamp-2">
+                    {dailyInsight.featured_sermon.title}
+                  </h4>
+                  <span className="text-xs text-amber-300 font-medium">
+                    Chủ đề: {dailyInsight.featured_sermon.theme}
+                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed line-clamp-3 font-serif">
+                    {dailyInsight.featured_sermon.summary}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 text-[11px]">4 Mẫu Kinh Điển</span>
+                  <Link
+                    href="/study"
+                    className="text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1"
+                  >
+                    Soạn Bài Giảng →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}

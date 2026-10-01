@@ -390,7 +390,57 @@ def get_daily_insight(db: Session = Depends(get_db)):
             "scripture": (e_row.metadata or {}).get("scripture")
         }
 
-    # 4. System Counts
+    # 4. Daily Quiz Question (§3, §46, §53)
+    q_row = db.execute(
+        text("SELECT id, question_text, options, correct_option, explanation, scripture_reference, difficulty FROM quiz_questions ORDER BY RANDOM() LIMIT 1")
+    ).fetchone()
+    daily_quiz = None
+    if q_row:
+        daily_quiz = {
+            "id": str(q_row.id),
+            "question": q_row.question_text,
+            "options": q_row.options if isinstance(q_row.options, list) else json.loads(q_row.options or "[]"),
+            "correct_index": q_row.correct_option,
+            "explanation": q_row.explanation or "",
+            "scripture_ref": q_row.scripture_reference or "",
+            "difficulty_level": q_row.difficulty
+        }
+
+    # 5. Featured Sermon Blueprint (§50)
+    from app.routers.study import SERMON_PRESETS
+    featured_sermon = {
+        "id": SERMON_PRESETS[0].id,
+        "title": SERMON_PRESETS[0].title,
+        "passage_ref": SERMON_PRESETS[0].passage_ref,
+        "theme": SERMON_PRESETS[0].theme,
+        "summary": SERMON_PRESETS[0].summary
+    }
+
+    # 6. Featured Challenge Pack (§46)
+    from app.routers.learn import CHALLENGE_PACKS_DATA
+    cp = CHALLENGE_PACKS_DATA[0]
+    featured_pack = {
+        "id": cp["id"],
+        "title": cp["title"],
+        "description": cp["description"],
+        "category": cp["category"],
+        "total_questions": cp["total_questions"],
+        "badge_label": cp["badge_label"]
+    }
+
+    # 7. Featured Biblical Journey (§9)
+    from app.routers.graph import list_biblical_journeys
+    all_j = list_biblical_journeys()
+    fj = all_j[1] if len(all_j) > 1 else all_j[0]
+    featured_journey = {
+        "id": fj["id"],
+        "title": fj["title"],
+        "period": fj["period"],
+        "waypoints_count": len(fj.get("waypoints", [])),
+        "description": fj["description"]
+    }
+
+    # 8. System Counts & Metrics
     total_verses = db.execute(text("SELECT count(*) FROM bible_verses")).scalar() or 0
     total_chunks = db.execute(text("SELECT count(*) FROM document_chunks")).scalar() or 0
     total_flashcards = db.execute(text("SELECT count(*) FROM flashcards")).scalar() or 0
@@ -401,12 +451,19 @@ def get_daily_insight(db: Session = Depends(get_db)):
         "verse_of_the_day": verse_data,
         "person_of_the_day": person_data,
         "event_of_the_day": event_data,
+        "daily_quiz": daily_quiz,
+        "featured_sermon": featured_sermon,
+        "featured_challenge_pack": featured_pack,
+        "featured_journey": featured_journey,
         "metrics": {
             "total_verses": total_verses,
             "total_chunks": total_chunks,
             "total_flashcards": total_flashcards,
             "total_notes": total_notes,
-            "total_nodes": total_nodes
+            "total_nodes": total_nodes,
+            "total_journeys": len(all_j),
+            "total_challenge_packs": len(CHALLENGE_PACKS_DATA),
+            "total_sermon_presets": len(SERMON_PRESETS)
         }
     }
 
