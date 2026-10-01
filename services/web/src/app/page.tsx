@@ -195,6 +195,12 @@ export default function Home() {
               <GraduationCap className="w-4 h-4" /> Học Tập & Đố Vui (Learn) →
             </a>
             <a 
+              href="/explore"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-600/30"
+            >
+              <Network className="w-4 h-4" /> Khám Phá & Đồ Thị (Explore) →
+            </a>
+            <a 
               href="/research"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
             >
@@ -261,21 +267,23 @@ export default function Home() {
           </a>
 
           {/* Layer 3: Connect */}
-          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-indigo-500">
+          <a href="/explore" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-indigo-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3">
                 <Network className="w-5 h-5" />
               </div>
               <div className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Tầng 3</div>
-              <h4 className="text-lg font-bold text-white mt-1">Kết Nối (Connect)</h4>
+              <h4 className="text-lg font-bold text-white mt-1 group-hover:text-indigo-300 transition-colors flex items-center justify-between">
+                Kết Nối (Connect) <span>→</span>
+              </h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Đồ thị tri thức Knowledge Graph (Cytoscape.js), biểu diễn tương tác giữa Nhân vật, Địa danh, Biến cố và Tham chiếu chéo giữa các sách.
+                Đồ thị tri thức Knowledge Graph, biểu diễn tương tác giữa Nhân vật, Địa danh, Biến cố và Dòng thời gian lịch sử cứu rỗi.
               </p>
             </div>
-            <div className="pt-3 border-t border-slate-800 text-xs text-slate-400 font-medium">
-              Mô hình Đồ thị & Phả hệ
+            <div className="pt-3 border-t border-slate-800 text-xs text-indigo-400/80 font-medium">
+              Mạng lưới Đồ thị & Timeline →
             </div>
-          </div>
+          </a>
 
           {/* Layer 4: Research */}
           <a href="/research" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">

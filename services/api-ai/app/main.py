@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import health, ai, bible, rag, learn
+from app.routers import health, ai, bible, rag, learn, graph
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -24,6 +24,7 @@ app.include_router(ai.router, prefix=settings.API_PREFIX)
 app.include_router(bible.router, prefix=settings.API_PREFIX)
 app.include_router(rag.router, prefix=settings.API_PREFIX)
 app.include_router(learn.router, prefix=settings.API_PREFIX)
+app.include_router(graph.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/")
