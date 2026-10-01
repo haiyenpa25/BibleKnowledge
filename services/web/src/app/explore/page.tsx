@@ -30,8 +30,46 @@ import {
   HelpCircle,
   Layers,
   GitBranch,
-  ShieldAlert
+  ShieldAlert,
+  Columns,
+  GitCompare
 } from "lucide-react";
+
+interface HarmonyVerse {
+  verse: number;
+  text_vi: string;
+  text_kjv?: string;
+  section_title?: string;
+}
+
+interface HarmonyPassageItem {
+  book_code: string;
+  book_name: string;
+  ref: string;
+  chapter: number;
+  start_verse: number;
+  end_verse: number;
+  theological_focus: string;
+  total_verses?: number;
+  verses?: HarmonyVerse[];
+}
+
+interface HarmonyEventItem {
+  id: string;
+  title_vi: string;
+  title_en: string;
+  category: string;
+  period_date: string;
+  location: string;
+  summary: string;
+  passages: Record<string, HarmonyPassageItem>;
+  synoptic_distinctives: {
+    shared_elements: string[];
+    unique_details: Record<string, string>;
+    theological_significance: string;
+    key_themes: string[];
+  };
+}
 
 interface CrossBibleConnection {
   id: string;
@@ -161,7 +199,17 @@ interface CharacterStudyData {
 }
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology" | "harmony">("graph");
+
+  // Gospel Harmony & Parallel Passages State (§8, §18)
+  const [harmonyEvents, setHarmonyEvents] = useState<HarmonyEventItem[]>([]);
+  const [harmonyCategories, setHarmonyCategories] = useState<string[]>([]);
+  const [selectedHarmonyCat, setSelectedHarmonyCat] = useState<string>("Tất cả");
+  const [harmonySearch, setHarmonySearch] = useState<string>("");
+  const [selectedHarmonyEvent, setSelectedHarmonyEvent] = useState<HarmonyEventItem | null>(null);
+  const [loadingHarmonyList, setLoadingHarmonyList] = useState<boolean>(false);
+  const [loadingHarmonyDetail, setLoadingHarmonyDetail] = useState<boolean>(false);
+  const [speakingPassage, setSpeakingPassage] = useState<string | null>(null);
 
   // Character Dossier Modal State (§7)
   const [isDossierOpen, setIsDossierOpen] = useState(false);
@@ -383,16 +431,103 @@ export default function ExplorePage() {
     }
   };
 
+  // Fetch Gospel Harmony & Cross-Passage Parallels (§8, §18)
+  const fetchHarmonyEvents = async (cat?: string, search?: string) => {
+    setLoadingHarmonyList(true);
+    try {
+      let url = `${apiUrl}/api/bible/harmony-events?`;
+      const curCat = cat !== undefined ? cat : selectedHarmonyCat;
+      const curSearch = search !== undefined ? search : harmonySearch;
+      if (curCat && curCat !== "Tất cả") url += `category=${encodeURIComponent(curCat)}&`;
+      if (curSearch) url += `search=${encodeURIComponent(curSearch)}&`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const evs = data.events || [];
+        setHarmonyEvents(evs);
+        if (data.categories) setHarmonyCategories(data.categories);
+        if (evs.length > 0 && !selectedHarmonyEvent) {
+          loadHarmonyDetail(evs[0].id);
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching harmony events:", e);
+    } finally {
+      setLoadingHarmonyList(false);
+    }
+  };
+
+  const loadHarmonyDetail = async (eventId: string) => {
+    setLoadingHarmonyDetail(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/harmony-detail?event_id=${encodeURIComponent(eventId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedHarmonyEvent(data);
+      }
+    } catch (e) {
+      console.error("Error loading harmony detail:", e);
+    } finally {
+      setLoadingHarmonyDetail(false);
+    }
+  };
+
+  const speakPassageText = (passageKey: string, textToSpeak: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speakingPassage === passageKey) {
+      window.speechSynthesis.cancel();
+      setSpeakingPassage(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = "vi-VN";
+    utterance.rate = 0.95;
+    utterance.onend = () => setSpeakingPassage(null);
+    utterance.onerror = () => setSpeakingPassage(null);
+    setSpeakingPassage(passageKey);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const getHarmonyBookStyle = (bookCode: string) => {
+    switch (bookCode.toLowerCase()) {
+      case "mat":
+        return { label: "Ma-thi-ơ", badge: "MT", bg: "bg-amber-500/20", border: "border-amber-500/40", text: "text-amber-300", accent: "Vua Đấng Mê-si & Luật Pháp" };
+      case "mac":
+        return { label: "Mác", badge: "MK", bg: "bg-emerald-500/20", border: "border-emerald-500/40", text: "text-emerald-300", accent: "Đầy Tớ Đau Thương & Hành Động" };
+      case "lu":
+        return { label: "Lu-ca", badge: "LK", bg: "bg-blue-500/20", border: "border-blue-500/40", text: "text-blue-300", accent: "Con Người Nhân Từ & Cứu Chuộc" };
+      case "gi":
+        return { label: "Giăng", badge: "JN", bg: "bg-purple-500/20", border: "border-purple-500/40", text: "text-purple-300", accent: "Con Đức Chúa Trời & Thần Tính" };
+      case "2sa":
+        return { label: "II Sa-mu-ên", badge: "2SA", bg: "bg-sky-500/20", border: "border-sky-500/40", text: "text-sky-300", accent: "Lịch Sử & Tiên Tri Cựu Ước" };
+      case "1su":
+        return { label: "I Sử-ký", badge: "1SU", bg: "bg-rose-500/20", border: "border-rose-500/40", text: "text-rose-300", accent: "Góc Nhìn Thuộc Linh & Đền Thờ" };
+      case "1vua":
+        return { label: "I Các Vua", badge: "1VUA", bg: "bg-sky-500/20", border: "border-sky-500/40", text: "text-sky-300", accent: "Vương Triều Sa-lô-môn" };
+      case "2su":
+        return { label: "II Sử-ký", badge: "2SU", bg: "bg-rose-500/20", border: "border-rose-500/40", text: "text-rose-300", accent: "Phục Hưng Thờ Phượng" };
+      case "cong":
+        return { label: "Công-vụ", badge: "CV", bg: "bg-teal-500/20", border: "border-teal-500/40", text: "text-teal-300", accent: "Thánh Linh & Hội Thánh Đầu Tiên" };
+      default:
+        return { label: bookCode.toUpperCase(), badge: bookCode.toUpperCase(), bg: "bg-slate-500/20", border: "border-slate-500/40", text: "text-slate-300", accent: "Tài Liệu Song Hành" };
+    }
+  };
+
   useEffect(() => {
     fetchGraph();
     fetchTimeline();
     fetchMapData();
     fetchConnections();
+    fetchHarmonyEvents();
   }, [apiUrl]);
 
   useEffect(() => {
     if (activeTab === "typology" && connections.length === 0) {
       fetchConnections();
+    }
+    if (activeTab === "harmony" && harmonyEvents.length === 0) {
+      fetchHarmonyEvents();
     }
   }, [activeTab]);
 
@@ -608,6 +743,19 @@ export default function ExplorePage() {
             }`}
           >
             <Sparkles className="w-4 h-4 text-amber-300" /> Hình Bóng & Tiên Tri (§18)
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("harmony");
+              if (harmonyEvents.length === 0) fetchHarmonyEvents();
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "harmony"
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <Columns className="w-4 h-4 text-purple-300" /> Hòa Hợp Phúc Âm & Song Hành (§8, §18)
           </button>
         </div>
       </header>
@@ -1650,6 +1798,413 @@ export default function ExplorePage() {
                 <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
                   <BookOpen className="w-8 h-8 text-slate-600" />
                   <p className="text-xs">Chọn một cặp liên kết bên trái để mở rộng phân tích chi tiết.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 6. GOSPEL HARMONY & CROSS-PASSAGE PARALLELS (§8, §18) */}
+      {/* ===================================================================== */}
+      {activeTab === "harmony" && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner */}
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-950/40 via-indigo-950/40 to-slate-900/60 border border-purple-800/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Columns className="w-3 h-3" /> Nghiên Cứu Đối Chiếu Đa Chiều (§8, §18)
+                </span>
+                <span className="text-xs text-slate-400 font-mono">16+ Biến Cố Song Hành</span>
+              </div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <GitCompare className="w-5 h-5 text-purple-400" />
+                Hòa Hợp Phúc Âm & Các Bản Song Hành Lịch Sử
+              </h2>
+              <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                Đối chiếu văn bản Kinh Thánh nguyên ngữ và tiếng Việt 1925 song song giữa 4 sách Phúc Âm (Ma-thi-ơ, Mác, Lu-ca, Giăng) cùng các cặp ký thuật song hành Cựu Ước (Các Vua vs Sử Ký) với phân tích sắc thái thần học riêng biệt.
+              </p>
+            </div>
+            
+            <Link
+              href="/research?tab=agent"
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-purple-600/30 shrink-0"
+            >
+              <Sparkles className="w-4 h-4 text-purple-200" /> AI Nghiên Cứu Chuyên Sâu
+            </Link>
+          </div>
+
+          {/* Filters & Search */}
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+            {/* Category Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+              <span className="text-slate-400 whitespace-nowrap">Chủ đề:</span>
+              {(harmonyCategories.length > 0 ? harmonyCategories : ["Tất cả", "Khởi Đầu Chức Vụ", "Phép Lạ Quyền Năng", "Dụ Ngôn Nước Trời", "Tuần Lễ Khổ Nạn", "Phục Sinh & Thăng Thiên", "Song Hành Cựu Ước"]).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedHarmonyCat(cat);
+                    fetchHarmonyEvents(cat, harmonySearch);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    selectedHarmonyCat === cat
+                      ? "bg-purple-600 text-white font-semibold shadow-md shadow-purple-600/30"
+                      : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/60"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative min-w-[240px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Tìm sự kiện, địa danh, câu gốc..."
+                value={harmonySearch}
+                onChange={(e) => {
+                  setHarmonySearch(e.target.value);
+                  fetchHarmonyEvents(selectedHarmonyCat, e.target.value);
+                }}
+                className="w-full bg-slate-900 border border-slate-700 text-xs text-white pl-9 pr-8 py-2 rounded-xl focus:outline-none focus:border-purple-500"
+              />
+              {harmonySearch && (
+                <button
+                  onClick={() => {
+                    setHarmonySearch("");
+                    fetchHarmonyEvents(selectedHarmonyCat, "");
+                  }}
+                  className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Master-Detail Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Events Navigation List (4 cols) */}
+            <div className="lg:col-span-4 flex flex-col gap-2.5 max-h-[820px] overflow-y-auto pr-1">
+              {loadingHarmonyList && harmonyEvents.length === 0 ? (
+                <div className="p-8 rounded-2xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+                  <span className="text-xs">Đang tải danh mục song hành...</span>
+                </div>
+              ) : harmonyEvents.length === 0 ? (
+                <div className="p-8 rounded-2xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400 text-center">
+                  <Info className="w-6 h-6 text-slate-500" />
+                  <p className="text-xs">Không tìm thấy sự kiện nào khớp với từ khóa tìm kiếm.</p>
+                </div>
+              ) : (
+                harmonyEvents.map((ev) => {
+                  const isSelected = selectedHarmonyEvent?.id === ev.id;
+                  const passageKeys = Object.keys(ev.passages || {});
+                  return (
+                    <button
+                      key={ev.id}
+                      onClick={() => loadHarmonyDetail(ev.id)}
+                      className={`w-full text-left p-4 rounded-2xl border transition-all flex flex-col gap-2.5 ${
+                        isSelected
+                          ? "bg-purple-950/40 border-purple-500/60 shadow-lg shadow-purple-900/20"
+                          : "bg-slate-900/50 hover:bg-slate-850 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          {ev.category}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {ev.period_date}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <h3 className={`text-xs font-bold leading-snug ${isSelected ? "text-purple-200" : "text-slate-200"}`}>
+                          {ev.title_vi}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 italic">
+                          {ev.title_en}
+                        </p>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                        {ev.summary}
+                      </p>
+
+                      {/* Book Badges */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-800/60">
+                        {passageKeys.map((k) => {
+                          const pInfo = ev.passages[k];
+                          const style = getHarmonyBookStyle(pInfo.book_code);
+                          return (
+                            <span
+                              key={k}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${style.bg} ${style.text} ${style.border}`}
+                              title={`${pInfo.book_name} (${pInfo.ref})`}
+                            >
+                              {style.badge}
+                            </span>
+                          );
+                        })}
+                        <span className="text-[10px] text-slate-500 ml-auto font-sans">
+                          {ev.location}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right Column: Comparative Side-by-Side Synoptic Stage (8 cols) */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              {loadingHarmonyDetail ? (
+                <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                  <p className="text-xs">Đang tải đối chiếu câu Kinh Thánh song hành...</p>
+                </div>
+              ) : selectedHarmonyEvent ? (
+                <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+                  {/* Event Detail Header */}
+                  <div className="p-6 rounded-3xl glass-panel border border-slate-800 flex flex-col gap-3 shadow-xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold">
+                          {selectedHarmonyEvent.category}
+                        </span>
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" /> {selectedHarmonyEvent.period_date}
+                        </span>
+                        <span className="text-xs text-slate-400 flex items-center gap-1 ml-2">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500" /> {selectedHarmonyEvent.location}
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/research?q=${encodeURIComponent(`Phân tích đối chiếu Phúc Âm sự kiện: ${selectedHarmonyEvent.title_vi}`)}`}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/20"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Hỏi AI Về Sự Kiện Này
+                      </Link>
+                    </div>
+
+                    <h2 className="text-lg font-bold text-white leading-tight">
+                      {selectedHarmonyEvent.title_vi}
+                    </h2>
+                    <p className="text-xs text-slate-400 italic">
+                      {selectedHarmonyEvent.title_en}
+                    </p>
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800/80">
+                      {selectedHarmonyEvent.summary}
+                    </p>
+                  </div>
+
+                  {/* Synchronized Side-by-Side Columns */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                        <Columns className="w-4 h-4 text-purple-400" /> Đối Chiếu Văn Bản Song Hành (Parallel Columns)
+                      </h3>
+                      <span className="text-[11px] text-slate-400">
+                        {Object.keys(selectedHarmonyEvent.passages || {}).length} nguồn chứng ngôn
+                      </span>
+                    </div>
+
+                    <div className={`grid grid-cols-1 ${
+                      Object.keys(selectedHarmonyEvent.passages || {}).length >= 4
+                        ? "md:grid-cols-2 xl:grid-cols-4"
+                        : Object.keys(selectedHarmonyEvent.passages || {}).length === 3
+                        ? "md:grid-cols-3"
+                        : "md:grid-cols-2"
+                    } gap-4`}>
+                      {Object.entries(selectedHarmonyEvent.passages || {}).map(([key, passage]) => {
+                        const style = getHarmonyBookStyle(passage.book_code);
+                        const isSpeakingThis = speakingPassage === key;
+                        const allPassageText = (passage.verses || []).map(v => `${v.verse}. ${v.text_vi}`).join(" ");
+
+                        return (
+                          <div
+                            key={key}
+                            className={`rounded-2xl border flex flex-col justify-between overflow-hidden bg-slate-900/70 border-slate-800 transition-all hover:border-slate-700 shadow-lg`}
+                          >
+                            {/* Column Header */}
+                            <div className={`p-4 border-b ${style.border} bg-slate-950/80 flex flex-col gap-2`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-6 h-6 rounded-lg ${style.bg} ${style.text} ${style.border} border text-[11px] font-bold flex items-center justify-center`}>
+                                    {style.badge}
+                                  </span>
+                                  <span className="text-xs font-bold text-white">
+                                    {passage.book_name}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => speakPassageText(key, allPassageText)}
+                                    title="Nghe đọc đoạn văn bản này bằng TTS"
+                                    className={`p-1.5 rounded-lg border text-xs transition-colors ${
+                                      isSpeakingThis
+                                        ? "bg-purple-600 text-white border-purple-500 animate-pulse"
+                                        : "bg-slate-800 text-slate-300 hover:text-white border-slate-700 hover:bg-slate-700"
+                                    }`}
+                                  >
+                                    {isSpeakingThis ? <Pause className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                                  </button>
+                                  <Link
+                                    href={`/bible?book=${passage.book_code}&chapter=${passage.chapter}`}
+                                    target="_blank"
+                                    title="Mở toàn bộ chương trong Bible Reader"
+                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-700 transition-colors"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </Link>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className={`font-semibold ${style.text}`}>
+                                  {passage.ref}
+                                </span>
+                                <span className="text-slate-400 text-[10px]">
+                                  {passage.total_verses || (passage.verses?.length || 0)} câu
+                                </span>
+                              </div>
+
+                              {/* Author Focus */}
+                              <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 text-[10px] text-slate-300 leading-snug">
+                                <span className="text-purple-300 font-semibold block mb-0.5">Sắc thái thần học:</span>
+                                {passage.theological_focus}
+                              </div>
+                            </div>
+
+                            {/* Verses Text Body */}
+                            <div className="p-4 flex flex-col gap-3 max-h-[460px] overflow-y-auto">
+                              {(passage.verses || []).map((v) => (
+                                <div key={v.verse} className="flex flex-col gap-1 text-xs">
+                                  {v.section_title && (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400/90 mt-1">
+                                      {v.section_title}
+                                    </span>
+                                  )}
+                                  <div className="flex items-start gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold flex items-center justify-center shrink-0 border border-slate-700 mt-0.5">
+                                      {v.verse}
+                                    </span>
+                                    <p className="text-slate-200 leading-relaxed font-sans">
+                                      {v.text_vi}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Scholarly Harmony Synthesis Card */}
+                  {selectedHarmonyEvent.synoptic_distinctives && (
+                    <div className="p-6 rounded-3xl glass-panel border border-slate-800 flex flex-col gap-5 shadow-xl">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                          Tổng Hợp Học Thuật & Ý Nghĩa Thần Học Hiệp Nhất (Synoptic Synthesis)
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Consensus */}
+                        <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-800/40 flex flex-col gap-2.5">
+                          <h4 className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Điểm Đồng Thuận Cốt Lõi (Shared Elements)
+                          </h4>
+                          <ul className="flex flex-col gap-2 mt-1">
+                            {selectedHarmonyEvent.synoptic_distinctives.shared_elements?.map((item, idx) => (
+                              <li key={idx} className="text-xs text-slate-200 leading-relaxed flex items-start gap-2">
+                                <span className="text-emerald-400 font-bold shrink-0">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Unique Variations */}
+                        <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-800/40 flex flex-col gap-2.5">
+                          <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <GitBranch className="w-3.5 h-3.5 text-indigo-400" /> Sắc Thái Riêng Biệt Từng Tác Giả (Unique Details)
+                          </h4>
+                          <div className="flex flex-col gap-2 mt-1">
+                            {Object.entries(selectedHarmonyEvent.synoptic_distinctives.unique_details || {}).map(([bKey, note]) => {
+                              const style = getHarmonyBookStyle(bKey);
+                              return (
+                                <div key={bKey} className="text-xs text-slate-200 leading-relaxed flex items-start gap-2 p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${style.bg} ${style.text} ${style.border}`}>
+                                    {style.badge}
+                                  </span>
+                                  <span>{note}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Theological Significance & Key Themes */}
+                      <div className="p-5 rounded-2xl bg-purple-950/20 border border-purple-800/40 flex flex-col gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <h4 className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Ý Nghĩa Thần Học Hiệp Nhất (Theological Significance)
+                          </h4>
+                          <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                            {selectedHarmonyEvent.synoptic_distinctives.theological_significance}
+                          </p>
+                        </div>
+
+                        {/* Key Themes Pills */}
+                        {selectedHarmonyEvent.synoptic_distinctives.key_themes && (
+                          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-purple-800/30">
+                            <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Chủ đề then chốt:</span>
+                            {selectedHarmonyEvent.synoptic_distinctives.key_themes.map((theme, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30 text-[10px] font-medium"
+                              >
+                                #{theme}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Navigation Actions */}
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <Link
+                          href="/bible"
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                        >
+                          <BookOpen className="w-3.5 h-3.5 text-indigo-400" /> Tra Xem Toàn Bộ Kinh Thánh
+                        </Link>
+                        <Link
+                          href={`/study?event=${encodeURIComponent(selectedHarmonyEvent.id)}`}
+                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-purple-600/20"
+                        >
+                          <Layers className="w-3.5 h-3.5" /> Mở Trong Study Projects Workspace
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Columns className="w-8 h-8 text-slate-600" />
+                  <p className="text-xs">Chọn một sự kiện song hành bên trái để mở rộng đối chiếu chi tiết.</p>
                 </div>
               )}
             </div>

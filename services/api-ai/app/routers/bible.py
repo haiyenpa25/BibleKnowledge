@@ -1113,4 +1113,1048 @@ def get_parallel_chapter(
     }
 
 
+# ==============================================================================
+# SECTION 8 & 18: GOSPEL HARMONY & CROSS-PASSAGE PARALLELS CATALOG & ENDPOINTS
+# ==============================================================================
+
+HARMONY_EVENTS_CATALOG: List[Dict[str, Any]] = [
+    {
+        "id": "baptism_of_jesus",
+        "title_vi": "Lễ Báp-têm Của Chúa Giê-xu & Chúa Ba Ngôi Hiện Diện",
+        "title_en": "The Baptism of Jesus & The Triune Revelation",
+        "category": "Khởi Đầu Chức Vụ",
+        "period_date": "Mùa thu năm 26 hoặc 27 CN",
+        "location": "Sông Giô-đanh (Bê-tha-ni bên kia sông Giô-đanh)",
+        "summary": "Chúa Giê-xu chịu báp-têm bởi Giăng Báp-tít để làm trọn mọi sự công bình. Đức Thánh Linh ngự xuống như chim bồ câu và tiếng Đức Chúa Cha phán từ trời.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 3:13-17",
+                "chapter": 3,
+                "start_verse": 13,
+                "end_verse": 17,
+                "theological_focus": "Nhấn mạnh cuộc đối thoại với Giăng Báp-tít để 'làm trọn mọi sự công bình' của Luật pháp và chức vụ Đấng Mê-si."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 1:9-11",
+                "chapter": 1,
+                "start_verse": 9,
+                "end_verse": 11,
+                "theological_focus": "Hành văn nhanh gọn, dùng chữ 'ngay lập tức' (euthus), các từng trời 'xé ra' (schizomenous)."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 3:21-22",
+                "chapter": 3,
+                "start_verse": 21,
+                "end_verse": 22,
+                "theological_focus": "Ghi nhận chi tiết Chúa Giê-xu đang cầu nguyện khi trời mở ra; nhấn mạnh Thánh Linh lấy hình thể như chim bồ câu."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 1:29-34",
+                "chapter": 1,
+                "start_verse": 29,
+                "end_verse": 34,
+                "theological_focus": "Lời chứng trực tiếp của Giăng Báp-tít: 'Kìa, Chiên Con của Đức Chúa Trời', xác nhận Khải thị Đấng làm phép báp-têm bằng Đức Thánh Linh."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Đức Thánh Linh ngự xuống như hình chim bồ câu",
+                "Tiếng phán của Đức Chúa Cha từ trời tuyên xưng Con Yêu Dấu",
+                "Sự chứng thực thiêng liêng về thần tính của Chúa Cứu Thế"
+            ],
+            "unique_details": {
+                "matthew": "Đối thoại giữa Chúa Giê-xu và Giăng về sự xứng đáng và sự công bình.",
+                "mark": "Mô tả các từng trời bị 'xé rách' (tương đồng với bức màn đền thờ bị xé khi Ngài trút linh hồn).",
+                "luke": "Chúa Giê-xu đang cầu nguyện và toàn thể dân chúng cũng đã chịu báp-têm.",
+                "john": "Lời tôn xưng Chiên Con của Đức Chúa Trời cất tội lỗi thế gian đi."
+            },
+            "theological_significance": "Sự mạc khải công khai đầu tiên về Ba Ngôi Đức Chúa Trời cùng lúc trong Tân Ước: Con vâng phục, Thánh Linh ngự xuống, Cha chuẩn nhận.",
+            "key_themes": ["Ba Ngôi Đức Chúa Trời", "Sự Công Bình", "Xức Dầu Thánh Linh", "Chiên Con Cứu Chuộc"]
+        }
+    },
+    {
+        "id": "temptation_in_wilderness",
+        "title_vi": "Sự Cám Dỗ Trong Sa Mạc (Chúa Giê-xu Đắc Thắng Ma Quỷ)",
+        "title_en": "The Temptation of Jesus in the Wilderness",
+        "category": "Khởi Đầu Chức Vụ",
+        "period_date": "Mùa đông năm 26-27 CN (ngay sau Lễ Báp-têm)",
+        "location": "Đồng vắng Giu-đê",
+        "summary": "Sau 40 ngày kiêng ăn, Chúa Giê-xu bị ma quỷ cám dỗ về thể xác, danh vọng và quyền lực. Ngài đắc thắng hoàn toàn bằng Lời Đức Chúa Trời trích từ Phục Truyền.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 4:1-11",
+                "chapter": 4,
+                "start_verse": 1,
+                "end_verse": 11,
+                "theological_focus": "Thứ tự cám dỗ: Bánh mì -> Nóc đền thờ -> Các nước thế gian (kết thúc bằng núi cao nơi Đấng Mê-si từ chối quyền lực ma quỷ)."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 1:12-13",
+                "chapter": 1,
+                "start_verse": 12,
+                "end_verse": 13,
+                "theological_focus": "Tóm lược súc tích, Đức Thánh Linh 'thúc giục' Ngài vào đồng vắng; Ngài ở giữa các thú rừng và các thiên sứ hầu việc Ngài."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 4:1-13",
+                "chapter": 4,
+                "start_verse": 1,
+                "end_verse": 13,
+                "theological_focus": "Thứ tự: Bánh mì -> Các nước thế gian -> Nóc đền thờ (kết thúc tại Giê-ru-sa-lem, trọng tâm địa lý cứu rỗi của Lu-ca)."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "40 ngày kiêng ăn trong đồng vắng dưới sự dẫn dắt của Đức Thánh Linh",
+                "Satan dùng chính Lời Chúa để bóp méo mục đích cứu rỗi",
+                "Chúa Giê-xu đánh tan ma quỷ độc nhất bằng Lời Kinh Thánh (Phục Truyền)"
+            ],
+            "unique_details": {
+                "matthew": "Nhấn mạnh Chúa từ chối quỳ lạy Satan để nhận các vương quốc trần gian, thiên sứ đến hầu việc.",
+                "mark": "Chi tiết sống chung với thú rừng nơi hoang vắng (biểu tượng phục hồi địa đàng bình an).",
+                "luke": "Ghi nhận Satan tạm lìa Ngài 'cho đến một dịp tiện khác' (báo hiệu cuộc chiến Gethsemane)."
+            },
+            "theological_significance": "Chúa Giê-xu là A-đam Thứ Hai trung tín và là Y-sơ-ra-ên thật vượt qua 40 năm thử thách sa mạc mà không phạm tội.",
+            "key_themes": ["Lời Đức Chúa Trời", "Đắc Thắng Cám Dỗ", "A-đam Thứ Hai", "Kiêng Ăn Cầu Nguyện"]
+        }
+    },
+    {
+        "id": "parable_of_the_sower",
+        "title_vi": "Dụ Ngôn Người Gieo Giống & Bốn Loại Đất Lòng",
+        "title_en": "The Parable of the Sower & The Four Soils",
+        "category": "Dụ Ngôn Nước Trời",
+        "period_date": "Khoảng năm 28 CN",
+        "location": "Bờ Biển Ga-li-lê (ngồi trên thuyền giảng giải)",
+        "summary": "Dụ ngôn nền tảng về Nước Trời: Hạt giống Đạo rơi vào bên đường, nơi đá sỏi, bụi gai, và đất tốt, tượng trưng cho thái độ đón nhận Lời Đức Chúa Trời.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 13:1-9",
+                "chapter": 13,
+                "start_verse": 1,
+                "end_verse": 9,
+                "theological_focus": "Mở đầu cụm 7 dụ ngôn Nước Trời; kết quả bội phần: 'một hạt ra một trăm, một hạt ra sáu chục, một hạt ra ba chục'."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 4:1-9",
+                "chapter": 4,
+                "start_verse": 1,
+                "end_verse": 9,
+                "theological_focus": "Kèm lời kêu gọi 'Hãy lắng nghe!' (Shema) và thứ tự kết quả tăng tiến: ba chục -> sáu chục -> một trăm."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 8:4-8",
+                "chapter": 8,
+                "start_verse": 4,
+                "end_verse": 8,
+                "theological_focus": "Thêm chi tiết hạt giống bên đường 'bị giày đạp dưới chân'; giải thích đất tốt là tấm lòng 'thành thật trọn vẹn, kiên trì kết quả'."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Bốn tình trạng của hạt giống ứng với bốn thái độ tâm linh",
+                "Giải nghĩa rõ ràng cho môn đồ về kẻ thù ma quỷ cướp Lời, bắt bớ làm khô héo, lo toan nghẹt ngòi"
+            ],
+            "unique_details": {
+                "matthew": "Tập trung vào sự hiểu biết Lời Chúa và trái bông hạt.",
+                "mark": "Cấu trúc lời giảng trên thuyền với lời cảnh tỉnh lắng nghe mạnh mẽ.",
+                "luke": "Nhấn mạnh sự 'kiên trì chịu đựng' (hypomone) của mảnh đất tốt."
+            },
+            "theological_significance": "Quyền năng biến đổi nằm nơi hạt giống tinh ròng (Lời Chúa), nhưng trách nhiệm đáp ứng thuộc về sự cày xới của tấm lòng con người.",
+            "key_themes": ["Lời Đức Chúa Trời", "Nước Thiên Đàng", "Sự Bắt Bớ", "Trái Thánh Linh"]
+        }
+    },
+    {
+        "id": "calming_the_storm",
+        "title_vi": "Chúa Yên Lặng Sóng Gió Biển Hồ Ga-li-lê",
+        "title_en": "Jesus Calms the Wind and the Sea",
+        "category": "Phép Lạ Quyền Năng",
+        "period_date": "Năm 28 CN",
+        "location": "Biển Ga-li-lê",
+        "summary": "Một cơn bão bất ngờ dâng sóng ngập thuyền khi Chúa đang ngủ. Các môn đồ kinh hãi thức Ngài dậy. Ngài quở gió và biển, tất cả liền yên lặng như tờ.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 8:23-27",
+                "chapter": 8,
+                "start_verse": 23,
+                "end_verse": 27,
+                "theological_focus": "Chúa quở trách sự yếu đức tin của môn đồ TRƯỚC rồi mới quở bão biển; dùng từ bão lớn là 'seismos' (cơn chấn động)."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 4:35-41",
+                "chapter": 4,
+                "start_verse": 35,
+                "end_verse": 41,
+                "theological_focus": "Chi tiết sống động: Chúa đang ngủ ở đằng lái trên một chiếc gối; lời truyền lệnh: 'Hãy êm đi, lặng đi!' (siopa, pephimoso)."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 8:22-25",
+                "chapter": 8,
+                "start_verse": 22,
+                "end_verse": 25,
+                "theological_focus": "Nhấn mạnh câu hỏi sâu sắc: 'Đức tin các ngươi ở đâu?'; các môn đồ run sợ và thán phục quyền năng Đấng Tạo Hóa."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Cơn bão bất thình lình trên hồ nước ngọt",
+                "Chúa Giê-xu có uy quyền tối thượng trên các thế lực tự nhiên",
+                "Môn đồ sững sờ: 'Người nầy là ai mà gió và biển cũng đều vâng lệnh?'"
+            ],
+            "unique_details": {
+                "matthew": "Quy tụ trong cụm 10 phép lạ chứng minh quyền năng Vua Đấng Mê-si.",
+                "mark": "Chi tiết Chúa gối đầu ngủ trên gối nơi lái thuyền biểu hiện sự an nghỉ tuyệt đối trong Đức Chúa Cha.",
+                "luke": "Nêu rõ bão táp ập xuống hồ và nước dâng đầy hiểm nghèo."
+            },
+            "theological_significance": "Khẳng định thần tính của Đức Chúa Giê-xu: Chỉ có Đức Giê-hô-va trong Cựu Ước mới dẹp yên sóng gió biển khơi (Thi thiên 107:29).",
+            "key_themes": ["Thần Tính Của Đấng Christ", "Đức Tin", "Bình An Vượt Mọi Hoàn Cảnh", "Tạo Hóa Vâng Phục"]
+        }
+    },
+    {
+        "id": "feeding_5000",
+        "title_vi": "Phép Lạ Hóa Bánh Nuôi 5.000 Người (Có Trong Cả 4 Phúc Âm)",
+        "title_en": "Feeding of the 5,000 (Recorded in All Four Gospels)",
+        "category": "Phép Lạ Quyền Năng",
+        "period_date": "Mùa xuân năm 29 CN (gần Lễ Vượt Qua)",
+        "location": "Bê-sai-đa, sườn đồi phía đông bắc Biển Ga-li-lê",
+        "summary": "Phép lạ duy nhất được ghi lại trong cả 4 Phúc Âm: Từ 5 chiếc bánh mạch nha và 2 con cá nhỏ của một em bé, Chúa chúc tạ và bẻ ra cho hơn 5.000 người ăn no nê còn thừa 12 giỏ.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 14:13-21",
+                "chapter": 14,
+                "start_verse": 13,
+                "end_verse": 21,
+                "theological_focus": "Ghi rõ số lượng 5.000 người nam chưa kể đàn bà con trẻ; lòng thương xót chữa lành người đau ốm trước khi cho ăn."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 6:30-44",
+                "chapter": 6,
+                "start_verse": 30,
+                "end_verse": 44,
+                "theological_focus": "Mô tả dân chúng như 'chiên không có người chăn'; sắp xếp dân chúng ngồi từng nhóm 50 và 100 trên cỏ xanh."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 9:10-17",
+                "chapter": 9,
+                "start_verse": 10,
+                "end_verse": 17,
+                "theological_focus": "Định vị rõ tại thành Bê-sai-đa; Chúa tiếp đón dân chúng, giảng về Nước Đức Chúa Trời và chữa lành kẻ bệnh."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 6:1-14",
+                "chapter": 6,
+                "start_verse": 1,
+                "end_verse": 14,
+                "theological_focus": "Nêu đích danh Phi-líp và Anh-rê; chính Anh-rê dẫn cậu bé mang 5 ổ bánh mạch nha và 2 con cá đến; dẫn nhập bài giảng 'Bánh Sự Sống'."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Năm chiếc bánh và hai con cá",
+                "Chúa ngước mắt lên trời, tạ ơn, bẻ bánh ra giao cho môn đồ phân phát",
+                "Hơn 5.000 người ăn thỏa mãn và thu lại đúng 12 giỏ bánh vụn đầy"
+            ],
+            "unique_details": {
+                "matthew": "Nhấn mạnh số lượng chưa kể đàn bà và con trẻ.",
+                "mark": "Hình ảnh cỏ xanh rực rỡ và các nhóm ngồi hàng lối như những luống hoa.",
+                "luke": "Nối liền với cuộc hồi trình sau chuyến sai phái 12 sứ đồ đi truyền giáo.",
+                "john": "Bối cảnh Lễ Vượt Qua gần kề và phản ứng dân chúng muốn tôn Chúa làm Vua."
+            },
+            "theological_significance": "Tiên trưng Chúa Giê-xu là Bánh Hằng Sống từ trời ban xuống; hình bóng tiệc Vượt Qua Mới và Đấng Chăn Chiên Lành chu cấp trọn vẹn.",
+            "key_themes": ["Bánh Sự Sống", "Lòng Thương Xót", "Sự Cung Ứng Siêu Nhiên", "Lễ Vượt Qua"]
+        }
+    },
+    {
+        "id": "walking_on_water",
+        "title_vi": "Chúa Đi Bộ Trên Mặt Nước & Phi-e-rơ Bước Ra Khỏi Thuyền",
+        "title_en": "Jesus Walks on the Water & Peter's Step of Faith",
+        "category": "Phép Lạ Quyền Năng",
+        "period_date": "Đêm ngay sau phép lạ hóa bánh cho 5.000 người (năm 29 CN)",
+        "location": "Biển Ga-li-lê (canh tư đêm)",
+        "summary": "Môn đồ chèo thuyền ngược gió bão giữa hồ. Vào canh tư đêm, Chúa đi bộ trên mặt nước đến với họ. Phi-e-rơ xin bước đi trên nước, nhưng khi thấy gió thổi thì hoảng sợ bắt đầu chìm.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 14:22-33",
+                "chapter": 14,
+                "start_verse": 22,
+                "end_verse": 33,
+                "theological_focus": "Sách duy nhất ghi lại biến cố Phi-e-rơ bước xuống nước; lời kêu cứu 'Chúa ôi, xin cứu tôi!' và lời xưng nhận: 'Thầy thật là Con Đức Chúa Trời!'"
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 6:45-52",
+                "chapter": 6,
+                "start_verse": 45,
+                "end_verse": 52,
+                "theological_focus": "Ghi nhận chi tiết Chúa muốn 'đi vượt qua họ'; nhấn mạnh lòng môn đồ còn cứng cỏi chưa hiểu phép lạ hóa bánh."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 6:16-21",
+                "chapter": 6,
+                "start_verse": 16,
+                "end_verse": 21,
+                "theological_focus": "Lời tuyên bố thần thượng 'Chính Ta đây (Ego Eimi), đừng sợ!'; thuyền lập tức cặp bờ nơi họ định đến một cách diệu kỳ."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Chúa một mình lên núi cầu nguyện sau khi giải tán dân chúng",
+                "Thuyền gặp sóng gió ngược dòng giữa biển đêm",
+                "Chúa đi bộ trên mặt biển; môn đồ tưởng là ma và la hét",
+                "Lời trấn an vang dội: 'Hãy yên lòng, Ta đây, đừng sợ!'"
+            ],
+            "unique_details": {
+                "matthew": "Ký thuật đầy đủ về Phi-e-rơ đi trên nước và tay Chúa đưa ra nắm lấy ông.",
+                "mark": "Ghi nhận sự kinh ngạc cực độ của môn đồ vì lòng họ còn chai lì chưa ngộ phép lạ bánh.",
+                "john": "Phép lạ không gian: Vừa khi tiếp Ngài vào thuyền, thuyền liền tới ngay bến đỗ."
+            },
+            "theological_significance": "Lời tuyên xưng thần danh 'EGO EIMI' (Ta Là Đấng Tự Hữu Hằng Hữu); Đấng đạp trên các ngọn sóng của biển cả (Gióp 9:8).",
+            "key_themes": ["Đức Tin & Nghi Ngờ", "Ego Eimi (Ta Là)", "Quyền Bính Vũ Trụ", "Sự Cầu Nguyện"]
+        }
+    },
+    {
+        "id": "peters_confession",
+        "title_vi": "Lời Tuyên Tín Của Phi-e-rơ Tại Sê-sa-rê Phi-líp",
+        "title_en": "Peter's Great Confession at Caesarea Philippi",
+        "category": "Khởi Đầu Chức Vụ",
+        "period_date": "Mùa thu năm 29 CN",
+        "location": "Vùng Sê-sa-rê Phi-líp (chân Núi Hẹt-môn)",
+        "summary": "Tại trung tâm thờ lạy tà thần ngoại giáo, Chúa hỏi: 'Các ngươi nói Ta là ai?'. Phi-e-rơ tuyên xưng: 'Thầy là Đấng Christ, Con Đức Chúa Trời hằng sống'.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 16:13-20",
+                "chapter": 16,
+                "start_verse": 13,
+                "end_verse": 20,
+                "theological_focus": "Ghi chép lời chúc phước cho Si-môn Ba-giô-na; lời hứa xây dựng Hội Thánh trên vầng đá và chìa khóa Nước Thiên Đàng."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 8:27-30",
+                "chapter": 8,
+                "start_verse": 27,
+                "end_verse": 30,
+                "theological_focus": "Ngắn gọn, trực tiếp: 'Thầy là Đấng Christ'; sau đó lập tức Chúa báo trước về sự thương khó và chịu chết."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 9:18-21",
+                "chapter": 9,
+                "start_verse": 18,
+                "end_verse": 21,
+                "theological_focus": "Chi tiết Chúa đang 'cầu nguyện riêng' trước khi hỏi các môn đồ; lời tuyên tín: 'Thầy là Đấng Christ của Đức Chúa Trời'."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Bối cảnh câu hỏi dân chúng coi Ngài là ai (Giăng Báp-tít, Ê-li, Giê-rê-mi, hay đấng tiên tri nào đó)",
+                "Lời tuyên xưng Đấng Christ then chốt biến đổi toàn bộ chặng đường chức vụ"
+            ],
+            "unique_details": {
+                "matthew": "Tuyên bố xây Hội Thánh, cửa âm phủ không thắng nổi, và trao quyền buộc/mở trên trời.",
+                "mark": "Đóng vai trò bản lề trung tâm của toàn bộ sách Mác (từ chức vụ phép lạ chuyển sang con đường Thập tự giá).",
+                "luke": "Nối kết biến cố với sự tĩnh nguyện sâu nhiệm của Chúa Giê-xu."
+            },
+            "theological_significance": "Bước ngoặt trong sự mặc khải Cơ Đốc học: Nhận diện Đấng Mê-si không phải là vua chinh chiến chính trị mà là Tôi Tớ Đau Thương chịu chết chuộc tội.",
+            "key_themes": ["Cơ Đốc Học", "Nền Tảng Hội Thánh", "Khải Thị Thuộc Linh", "Thập Tự Giá"]
+        }
+    },
+    {
+        "id": "the_transfiguration",
+        "title_vi": "Sự Hóa Hình Trên Núi Thánh (Vinh Hiển Nước Trời)",
+        "title_en": "The Transfiguration of Jesus on the Mount",
+        "category": "Khởi Đầu Chức Vụ",
+        "period_date": "Năm 29 CN (khoảng 6-8 ngày sau lời tuyên tín)",
+        "location": "Núi cao (truyền thống là Núi Hẹt-môn hoặc Núi Tha-bô)",
+        "summary": "Chúa đưa Phi-e-rơ, Gia-cơ và Giăng lên núi. Dung mạo Ngài biến đổi sáng lòa như mặt trời, áo trắng tinh. Môi-se và Ê-li hiện ra đàm đạo với Ngài. Mây sáng rực bao phủ và tiếng Chúa Cha phán.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 17:1-9",
+                "chapter": 17,
+                "start_verse": 1,
+                "end_verse": 9,
+                "theological_focus": "Khuôn mặt Ngài 'sáng lòa như mặt trời'; các môn đồ sấp mặt xuống đất kinh hãi; Chúa đến sờ họ và phán 'Đừng sợ'."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 9:2-10",
+                "chapter": 9,
+                "start_verse": 2,
+                "end_verse": 10,
+                "theological_focus": "Mô tả chiếc áo trắng chói lọi 'không một thợ nhuộm nào trên đất có thể làm trắng được như vậy'; bối rối của Phi-e-rơ khi không biết mình nói gì."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 9:28-36",
+                "chapter": 9,
+                "start_verse": 28,
+                "end_verse": 36,
+                "theological_focus": "Sách duy nhất ghi lại đề tài cuộc đàm đạo: Môi-se và Ê-li nói về 'sự xuất hành' (exodos) mà Chúa sắp hoàn tất tại Giê-ru-sa-lem."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Ba môn đồ thân tín: Phi-e-rơ, Gia-cơ, Giăng",
+                "Môi-se (đại diện Luật Pháp) và Ê-li (đại diện Tiên Tri) xuất hiện",
+                "Đám mây sáng che phủ và tiếng phán từ trời: 'Nầy là Con yêu dấu của Ta... hãy nghe Ngài!'"
+            ],
+            "unique_details": {
+                "matthew": "Mặt Chúa sáng như mặt trời, thiên sứ không cần thiết hiện ra vì Chúa chính là nguồn sáng.",
+                "mark": "Nhấn mạnh sự kinh hãi và việc giữ bí mật cho đến khi Con Người từ kẻ chết sống lại.",
+                "luke": "Nội dung cuộc trò chuyện về sự chết tại Giê-ru-sa-lem (Exodus mới giải cứu nhân loại)."
+            },
+            "theological_significance": "Chúa Giê-xu trổi hơn và làm trọn vẹn cả Luật pháp lẫn Tiên tri; hé mở trước vinh quang tái lâm của Con Trời.",
+            "key_themes": ["Vinh Quang Thiên Thượng", "Luật Pháp & Tiên Tri", "Exodus Mới", "Vâng Nghe Lời Chúa"]
+        }
+    },
+    {
+        "id": "triumphal_entry",
+        "title_vi": "Chúa Vào Thành Giê-ru-sa-lem Khải Hoàn (Chúa Nhật Lễ Lá)",
+        "title_en": "The Triumphal Entry into Jerusalem (Palm Sunday)",
+        "category": "Tuần Lễ Khổ Nạn",
+        "period_date": "Nisan 9 hoặc 10, năm 30 CN (Chủ Nhật trước Lễ Vượt Qua)",
+        "location": "Từ Núi Ô-liu, Bê-pha-gê đến Cổng Đông Thành Giê-ru-sa-lem",
+        "summary": "Chúa Giê-xu cỡi lừa con tiến vào Giê-ru-sa-lem trong tiếng reo hò 'Hô-sa-na!' của đoàn dân rải áo và cành kè đón Vua Đấng Mê-si khiêm nhường.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 21:1-11",
+                "chapter": 21,
+                "start_verse": 1,
+                "end_verse": 11,
+                "theological_focus": "Trích dẫn trực tiếp lời tiên tri Xa-cha-ri 9:9: 'Kìa, Vua ngươi đến cùng ngươi, nhu mì cỡi lừa'; cả thành đều chấn động hỏi 'Người nầy là ai?'."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 11:1-11",
+                "chapter": 11,
+                "start_verse": 1,
+                "end_verse": 11,
+                "theological_focus": "Ký thuật chi tiết việc tìm lừa con chưa ai từng cưỡi; kết thúc bằng việc Chúa vào đền thờ xem xét mọi sự rồi trở về Bê-tha-ni."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 19:28-40",
+                "chapter": 19,
+                "start_verse": 28,
+                "end_verse": 40,
+                "theological_focus": "Ghi nhận người Pha-ri-si đòi cấm môn đồ reo hò; Chúa đáp: 'Nếu họ nín lặng thì đá sẽ kêu lên!'; tiếp theo là phân đoạn Chúa khóc thương thành Giê-ru-sa-lem."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 12:12-19",
+                "chapter": 12,
+                "start_verse": 12,
+                "end_verse": 19,
+                "theological_focus": "Ghi rõ dân chúng cầm các 'nhành kè' (la-ba); gắn liền cơn sốt của đám đông với phép lạ Chúa vừa kêu La-xa-rơ sống lại."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Cỡi lừa con thay vì ngựa chiến thể hiện Vua Bình An khiêm nhường",
+                "Tiếng tung hô trích Thi thiên 118:25-26: 'Hô-sa-na! Đáng chúc tụng Đấng nhân danh Chúa mà đến!'",
+                "Trải áo xống và cành cây trên đường đón Vua"
+            ],
+            "unique_details": {
+                "matthew": "Nhắc cả lừa mẹ và lừa con theo sát lời thi ca đối xứng của Xa-cha-ri.",
+                "mark": "Chúa vào nhìn quanh đền thờ lúc trời đã tối rồi mới rút lui về Bê-tha-ni.",
+                "luke": "Lời tuyên bố chấn động về việc sỏi đá sẽ cất tiếng ngợi khen và nước mắt của Ngài khóc cho thành.",
+                "john": "Mối liên hệ nhân quả với sự việc La-xa-rơ sống lại khiến giới cầm quyền thốt lên: 'Cả thế gian đều chạy theo người!'."
+            },
+            "theological_significance": "Sự xuất hiện công khai chính thức của Vua Giao Ước; chọn con lừa biểu thị vương quyền cứu chuộc trong hòa bình chứ không phải bạo lực quân sự.",
+            "key_themes": ["Vua Khiêm Nhu", "Hô-sa-na", "Lời Tiên Tri Ứng Nghiệm", "Lễ Vượt Qua"]
+        }
+    },
+    {
+        "id": "the_last_supper",
+        "title_vi": "Lễ Tiệc Thánh & Thiết Lập Giao Ước Mới",
+        "title_en": "The Last Supper & Institution of the New Covenant",
+        "category": "Tuần Lễ Khổ Nạn",
+        "period_date": "Nisan 14, năm 30 CN (Tối Thứ Năm)",
+        "location": "Phòng Cao, Thành Giê-ru-sa-lem",
+        "summary": "Trong bữa ăn Lễ Vượt Qua cuối cùng, Chúa Giê-xu cầm bánh bẻ ra và chén rượu trao cho môn đồ, thiết lập Giao Ước Mới trong huyết Ngài đổ ra tha tội cho muôn người.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 26:26-29",
+                "chapter": 26,
+                "start_verse": 26,
+                "end_verse": 29,
+                "theological_focus": "Nhấn mạnh huyết giao ước đổ ra 'cho nhiều người được tha tội' (sự cứu chuộc đại diện thay thế)."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 14:22-25",
+                "chapter": 14,
+                "start_verse": 22,
+                "end_verse": 25,
+                "theological_focus": "Hành văn trực tiếp, nhấn mạnh 'hết thảy đều uống chén ấy' và lời thề không uống rượu nho cho đến ngày trong Nước Trời."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 22:14-20",
+                "chapter": 22,
+                "start_verse": 14,
+                "end_verse": 20,
+                "theological_focus": "Hai chiếc chén; công thức tưởng niệm muôn đời: 'Hãy làm sự nầy để nhớ đến Ta'; nhấn mạnh thân thể vì anh em mà phó cho."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 13:1-17",
+                "chapter": 13,
+                "start_verse": 1,
+                "end_verse": 17,
+                "theological_focus": "Không tập trung vào bánh chén mà khắc họa hành động Chúa quấn khăn rửa chân cho từng môn đồ như bài học khiêm nhường tột cùng."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Bánh tượng trưng thân thể Đấng Christ vỡ tan vì nhân loại",
+                "Chén rượu nho tượng trưng Huyết của Giao Ước Mới",
+                "Lời cảnh báo về kẻ phản bội Giu-đa Ích-ca-ri-ốt"
+            ],
+            "unique_details": {
+                "matthew": "Mục đích rõ rệt: 'được tha tội' (eis aphesin hamartion).",
+                "mark": "Cấu trúc súc tích dồn sức nặng vào chén huyết giao ước.",
+                "luke": "Mạng lệnh lập lễ tưởng niệm thường xuyên cho Hội Thánh ('Hãy làm điều này').",
+                "john": "Gương rửa chân và Điều Răn Mới: 'Các ngươi hãy yêu nhau như Ta đã yêu các ngươi'."
+            },
+            "theological_significance": "Hoàn tất lễ nghi Chiên Con Vượt Qua Cựu Ước, khai sinh Giao Ước Mới đời đời bằng huyết vô tội của Đấng Cứu Thế.",
+            "key_themes": ["Giao Ước Mới", "Sự Cứu Chuộc Tha Tội", "Khiêm Nhường Rửa Chân", "Tiệc Thánh Tưởng Niệm"]
+        }
+    },
+    {
+        "id": "gethsemane_agony",
+        "title_vi": "Nỗi Thống Khổ & Lời Cầu Nguyện Tại Vườn Ghết-sê-ma-nê",
+        "title_en": "The Agony & Submission in the Garden of Gethsemane",
+        "category": "Tuần Lễ Khổ Nạn",
+        "period_date": "Đêm Thứ Năm rạng sáng Thứ Sáu (Nisan 14)",
+        "location": "Vườn Ghết-sê-ma-nê (dưới chân Núi Ô-liu)",
+        "summary": "Đối diện với chén thạnh nộ của tội lỗi nhân loại, Chúa Giê-xu đau đớn tột cùng cầu nguyện: 'Xin chén nầy lìa khỏi Con, song không theo ý Con mà theo ý Cha'. Môn đồ ngủ mê vì mệt mỏi.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 26:36-46",
+                "chapter": 26,
+                "start_verse": 36,
+                "end_verse": 46,
+                "theological_focus": "Ba lần Chúa cầu nguyện cùng một lời; Ngài than thở: 'Linh hồn Ta buồn rầu cay đắng cho đến chết'."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 14:32-42",
+                "chapter": 14,
+                "start_verse": 32,
+                "end_verse": 42,
+                "theological_focus": "Tiếng kêu thân thương bằng tiếng A-ram: 'A-ba, Cha ôi! Mọi sự Cha đều làm được'; sự kinh hãi và xao xuyến tột bực."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 22:39-46",
+                "chapter": 22,
+                "start_verse": 39,
+                "end_verse": 46,
+                "theological_focus": "Thiên sứ từ trời hiện đến thêm sức; cơn đau thương quằn quại khiến mồ hôi Ngài trở nên như những giọt máu lớn rơi xuống đất."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 18:1-11",
+                "chapter": 18,
+                "start_verse": 1,
+                "end_verse": 11,
+                "theological_focus": "Không chép lại lời cầu nguyện xin cất chén mà nhấn mạnh quyền năng uy nghi: Khi Chúa phán 'Chính Ta đây', quân lính đều thối lui ngã xuống đất."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Đưa Phi-e-rơ, Gia-cơ, Giăng đi riêng vào chỗ cầu nguyện sâu hơn",
+                "Cuộc chiến cam go giữa sự yếu đuối xác thịt và sự vâng phục tuyệt đối ý chỉ Đức Chúa Cha",
+                "Môn đồ ngủ gục vì buồn rầu"
+            ],
+            "unique_details": {
+                "matthew": "Nhấn mạnh ba lần cầu nguyện kiên định không đổi.",
+                "mark": "Ghi giữ danh xưng thân mật 'Abba' phản ánh tình phụ tử thâm sâu.",
+                "luke": "Bác sĩ Lu-ca mô tả hiện tượng sinh lý học mồ hôi như máu (hematidrosis) và thiên sứ thêm sức.",
+                "john": "Tư thế chủ động của Chúa bảo vệ môn đồ: 'Nếu các ngươi tìm Ta thì hãy để cho những người nầy đi'."
+            },
+            "theological_significance": "Sự đầu phục hoàn toàn của Ý Chí Con Người Đấng Christ trước Ý Chỉ Cứu Chuộc của Đức Chúa Cha; Ngài nhận lấy chén thịnh nộ thay cho tội nhân.",
+            "key_themes": ["Sự Vâng Phục Tột Cùng", "Chén Thạnh Nộ", "Cầu Nguyện Đắc Thắng", "Tình Yêu Cha Con"]
+        }
+    },
+    {
+        "id": "crucifixion_of_jesus",
+        "title_vi": "Sự Chết Chuộc Tội Của Chúa Giê-xu Trên Thập Tự Giá",
+        "title_en": "The Crucifixion & Atoning Death of Jesus Christ",
+        "category": "Tuần Lễ Khổ Nạn",
+        "period_date": "Nisan 14, năm 30 CN (Thứ Sáu, từ 9h sáng đến 3h chiều)",
+        "location": "Đồi Gô-gô-tha (Nơi Sọ), bên ngoài tường thành Giê-ru-sa-lem",
+        "summary": "Chúa Giê-xu bị đóng đinh giữa hai tên trộm cướp. Trời tối sầm trong ba tiếng đồng hồ. Chúa trút linh hồn sau khi kêu lớn; bức màn đền thờ bị xé làm đôi từ trên xuống dưới.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 27:32-50",
+                "chapter": 27,
+                "start_verse": 32,
+                "end_verse": 50,
+                "theological_focus": "Tiếng kêu trích Thi thiên 22: 'Ê-li, Ê-li, lam-ma sa-bách-ta-ni?'; đất rúng động, vầng đá nứt nẻ và mồ mả người thánh mở ra."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 15:21-37",
+                "chapter": 15,
+                "start_verse": 21,
+                "end_verse": 37,
+                "theological_focus": "Ghi mốc thời gian giờ thứ ba (9h sáng); lời thú nhận của thầy đội La Mã: 'Người nầy thật là Con Đức Chúa Trời!'."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 23:26-46",
+                "chapter": 23,
+                "start_verse": 26,
+                "end_verse": 46,
+                "theological_focus": "Lời cầu tha thứ cho kẻ hành hình; cuộc đối thoại cứu rỗi tên cướp biết ăn năn: 'Hôm nay ngươi sẽ ở với Ta trong nơi Ba-ra-đi'; lời trút hơi thở: 'Cha ôi, Con giao linh hồn lại trong tay Cha'."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 19:16-30",
+                "chapter": 19,
+                "start_verse": 16,
+                "end_verse": 30,
+                "theological_focus": "Gửi gắm mẹ Ma-ri cho sứ đồ Giăng; lời phán long trời lở đất: 'Mọi sự đã được trọn!' (Tetelestai) - công cuộc cứu chuộc đã hoàn tất mỹ mãn."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Bảng án viết trên đầu thập tự bằng ba thứ tiếng: 'Jêsus Người Na-xa-rét, Vua Dân Giu-đa'",
+                "Binh lính bắt thăm chia nhau áo xống ứng nghiệm Thi thiên 22",
+                "Bóng tối bao trùm khắp xứ từ giờ thứ sáu đến giờ thứ chín (12h trưa đến 3h chiều)",
+                "Bức màn đền thờ bị xé đôi từ trên xuống dưới"
+            ],
+            "unique_details": {
+                "matthew": "Động đất dữ dội, mồ mả người thánh mở ra báo trước sự đắc thắng sự chết.",
+                "mark": "Lời tuyên xưng thần tính then chốt của thầy đội La Mã.",
+                "luke": "Ân điển cứu rỗi tức thì cho tên trộm cướp trên thập tự giá.",
+                "john": "Lời tuyên bố chiến thắng 'Mọi sự đã trọn' và huyết cùng nước tuôn trào từ cạnh sườn bị đâm thủng."
+            },
+            "theological_significance": "Trọng tâm của Tin Lành: Sự hy sinh chuộc tội đại diện một lần đủ cả; xóa bỏ bức tường ngăn cách giữa Đức Chúa Trời và con người.",
+            "key_themes": ["Sự Chuộc Tội Thay Thế", "Tetelestai (Mọi Sự Đã Trọn)", "Bức Màn Đền Thờ Xé Đôi", "Ân Điển Cứu Rỗi"]
+        }
+    },
+    {
+        "id": "resurrection_empty_tomb",
+        "title_vi": "Sự Sống Lại Vinh Hiển & Ngôi Mộ Trống",
+        "title_en": "The Glorious Resurrection & The Empty Tomb",
+        "category": "Phục Sinh & Thăng Thiên",
+        "period_date": "Nisan 16, năm 30 CN (Sáng sớm Chúa Nhật Phục Sinh)",
+        "location": "Khu vườn có ngôi mộ đá của Giô-sép người A-ri-ma-thê",
+        "summary": "Sáng sớm ngày thứ nhất trong tuần, những người nữ đến mộ và thấy hòn đá đã lăn ra khỏi cửa mộ. Thiên sứ báo tin: 'Ngài không ở đây đâu, Ngài sống lại rồi như lời Ngài đã phán'.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 28:1-10",
+                "chapter": 28,
+                "start_verse": 1,
+                "end_verse": 10,
+                "theological_focus": "Động đất lớn, thiên sứ từ trời lăn hòn đá ngồi lên trên; quân lính canh mộ run rẩy như kẻ chết; Chúa phục sinh hiện ra đón các người nữ."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 16:1-8",
+                "chapter": 16,
+                "start_verse": 1,
+                "end_verse": 8,
+                "theological_focus": "Các người nữ lo lắng 'Ai sẽ lăn hòn đá lấp cửa mộ giùm chúng ta?'; thấy một người trẻ tuổi mặc áo dài trắng ngồi bên hữu."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 24:1-12",
+                "chapter": 24,
+                "start_verse": 1,
+                "end_verse": 12,
+                "theological_focus": "Hai người nam mặc áo sáng chói phán: 'Sao các ngươi tìm kẻ sống trong vòng kẻ chết?'; Phi-e-rơ chạy đến mộ thấy chỉ còn lại vải liệm."
+            },
+            "john": {
+                "book_code": "gi",
+                "book_name": "Giăng",
+                "ref": "Giăng 20:1-10",
+                "chapter": 20,
+                "start_verse": 1,
+                "end_verse": 10,
+                "theological_focus": "Cuộc chạy đua giữa Phi-e-rơ và sứ đồ Giăng; khăn che đầu Chúa được cuốn tròn để riêng một nơi minh chứng đây là sự phục sinh trật tự siêu nhiên chứ không phải trộm xác."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Thời điểm sáng sớm ngày thứ nhất trong tuần khi trời còn mờ sương",
+                "Hòn đá nặng chặn cửa mộ đã được lăn ra",
+                "Ngôi mộ trống hoàn toàn không còn thi hài Chúa",
+                "Sứ điệp phục sinh giao cho các phụ nữ làm những người chứng kiến đầu tiên"
+            ],
+            "unique_details": {
+                "matthew": "Sự hiện diện của lính canh La Mã bị hối lộ để phao tin thất thiệt.",
+                "mark": "Mạng lệnh đặc biệt: 'Hãy đi nói cho môn đồ Ngài VÀ PHI-E-RƠ' (sự phục hồi người từng vấp ngã).",
+                "luke": "Lời nhắc nhở về những lời Chúa đã phán khi còn ở xứ Ga-li-lê.",
+                "john": "Chi tiết khăn trùm đầu xếp riêng ngăn nắp thuyết phục môn đồ Giăng tin ngay lập tức."
+            },
+            "theological_significance": "Chiến thắng chung cuộc trên sự chết và ma quỷ; sự xác nhận của Đức Chúa Cha rằng sự hy sinh chuộc tội của Con Ngài đã được nhậm trọn vẹn.",
+            "key_themes": ["Sự Sống Lại", "Ngôi Mộ Trống", "Chiến Thắng Sự Chết", "Niềm Hy Vọng Sống"]
+        }
+    },
+    {
+        "id": "great_commission_ascension",
+        "title_vi": "Đại Mạng Lệnh & Sự Thăng Thiên Của Chúa Cứu Thế",
+        "title_en": "The Great Commission & Ascension of the Lord",
+        "category": "Phục Sinh & Thăng Thiên",
+        "period_date": "Năm 30 CN (40 ngày sau Phục Sinh)",
+        "location": "Núi tại Ga-li-lê & Núi Ô-liu gần Bê-tha-ni",
+        "summary": "Chúa Giê-xu ban Đại Mạng Lệnh sai phái môn đồ đi môn đệ hóa muôn dân. Ngài giơ tay chúc phước rồi được cất lên trời trong đám mây vinh hiển trước mắt các sứ đồ.",
+        "passages": {
+            "matthew": {
+                "book_code": "mat",
+                "book_name": "Ma-thi-ơ",
+                "ref": "Ma-thi-ơ 28:16-20",
+                "chapter": 28,
+                "start_verse": 16,
+                "end_verse": 20,
+                "theological_focus": "Đại Mạng Lệnh kinh điển: 'Hết cả quyền phép trên trời và dưới đất đã giao cho Ta... hãy đi khiến muôn dân trở nên môn đồ Ta... Ta thường ở cùng các ngươi luôn cho đến tận thế'."
+            },
+            "mark": {
+                "book_code": "mac",
+                "book_name": "Mác",
+                "ref": "Mác 16:19-20",
+                "chapter": 16,
+                "start_verse": 19,
+                "end_verse": 20,
+                "theological_focus": "Chúa được cất lên trời 'ngồi bên hữu Đức Chúa Trời'; môn đồ đi ra giảng đạo và Chúa dùng các dấu lạ cặp theo để làm chứng cho Lời."
+            },
+            "luke": {
+                "book_code": "lu",
+                "book_name": "Lu-ca",
+                "ref": "Lu-ca 24:50-53",
+                "chapter": 24,
+                "start_verse": 50,
+                "end_verse": 53,
+                "theological_focus": "Chúa dẫn môn đồ đến Bê-tha-ni, giơ tay chúc phước đang khi được cất lên; môn đồ thờ lạy Ngài và trở về Giê-ru-sa-lem mừng rỡ ca tụng Chúa."
+            },
+            "acts": {
+                "book_code": "cong",
+                "book_name": "Công-vụ",
+                "ref": "Công-vụ 1:6-11",
+                "chapter": 1,
+                "start_verse": 6,
+                "end_verse": 11,
+                "theological_focus": "Lời hứa nhận lãnh quyền phép Thánh Linh làm chứng nhân từ Giê-ru-sa-lem đến cùng trái đất; hai thiên sứ hứa Ngài sẽ tái lâm y như cách Ngài lên trời."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Mạng lệnh truyền giảng Phúc Âm cho mọi sắc dân",
+                "Lời hứa quyền năng Thánh Linh và sự hiện diện hằng sống của Chúa",
+                "Sự thăng thiên hữu hình ngự về bên hữu Đức Chúa Cha"
+            ],
+            "unique_details": {
+                "matthew": "Công thức báp-têm nhân danh Đức Cha, Đức Con và Đức Thánh Linh.",
+                "mark": "Vị trí tôn cao tột bực của Đấng Christ bên hữu ngai Đức Chúa Trời.",
+                "luke": "Cử chỉ cuối cùng của Chúa trên đất là giơ tay ban phước lành trên con dân Ngài.",
+                "acts": "Lời tiên tri rõ ràng về sự Tái Lâm vinh hiển trên mây trời."
+            },
+            "theological_significance": "Chúa Giê-xu bước vào chức vụ Thầy Tế Lễ Thượng Phẩm và Vua vinh hiển cầu thay cho Hội Thánh; chuyển giao chức vụ truyền giáo cho Hội Thánh toàn cầu.",
+            "key_themes": ["Đại Mạng Lệnh", "Môn Đồ Hóa Muôn Dân", "Thăng Thiên Vinh Hiển", "Lời Hứa Tái Lâm"]
+        }
+    },
+    {
+        "id": "ot_david_census",
+        "title_vi": "Cựu Ước Song Hành: Đa-vít Kiểm Kê Dân Số (II Sa-mu-ên & I Sử-ký)",
+        "title_en": "OT Parallel: David's Census & The Altar on Mount Moriah",
+        "category": "Song Hành Cựu Ước",
+        "period_date": "Khoảng năm 975 TCN",
+        "location": "Giê-ru-sa-lem, Sân đập lúa của A-rau-na (Ô-rơ-nan)",
+        "summary": "Biến cố Đa-vít kiểm tra quân số Y-sơ-ra-ên dẫn đến cơn thạnh nộ phạt dịch lệ, kết thúc bằng việc Đa-vít lập bàn thờ tại sân đập lúa A-rau-na, nơi sau này xây Đền Thờ Sa-lô-môn.",
+        "passages": {
+            "samuel": {
+                "book_code": "2sa",
+                "book_name": "II Sa-mu-ên",
+                "ref": "II Sa-mu-ên 24:1-9",
+                "chapter": 24,
+                "start_verse": 1,
+                "end_verse": 9,
+                "theological_focus": "Góc nhìn lịch sử - tiên tri: 'Cơn thạnh nộ của Đức Giê-hô-va lại nổi phừng cùng dân Y-sơ-ra-ên, và Ngài giục lòng Đa-vít...'; quân số 800.000 Y-sơ-ra-ên và 500.000 Giu-đa."
+            },
+            "chronicles": {
+                "book_code": "1su",
+                "book_name": "I Sử-ký",
+                "ref": "I Sử-ký 21:1-8",
+                "chapter": 21,
+                "start_verse": 1,
+                "end_verse": 8,
+                "theological_focus": "Góc nhìn hậu lưu đày - thuộc linh: 'Sa-tan dấy lên nghịch cùng Y-sơ-ra-ên và giục Đa-vít kiểm tra dân số'; quân số 1.100.000 Y-sơ-ra-ên và 470.000 Giu-đa; Giô-áp ghê tởm lệnh vua."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Đa-vít ra lệnh kiểm kê dân số vì sự kiêu ngạo dựa vào quân số thay vì Đức Giê-hô-va",
+                "Tướng Giô-áp hết lời can ngăn nhưng không lay chuyển được lệnh vua",
+                "Địa điểm mua sân đập lúa trở thành nền móng xây Đền Thờ Giê-ru-sa-lem (Núi Mô-ri-a)"
+            ],
+            "unique_details": {
+                "samuel": "Ghi nhận nguyên nhân khởi thủy là cơn thịnh nộ của Chúa cho phép xảy ra.",
+                "chronicles": "Làm rõ vai trò kích động trực tiếp của Sa-tan và lý do Giô-áp không kiểm đếm chi phái Lê-vi và Bên-gia-min."
+            },
+            "theological_significance": "Bài học thần học sâu sắc về sự tể trị tối cao của Đức Chúa Trời: Chúa cho phép Sa-tan thử thách để phơi bày lòng kiêu ngạo, nhưng biến sự sửa phạt thành nơi thiết lập bàn thờ cứu rỗi và Đền Thờ của Ngài.",
+            "key_themes": ["Sự Tể Trị Của Đức Chúa Trời", "Cám Dỗ Của Sa-tan", "Sự Ăn Năn", "Nền Đền Thờ Mô-ri-a"]
+        }
+    },
+    {
+        "id": "ot_solomon_temple_dedication",
+        "title_vi": "Cựu Ước Song Hành: Vua Sa-lô-môn Cầu Nguyện Cung Hiến Đền Thờ",
+        "title_en": "OT Parallel: Solomon's Prayer Dedicating the Temple",
+        "category": "Song Hành Cựu Ước",
+        "period_date": "Khoảng năm 960 TCN",
+        "location": "Đền Thờ Giê-ru-sa-lem",
+        "summary": "Vua Sa-lô-môn quỳ gối trước toàn dân Y-sơ-ra-ên giơ tay lên trời cầu nguyện cung hiến Đền Thờ, xin Chúa đoái nghe lời cầu xin của dân sự khi họ hướng về nơi thánh này.",
+        "passages": {
+            "kings": {
+                "book_code": "1vua",
+                "book_name": "I Các Vua",
+                "ref": "I Các Vua 8:22-30",
+                "chapter": 8,
+                "start_verse": 22,
+                "end_verse": 30,
+                "theological_focus": "Nhấn mạnh Giao Ước Đa-vít và thực tế Đấng Tạo Hóa vô hạn không thể bị giới hạn trong đền thờ cất bởi tay người: 'Trời của các từng trời còn chẳng chứa Ngài được, phương chi cái đền nầy!'"
+            },
+            "chronicles": {
+                "book_code": "2su",
+                "book_name": "II Sử-ký",
+                "ref": "II Sử-ký 6:12-21",
+                "chapter": 6,
+                "start_verse": 12,
+                "end_verse": 21,
+                "theological_focus": "Bổ sung chi tiết Sa-lô-môn làm một cái bục đồng cao ba trượng đứng giữa sân rồi quỳ gối xuống trước hội chúng; hướng về giao ước đời đời và đền thờ thờ phượng."
+            }
+        },
+        "synoptic_distinctives": {
+            "shared_elements": [
+                "Sa-lô-môn đứng trước bàn thờ của Đức Giê-hô-va và giơ tay lên trời cầu nguyện",
+                "Xác tín Đức Chúa Trời giữ giao ước và lòng thương xót cho kẻ bước đi hết lòng",
+                "Khẩn xin mắt Chúa đoái xem đền thờ đêm ngày và tha thứ tội lỗi mỗi khi dân sự ăn năn hướng về nơi nầy"
+            ],
+            "unique_details": {
+                "kings": "Nhấn mạnh bối cảnh chính trị - vương quyền kế thừa ngai vàng Đa-vít.",
+                "chronicles": "Ký thuật chi tiết về bục đồng cung hiến và sau đó lửa từ trời giáng xuống thiêu hóa của lễ thiêu biểu thị sự nhậm lời thiêng liêng."
+            },
+            "theological_significance": "Đền Thờ là biểu tượng ngự trị của Danh Chúa giữa dân sự, tiên trưng Đấng Christ - Đền Thờ thật - nơi Đức Chúa Trời hòa giải trọn vẹn với loài người.",
+            "key_themes": ["Sự Hiện Diện Của Chúa", "Giao Ước Thành Tín", "Sự Cầu Nguyện", "Tha Thứ Tội Lỗi"]
+        }
+    }
+]
+
+
+@router.get("/harmony-events")
+def list_harmony_events(
+    category: Optional[str] = Query(None, description="Lọc theo phân loại (e.g. 'Khởi Đầu Chức Vụ', 'Phép Lạ Quyền Năng', 'Tuần Lễ Khổ Nạn', 'Song Hành Cựu Ước')"),
+    search: Optional[str] = Query(None, description="Tìm kiếm theo tiêu đề hoặc từ khóa sự kiện song hành")
+):
+    """
+    Returns the comprehensive catalog of Gospel Harmony & Cross-Passage Parallels (§8, §18).
+    Includes synoptic comparison anchors across Matthew, Mark, Luke, John, and OT Historical books.
+    """
+    events = HARMONY_EVENTS_CATALOG
+
+    if category and category.lower() != "all":
+        cat_lower = category.strip().lower()
+        events = [e for e in events if cat_lower in e["category"].lower()]
+
+    if search:
+        s_lower = search.strip().lower()
+        events = [
+            e for e in events
+            if s_lower in e["title_vi"].lower()
+            or s_lower in e["title_en"].lower()
+            or s_lower in e["summary"].lower()
+            or s_lower in e["location"].lower()
+            or any(s_lower in p["ref"].lower() for p in e["passages"].values())
+            or any(s_lower in t.lower() for t in e["synoptic_distinctives"].get("key_themes", []))
+        ]
+
+    return {
+        "total_events": len(events),
+        "categories": [
+            "Tất cả",
+            "Khởi Đầu Chức Vụ",
+            "Phép Lạ Quyền Năng",
+            "Dụ Ngôn Nước Trời",
+            "Tuần Lễ Khổ Nạn",
+            "Phục Sinh & Thăng Thiên",
+            "Song Hành Cựu Ước"
+        ],
+        "events": events
+    }
+
+
+@router.get("/harmony-detail")
+def get_harmony_detail(
+    event_id: str = Query(..., description="ID của sự kiện song hành (e.g. 'the_last_supper', 'feeding_5000')"),
+    include_kjv: bool = Query(False, description="Đính kèm bản dịch KJV đối chiếu nếu có"),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetches full side-by-side Scripture verses from PostgreSQL for each book passage in a parallel event.
+    Provides verified Vietnamese 1925 text for each synoptic column.
+    """
+    clean_id = event_id.strip().lower()
+    event = next((e for e in HARMONY_EVENTS_CATALOG if e["id"] == clean_id), None)
+    if not event:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy sự kiện song hành với ID: '{event_id}'")
+
+    populated_passages = {}
+
+    for book_key, passage_info in event["passages"].items():
+        book_code = passage_info["book_code"]
+        chapter = passage_info["chapter"]
+        start_v = passage_info["start_verse"]
+        end_v = passage_info["end_verse"]
+
+        # Fetch verses from PostgreSQL
+        sql = text("""
+            SELECT v.verse, v.text, v.section_title
+            FROM bible_verses v
+            JOIN bible_books b ON v.book_id = b.id
+            WHERE LOWER(b.code) = :code
+              AND v.chapter = :chapter
+              AND v.verse BETWEEN :start_v AND :end_v
+            ORDER BY v.verse ASC
+        """)
+        rows = db.execute(sql, {
+            "code": book_code.lower(),
+            "chapter": chapter,
+            "start_v": start_v,
+            "end_v": end_v
+        }).fetchall()
+
+        verse_list = [
+            {
+                "verse": r.verse,
+                "text": r.text,
+                "section_title": r.section_title or ""
+            }
+            for r in rows
+        ]
+
+        # Optional KJV retrieval
+        kjv_verses = {}
+        if include_kjv:
+            cache_key = f"{book_code}_{chapter}"
+            if cache_key in PARALLEL_CACHE:
+                kjv_verses = PARALLEL_CACHE[cache_key]
+            else:
+                kjv_file = "/data/bible/en_kjv.json"
+                import os
+                if os.path.exists(kjv_file):
+                    try:
+                        with open(kjv_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            # Match book by name or code
+                            for b_entry in data.get("books", []):
+                                if b_entry.get("code", "").lower() == book_code.lower() or b_entry.get("name", "").lower() == passage_info.get("book_name", "").lower():
+                                    for c_entry in b_entry.get("chapters", []):
+                                        if c_entry.get("chapter") == chapter:
+                                            kjv_verses = {v.get("verse"): v.get("text", "") for v in c_entry.get("verses", [])}
+                                            PARALLEL_CACHE[cache_key] = kjv_verses
+                                            break
+                    except Exception:
+                        pass
+
+        populated_passages[book_key] = {
+            **passage_info,
+            "total_verses": len(verse_list),
+            "verses": [
+                {
+                    "verse": v["verse"],
+                    "text_vi": v["text"],
+                    "text_kjv": kjv_verses.get(v["verse"], "") if include_kjv else "",
+                    "section_title": v["section_title"]
+                }
+                for v in verse_list
+            ]
+        }
+
+    return {
+        "event_id": event["id"],
+        "title_vi": event["title_vi"],
+        "title_en": event["title_en"],
+        "category": event["category"],
+        "period_date": event["period_date"],
+        "location": event["location"],
+        "summary": event["summary"],
+        "synoptic_distinctives": event["synoptic_distinctives"],
+        "passages": populated_passages
+    }
+
+
+
 
