@@ -296,6 +296,31 @@ async function main() {
   });
   report('POST /api/learn/timeline-challenge/verify (Chronology slot verification, gamified XP & redemptive narrative §46)', rTimelineVerify.ok, rTimelineVerify.error);
 
+  const rWhoAmI = await testEndpoint('/api/learn/who-am-i', d => {
+    if (!Array.isArray(d) || d.length !== 16) return `Expected 16 WhoAmI dossiers, got ${d?.length}`;
+    if (!d[0].clues || d[0].clues.length !== 4) return 'Dossier 0 missing 4 progressive clues';
+    if (!d[0].verse_text) return 'Dossier 0 missing authentic 1925 verse text';
+    return false;
+  });
+  report('GET /api/learn/who-am-i (16 Canonical Character Mystery Dossiers with 4 Progressive Clues & 1925 Verses §3, §7, §46)', rWhoAmI.ok, rWhoAmI.error);
+
+  const rWhoAmIVerify = await testEndpoint('/api/learn/who-am-i/verify', d => {
+    if (!d || !d.is_correct || typeof d.score_awarded !== 'number' || !d.christological_typology) {
+      return 'Invalid WhoAmI verify response structure';
+    }
+    return false;
+  }, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      case_id: 'wai-peter',
+      chosen_suspect: 'Si-môn Phi-e-rơ',
+      clues_unlocked: 2,
+      user_identifier: 'local_user'
+    })
+  });
+  report('POST /api/learn/who-am-i/verify (Character deduction verification, progressive XP scale & typology §3, §46)', rWhoAmIVerify.ok, rWhoAmIVerify.error);
+
   // Exegetical Workspace Module
   const rHarmony = await testEndpoint('/api/study/harmony', d => (d.total_events !== 16 && d.events?.length !== 16) && `Expected 16 harmony events, got ${d?.total_events}`);
   report('GET /api/study/harmony (Parallel Gospels & Historical synopsis)', rHarmony.ok, rHarmony.error);

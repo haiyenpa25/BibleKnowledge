@@ -539,6 +539,67 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
     }
     ```
 
+### 5.8 "Who Am I?" Biblical Character Mystery & Clue Deduction Engine (§3, §7, §46)
+- **Dossiers Endpoint**: `GET /api/learn/who-am-i?era={era}&category={category}&search={search}`
+  - **Description**: Returns 16 curated canonical biblical character mystery dossiers spanning the Old and New Testaments. Each dossier presents an anonymous biblical figure with 4 progressive clues (Level 1: Background & Origins, Level 2: Calling & Commission, Level 3: Peak Moments & Great Trials, Level 4: Defining Characteristics & Decisive Scripture). Dynamically extracts authentic Protestant 1925 Vietnamese scripture text directly from PostgreSQL `bible_verses`, provides 4 plausible candidate options, Christological typology, and theological significance.
+  - **Payload Structure**:
+    ```json
+    [
+      {
+        "id": "wai-peter",
+        "case_number": 1,
+        "codename": "Hồ Sơ Mật #01: Ngư Phủ Ga-li-lê Đi Trên Mặt Nước",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "si-mon-phi-e-ro",
+        "target_name_vi": "Si-môn Phi-e-rơ",
+        "target_title": "Sứ đồ trưởng đoàn, Tay đánh lưới người, Trụ cột Hội Thánh ban đầu",
+        "golden_scripture_ref": "Ma-thi-ơ 14:29",
+        "verse_text": "Ngài phán rằng: Hãy lại đây! Phi-e-rơ ở trên thuyền bước xuống, đi bộ trên mặt nước mà đến cùng Đức Chúa Jêsus.",
+        "suspect_options": ["Si-môn Phi-e-rơ", "Sứ đồ Anh-rê", "Sứ đồ Gia-cơ", "Sứ đồ Giăng"],
+        "clues": [
+          {
+            "order": 1,
+            "level": 1,
+            "title": "Manh Mối 1: Xuất Thân & Bối Cảnh Làng Chài",
+            "text": "Tôi sinh ra tại thành Bết-sai-đa và cùng em trai làm nghề chài lưới nhọc nhằn đêm ngày trên Biển Hồ Ga-li-lê.",
+            "points": 100
+          }
+        ],
+        "theological_significance": "Minh chứng sống động cho ân điển phục hồi của Chúa Cứu Thế...",
+        "christological_typology": "Người chăn chiên phụ dưới quyền Đấng Chăn Chiên Lớn (I Phi-e-rơ 5:4)..."
+      }
+    ]
+    ```
+- **Deduction Verification & Gamification Endpoint**: `POST /api/learn/who-am-i/verify`
+  - **Request Body**:
+    ```json
+    {
+      "case_id": "wai-peter",
+      "chosen_suspect": "Si-môn Phi-e-rơ",
+      "clues_unlocked": 2,
+      "user_identifier": "local_user"
+    }
+    ```
+  - **Response Structure**:
+    ```json
+    {
+      "is_correct": true,
+      "target_character": "si-mon-phi-e-ro",
+      "target_name_vi": "Si-môn Phi-e-rơ",
+      "target_title": "Sứ đồ trưởng đoàn, Tay đánh lưới người, Trụ cột Hội Thánh ban đầu",
+      "golden_scripture_ref": "Ma-thi-ơ 14:29",
+      "verse_text": "Ngài phán rằng: Hãy lại đây! Phi-e-rơ ở trên thuyền bước xuống, đi bộ trên mặt nước mà đến cùng Đức Chúa Jêsus.",
+      "score_awarded": 75,
+      "total_xp": 620,
+      "streak_days": 8,
+      "theological_significance": "Minh chứng sống động cho ân điển phục hồi của Chúa Cứu Thế...",
+      "christological_typology": "Người chăn chiên phụ dưới quyền Đấng Chăn Chiên Lớn (I Phi-e-rơ 5:4)...",
+      "explanation": "Chính xác xuất sắc! Bạn đã phá án chuẩn xác: Si-môn Phi-e-rơ. Bạn giải mã thành công chỉ với 2/4 manh mối, nhận trọn vẹn +75 XP!"
+    }
+    ```
+
 ---
 
 ## 6. Scholarly Exegesis & Synthesis Engine (`/api/study`)

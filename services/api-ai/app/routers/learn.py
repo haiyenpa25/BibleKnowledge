@@ -1264,205 +1264,1170 @@ def verify_timeline_challenge(
 
 
 # ==============================================================================
-# Who Am I? Interactive Multi-Clue Character Riddles (§3, §5)
+# §3, §7, §46 — "Who Am I?" Biblical Character Mystery & Clue Deduction Engine
 # ==============================================================================
 
 class WhoAmIClue(BaseModel):
-    order: int
-    text: str
-    difficulty_label: str
-    points: int
+    order: int = 1
+    level: int = 1
+    title: str = ""
+    text: str = ""
+    clue_text: str = ""
+    difficulty_label: str = ""
+    points: int = 25
+    xp_value: int = 25
 
 
-class WhoAmIQuestion(BaseModel):
+class WhoAmIDossier(BaseModel):
     id: str
+    case_number: int
+    codename: str
+    era: str  # old_testament | new_testament
+    category: str  # Patriarchs & Exodus, Kings & Kingdom, Prophets, Gospels & Apostles, Early Church
+    difficulty: int  # 1 (Easy), 2 (Medium), 3 (Hard)
+    target_character: str  # Slug e.g. si-mon-phi-e-ro
+    target_name_vi: str  # e.g. Si-môn Phi-e-rơ
+    target_title: str  # e.g. Sứ đồ trưởng nhóm, người đi bộ trên mặt nước
+    golden_scripture_ref: str
+    verse_text: str
+    suspect_options: List[str]
     clues: List[WhoAmIClue]
-    options: List[str]
-    correct_option: int
-    correct_name: str
-    character_slug: str
-    title_or_role: str
-    scripture_reference: str
+    theological_significance: str
+    christological_typology: str
+    # Compatible alias fields
+    options: List[str] = []
+    correct_option: int = 0
+    correct_name: str = ""
+    character_slug: str = ""
+    title_or_role: str = ""
+    scripture_reference: str = ""
+    explanation: str = ""
+    era_or_testament: str = ""
+
+
+class WhoAmIVerifyRequest(BaseModel):
+    case_id: str
+    chosen_suspect: str
+    clues_unlocked: int = Field(1, ge=1, le=4)
+    user_identifier: Optional[str] = "local_user"
+
+
+class WhoAmIVerifyResponse(BaseModel):
+    is_correct: bool
+    target_character: str
+    target_name_vi: str
+    target_title: str
+    golden_scripture_ref: str
+    verse_text: str
+    score_awarded: int
+    total_xp: int
+    streak_days: int
+    theological_significance: str
+    christological_typology: str
     explanation: str
-    era_or_testament: str
 
 
-@router.get("/who-am-i", response_model=List[WhoAmIQuestion])
-def get_who_am_i_challenges():
-    """Retrieve multi-stage 'Who Am I?' character guessing challenges (§3)."""
-    challenges = [
-        WhoAmIQuestion(
-            id="wai-1",
-            correct_name="Si-môn Phi-e-rơ",
-            character_slug="si-mon-phi-e-ro",
-            title_or_role="Ngư phủ & Sứ đồ trưởng của Chúa Giê-xu",
-            era_or_testament="Tân Ước (Gospels & Early Church)",
-            scripture_reference="Ma-thi-ơ 14:28-31; 26:69-75; Công vụ 2:14-41",
-            explanation="Phi-e-rơ là người nhiệt thành, từng đi trên mặt biển, vấp ngã chối Chúa nhưng được Chúa phục hồi và trở thành trụ cột lãnh đạo Hội Thánh ban đầu.",
-            options=["Anh-rê", "Si-môn Phi-e-rơ", "Gia-cơ", "Giu-đa Ít-ca-ri-ốt"],
-            correct_option=1,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi là một ngư phủ bình dị sinh sống bên bờ Biển Ga-li-lê, được anh trai mình dẫn đến gặp Chúa Cứu Thế.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Tôi từng bước đi trên mặt nước sóng gió, nhưng vì sợ hãi mà bắt đầu chìm xuống cho đến khi được bàn tay Thầy nắm lấy.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Trong đêm bi thương trước khi Chúa chịu đóng đinh, tôi đã chối Ngài 3 lần trước khi gà gáy, sau đó khóc lóc thảm thiết.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi được Chúa phục hồi bên đống lửa than với câu hỏi 'Ngươi yêu ta chăng?' và trở thành người giảng luận cảm hóa 3,000 người trong ngày Ngũ Tuần.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-2",
-            correct_name="Môi-se",
-            character_slug="moi-se",
-            title_or_role="Người Giải Phóng Tuyển Dân & Ban Luật Pháp",
-            era_or_testament="Cựu Ước (Exodus & Wilderness)",
-            scripture_reference="Xuất Ê-díp-tô Ký 2:1-10; 3:1-12; 14:21-22; 20:1-17",
-            explanation="Môi-se là vị tiên tri khiêm nhường nhất trên đất, người được diện đối diện với Đức Chúa Trời và dẫn dắt Y-sơ-ra-ên ra khỏi ách nô lệ Ai Cập.",
-            options=["A-rôn", "Giô-suê", "Môi-se", "Ghi-đê-ôn"],
-            correct_option=2,
-            clues=[
-                WhoAmIClue(order=1, text="Lúc sơ sinh, tôi được giấu trong chiếc nôi mây trét chai thả nổi giữa đám sậy dòng sông Nin và được công chúa Ai Cập vớt lên nuôi nấng.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Sau 40 năm chăn chiên nơi đồng vắng Ma-đi-an, tôi kinh ngạc thấy một bụi gai cháy hừng hực nhưng không hề tàn rụi bên chân núi Hô-rếp.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Đức Chúa Trời dùng cây gậy nơi tay tôi giáng 10 tai vạ xuống Pha-ra-ôn và rẽ đôi Biển Đỏ cho tuyển dân bước qua như trên đất khô.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi lên đỉnh núi Si-na-i giữa mây mù sấm sét trong 40 ngày đêm và nhận lãnh Hai Bảng Chứng Mười Điều Răn do chính ngón tay Chúa khắc ghi.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-3",
-            correct_name="Sứ đồ Phao-lô",
-            character_slug="su-do-phao-lo",
-            title_or_role="Sứ đồ cho Dân Ngoại & Nhà Thần Học Tiên Phong",
-            era_or_testament="Tân Ước (Apostolic Age)",
-            scripture_reference="Công vụ 9:1-19; 22:3; 2 Ti-mô-thê 4:7-8",
-            explanation="Từ một người nhiệt thành bắt bớ đạo Chúa, Sau-lơ đã được ánh sáng từ trời biến cải để trở thành nhà truyền giáo vĩ đại nhất của Tân Ước.",
-            options=["Sứ đồ Phao-lô", "Ba-na-ba", "Phi-líp", "A-bô-lô"],
-            correct_option=0,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi sinh ra tại Tạt-sơ, là công dân La-mã và được thụ giáo dưới chân đại giáo sư danh tiếng Ga-ma-li-ên.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Thuở thanh niên, tôi nhiệt thành lùng bắt các tín hữu theo Đạo và tán thành việc ném đá xử tử thầy phó tế Ê-tiên trung tín.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Một luồng ánh sáng chói lòa hơn mặt trời giáng xuống khiến tôi mù mắt trên đường đến Đa-mách, cùng tiếng phán: 'Sau-lơ, Sau-lơ, sao ngươi bắt bớ Ta?'", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Sau khi được Chúa biến cải, tôi đi 3 chuyến truyền giáo khắp Đế quốc La-mã, lập nên vô số Hội Thánh và viết nên 13 bức thư tín bất hủ.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-4",
-            correct_name="Vua Đa-vít",
-            character_slug="vua-da-vit",
-            title_or_role="Vua vĩ đại của Y-sơ-ra-ên & Người đẹp lòng Chúa",
-            era_or_testament="Cựu Ước (United Monarchy)",
-            scripture_reference="1 Sa-mu-ên 16:11-13; 17:40-50; Thi-thiên 23",
-            explanation="Đa-vít khởi đầu là kẻ chăn chiên nghèo, đánh bại tướng Gô-li-át bằng đức tin, thống nhất vương quốc và lập nên dòng dõi của Đấng Mê-si-a.",
-            options=["Vua Sau-lơ", "Vua Sa-lô-môn", "Vua Đa-vít", "Giô-na-than"],
-            correct_option=2,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi là con út trong gia đình tại Bết-lê-hem, từng làm kẻ chăn chiên đàn hát thi ca ca ngợi Đấng Tạo Hóa nơi đồng nội.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Chỉ với một cái trành ném đá và năm hòn sỏi bóng láng, tôi đã hạ gục tên tướng khổng lồ Gô-li-át đang buông lời sỉ nhục quân đội Đức Chúa Trời.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Dù bị vua Sau-lơ truy sát ghen ghét suốt nhiều năm trong hang đá, tôi hai lần từ chối tra tay làm hại người được xức dầu của Chúa.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi được Đức Chúa Trời gọi là 'người đẹp lòng Ta', thống nhất toàn cõi Y-sơ-ra-ên, định đô Giê-ru-sa-lem và sáng tác phần lớn các bài Thi Thiên.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-5",
-            correct_name="Áp-ra-ham",
-            character_slug="ap-ra-ham",
-            title_or_role="Tổ phụ của đức tin & Bạn của Đức Chúa Trời",
-            era_or_testament="Cựu Ước (Patriarchal Era)",
-            scripture_reference="Sáng-thế Ký 12:1-4; 17:1-8; 22:1-14; Rô-ma 4:11",
-            explanation="Áp-ra-ham vì đức tin đã vâng lời Chúa rời quê hương, nhận lãnh giao ước về dòng dõi đông như sao trên trời, cát dưới biển.",
-            options=["Lót", "Áp-ra-ham", "Y-sác", "Nô-ê"],
-            correct_option=1,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi rời bỏ quê hương văn minh phồn thịnh U-rơ của người Canh-đê để đi đến một xứ sở mà thuở ban đầu tôi chưa từng biết rõ.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Khi tôi 99 tuổi và vợ tôi son sẻ đã già, Đức Chúa Trời lập giao ước đời đời và đổi tên tôi với lời hứa trở nên 'cha của nhiều dân tộc'.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Trên đỉnh núi Mô-ri-a, tôi đã vâng phục dâng đứa con một duy nhất mà mình yêu dấu, trước khi Chúa chuẩn bị con chiên đực mắc sừng thay thế.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi được Kinh Thánh tôn vinh là 'Tổ Phụ Của Mọi Kẻ Tin' và là người duy nhất được gọi là 'Bạn Của Đức Chúa Trời'.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-6",
-            correct_name="Giô-sép",
-            character_slug="gio-sep",
-            title_or_role="Quan Tể Tướng Ai Cập & Vị cứu tinh của gia tộc",
-            era_or_testament="Cựu Ước (Patriarchal Era)",
-            scripture_reference="Sáng-thế Ký 37:3-28; 39:1-20; 41:39-44; 50:20",
-            explanation="Dù bị các anh bán làm nô lệ và bị giam oan, Giô-sép nhờ sự kính sợ Chúa đã được cất nhắc lên làm Tể tướng cứu sống muôn dân qua nạn đói.",
-            options=["Bên-gia-min", "Giu-đa", "Giô-sép", "Đa-ni-ên"],
-            correct_option=2,
-            clues=[
-                WhoAmIClue(order=1, text="Cha tôi may tặng tôi chiếc áo dài nhiều màu rực rỡ, khiến các anh ruột sinh lòng ghen ghét và tìm cách hãm hại.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Tôi bị chính các anh ném xuống hố cạn rồi bán làm nô lệ sang xứ Ai Cập xa xôi với giá hai mươi miếng bạc.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Dù bị vợ quan Phô-ti-pha vu cáo và bị giam cầm oan uổng trong ngục tối, tôi vẫn giữ lòng thanh sạch kính sợ Đức Chúa Trời.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Nhờ giải mộng 7 năm được mùa và đói kém cho Pha-ra-ôn, tôi được phong làm Tể tướng trị nước Ai Cập và tha thứ cứu sống cả gia đình.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-7",
-            correct_name="Tiên tri Ê-li",
-            character_slug="e-li",
-            title_or_role="Tiên tri của Lửa & Người bảo vệ Đức tin chân thật",
-            era_or_testament="Cựu Ước (Divided Monarchy)",
-            scripture_reference="1 Các Vua 17:1-16; 18:20-40; 2 Các Vua 2:11",
-            explanation="Tiên tri Ê-li dũng cảm đối đầu vua A-háp và hoàng hậu Giê-sa-bên, thách thức tiên tri Ba-anh trên núi Cạt-mên và được cất lên trời trên xe lửa.",
-            options=["Tiên tri Ê-li-sê", "Tiên tri Ê-li", "Tiên tri Giê-rê-mi", "Tiên tri Ê-sai"],
-            correct_option=1,
-            clues=[
-                WhoAmIClue(order=1, text="Trong những ngày hạn hán khốc liệt 3 năm rưỡi, tôi được Đức Chúa Trời sai chim quạ đem bánh và thịt đến nuôi dưỡng bên khe suối Kê-rít.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Tại nhà người đàn bà góa Sa-rép-ta, nhờ lời cầu nguyện của tôi, hũ bột chẳng hề vơi và bình dầu không bao giờ cạn.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Một mình tôi thách thức 450 tiên tri Ba-anh trên núi Cạt-mên; lửa từ trời đã giáng xuống thiêu rụi của lễ đẫm nước chứng minh Chúa là chân thật.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi không trải qua sự chết nhưng được đưa thẳng lên trời bằng xe lửa và ngựa lửa giữa luồng gió lốc diệu kỳ.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-8",
-            correct_name="Đa-ni-ên",
-            character_slug="da-ni-en",
-            title_or_role="Quan Triều Đình & Nhà Tiên Tri Thời Lưu Đày",
-            era_or_testament="Cựu Ước (Babylonian Exile)",
-            scripture_reference="Đa-ni-ên 1:8; 2:1-45; 5:25-28; 6:10-23",
-            explanation="Đa-ni-ên giữ trọn sự thánh khiết nơi đất khách quê người, được ban sự khôn ngoan giải mộng và được Chúa gìn giữ trong hang sư tử đói.",
-            options=["Nê-hê-mi", "Ê-xơ-ra", "Đa-ni-ên", "Mạc-đô-chê"],
-            correct_option=2,
-            clues=[
-                WhoAmIClue(order=1, text="Thuở niên thiếu, tôi bị bắt lưu đày sang Ba-by-lôn nhưng quyết chí trong lòng không để mình bị ô uế bởi đồ ăn và rượu của vua ban.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Đức Chúa Trời ban cho tôi sự khôn ngoan gấp 10 lần các thuật sĩ và giải thích được giấc chiêm bao về pho tượng khổng lồ bằng kim loại cho vua Nê-bu-cát-nết-sa.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Chính tôi đã đọc và giải nghĩa những dòng chữ bí ẩn 'MÊ-NÊ, MÊ-NÊ, TÊ-KHEU, U-PHÁC-SIN' xuất hiện trên vách tường hoàng cung vua Bên-xát-sa.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Vì trung tín cầu nguyện 3 lần mỗi ngày hướng về Giê-ru-sa-lem, tôi bị ném vào hang sư tử đói, nhưng thiên sứ của Chúa đã bịt miệng sư tử gìn giữ tôi.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-9",
-            correct_name="Ma-ri (Mẹ Chúa Giê-xu)",
-            character_slug="ma-ri",
-            title_or_role="Người Nữ Được Ơn & Mẹ của Đấng Cứu Thế",
-            era_or_testament="Tân Ước (Gospels)",
-            scripture_reference="Lu-ca 1:26-56; 2:7; Giăng 19:25",
-            explanation="Ma-ri khiêm nhường vâng phục ý chỉ Thiên Chúa, trở thành người mẹ sinh hạ Đấng Cứu Thế và đồng hành suốt cuộc đời Ngài đến tận chân thập tự giá.",
-            options=["Ê-li-sa-bét", "Ma-thê", "Ma-ri Ma-đơ-len", "Ma-ri (Mẹ Chúa Giê-xu)"],
-            correct_option=3,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi là một thiếu nữ khiêm nhường sống tại thành Na-xa-rét nghèo nàn xứ Ga-li-lê, đã đính hôn cùng chàng thợ mộc Giô-sép.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Thiên sứ Gáp-ri-ên hiện ra chào tôi: 'Hỡi người được ơn, Chúa ở cùng ngươi!' và báo tin tôi sẽ mang thai bởi quyền phép Đức Thánh Linh.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Tôi đáp lại với đức tin trọn vẹn: 'Tôi là tôi tớ Chúa; xin sự ấy xảy ra cho tôi theo lời người!' và hát bài ca Ngợi Khen (Magnificat) bất hủ.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi đã sinh Đấng Cứu Thế nơi máng cỏ chuồng chiên Bết-lê-hem và đứng nghẹn ngào dưới chân thập tự giá chứng kiến Con mình chịu chết.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        ),
-        WhoAmIQuestion(
-            id="wai-10",
-            correct_name="Tiên tri Giô-na",
-            character_slug="gio-na",
-            title_or_role="Tiên tri trốn chạy & Bài học về lòng thương xót",
-            era_or_testament="Cựu Ước (Divided Monarchy)",
-            scripture_reference="Giô-na 1:1-17; 2:1-10; 3:1-5",
-            explanation="Giô-na tìm cách trốn chạy khỏi tiếng gọi Chúa, trải qua 3 ngày 3 đêm trong bụng cá lớn trước khi vâng phục đến Ni-ni-ve rao giảng sự ăn năn.",
-            options=["Tiên tri Giô-na", "Tiên tri Na-hum", "Tiên tri Ha-ba-cúc", "Tiên tri Ô-sê"],
-            correct_option=0,
-            clues=[
-                WhoAmIClue(order=1, text="Tôi là tiên tri được Chúa truyền lệnh đi đến cảnh cáo thành phố lớn Ni-ni-ve gian ác, nhưng tôi lại tìm cách trốn tránh tiếng gọi Ngài.", difficulty_label="Khởi Đầu (100đ)", points=100),
-                WhoAmIClue(order=2, text="Tôi xuống cảng Giốp-pê mua vé lên một chiếc thuyền chạy sang Ta-rê-sơ để trốn khỏi mặt Đức Giê-hô-va.", difficulty_label="Bối Cảnh (70đ)", points=70),
-                WhoAmIClue(order=3, text="Một trận bão biển dữ dội ập đến; các thủy thủ rút thăm trúng tôi và theo lời tôi, họ ném tôi xuống biển thì sóng gió lập tức yên lặng.", difficulty_label="Quyết Định (40đ)", points=40),
-                WhoAmIClue(order=4, text="Tôi ở trong bụng một con cá lớn suốt ba ngày ba đêm cầu nguyện ăn năn trước khi được mửa ra trên đất khô và tiếp tục sứ mạng.", difficulty_label="Rõ Nét (20đ)", points=20)
-            ]
-        )
-    ]
-    return challenges
+WHO_AM_I_DATA = [
+    {
+        "id": "wai-peter",
+        "case_number": 1,
+        "codename": "Hồ Sơ Mật #01: Ngư Phủ Ga-li-lê Đi Trên Mặt Nước",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "si-mon-phi-e-ro",
+        "target_name_vi": "Si-môn Phi-e-rơ",
+        "target_title": "Sứ đồ trưởng đoàn, Tay đánh lưới người, Trụ cột Hội Thánh ban đầu",
+        "golden_scripture_ref": "Ma-thi-ơ 14:29",
+        "suspect_options": ["Si-môn Phi-e-rơ", "Sứ đồ Anh-rê", "Sứ đồ Gia-cơ", "Sứ đồ Giăng"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Xuất Thân & Bối Cảnh Làng Chài",
+                "text": "Tôi sinh ra tại thành Bết-sai-đa và cùng em trai làm nghề chài lưới nhọc nhằn đêm ngày trên Biển Hồ Ga-li-lê.",
+                "clue_text": "Tôi sinh ra tại thành Bết-sai-đa và cùng em trai làm nghề chài lưới nhọc nhằn đêm ngày trên Biển Hồ Ga-li-lê.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Tiếng Kêu Gọi Của Thầy Na-xa-rét",
+                "text": "Một ngày nọ, một Tiên tri Na-xa-rét bước đến bờ hồ phán cùng tôi: 'Hãy theo Ta, Ta sẽ khiến các ngươi nên tay đánh lưới người.'",
+                "clue_text": "Một ngày nọ, một Tiên tri Na-xa-rét bước đến bờ hồ phán cùng tôi: 'Hãy theo Ta, Ta sẽ khiến các ngươi nên tay đánh lưới người.'",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Bước Chân Trên Mặt Sóng & Thử Thách Đức Tin",
+                "text": "Tôi từng cả gan bước chân xuống mặt nước đi về phía Thầy giữa đêm cuồng phong, nhưng khi thấy gió thổi mạnh liền sợ hãi và bắt đầu chìm xuống.",
+                "clue_text": "Tôi từng cả gan bước chân xuống mặt nước đi về phía Thầy giữa đêm cuồng phong, nhưng khi thấy gió thổi mạnh liền sợ hãi và bắt đầu chìm xuống.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Tiếng Gà Gáy Rạng Đông & Giọt Nước Mắt Phục Hồi",
+                "text": "Tôi từng khóc lóc đắng cay khi tiếng gà gáy cất lên lúc rạng đông vì đã chối Thầy ba lần, nhưng sau phục sinh Thầy đã hỏi: 'Ngươi yêu Ta chăng?' và trao sứ mạng chăn bầy.",
+                "clue_text": "Tôi từng khóc lóc đắng cay khi tiếng gà gáy cất lên lúc rạng đông vì đã chối Thầy ba lần, nhưng sau phục sinh Thầy đã hỏi: 'Ngươi yêu Ta chăng?' và trao sứ mạng chăn bầy.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Minh chứng sống động cho ân điển phục hồi của Chúa Cứu Thế; từ một ngư phủ bốc đồng hay sợ hãi trở thành vầng đá đức tin giảng luận ngày Ngũ Tuần khiến 3.000 người ăn năn.",
+        "christological_typology": "Người chăn chiên phụ dưới quyền Đấng Chăn Chiên Lớn (I Phi-e-rơ 5:4), sẵn sàng chịu tử đạo ngược đầu vì danh Chúa Giê-xu."
+    },
+    {
+        "id": "wai-paul",
+        "case_number": 2,
+        "codename": "Hồ Sơ Mật #02: Học Giả Tạt-sơ Trên Đường Đa-mách",
+        "era": "new_testament",
+        "category": "Early Church",
+        "difficulty": 1,
+        "target_character": "su-do-phao-lo",
+        "target_name_vi": "Sứ đồ Phao-lô",
+        "target_title": "Sứ đồ của Dân Ngoại, Học giả thần học vĩ đại, Trước giả 13 Thư tín",
+        "golden_scripture_ref": "Phi-líp 3:8",
+        "suspect_options": ["Sứ đồ Phao-lô", "Chấp sự Tê-phan", "Ba-na-ba", "Ti-mô-thê"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Gốc Gác Pha-ri-si & Quốc Tịch La Mã",
+                "text": "Tôi là người Do Thái sinh tại thành Tạt-sơ xứ Si-li-si, có quốc tịch La Mã bẩm sinh và thụ giáo Luật pháp nghiêm cẩn dưới chân đại giáo sư Ga-ma-li-ên.",
+                "clue_text": "Tôi là người Do Thái sinh tại thành Tạt-sơ xứ Si-li-si, có quốc tịch La Mã bẩm sinh và thụ giáo Luật pháp nghiêm cẩn dưới chân đại giáo sư Ga-ma-li-ên.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Cơn Hằm Hằm Bắt Bớ Đạo Chúa",
+                "text": "Tôi từng đồng tình giữ áo cho những kẻ ném đá tử đạo Tê-phan và xin trát của thầy tế lễ thượng phẩm để lùng sục bắt bớ các môn đồ Đạo tại mọi hội đường.",
+                "clue_text": "Tôi từng đồng tình giữ áo cho những kẻ ném đá tử đạo Tê-phan và xin trát của thầy tế lễ thượng phẩm để lùng sục bắt bớ các môn đồ Đạo tại mọi hội đường.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Luồng Ánh Sáng Chói Lòa Lúc Giữa Trưa",
+                "text": "Trên con đường đến Đa-mách, một luồng ánh sáng chói lòa từ trời quật tôi ngã ngựa và một tiếng phán: 'Sau-lơ, Sau-lơ, sao ngươi bắt bớ Ta?'. Tôi bị mù lòa trong ba ngày.",
+                "clue_text": "Trên con đường đến Đa-mách, một luồng ánh sáng chói lòa từ trời quật tôi ngã ngựa và một tiếng phán: 'Sau-lơ, Sau-lơ, sao ngươi bắt bớ Ta?'. Tôi bị mù lòa trong ba ngày.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Bốn Chuyến Hành Trình & Mười Ba Bức Thư Bất Hủ",
+                "text": "Tôi đã vượt bốn chuyến hải hành truyền giáo khắp Địa Trung Hải, chịu đòn vọt, tù đày, chìm tàu và viết 13 bức thư nền tảng thần học định hình Hội Thánh muôn đời.",
+                "clue_text": "Tôi đã vượt bốn chuyến hải hành truyền giáo khắp Địa Trung Hải, chịu đòn vọt, tù đày, chìm tàu và viết 13 bức thư nền tảng thần học định hình Hội Thánh muôn đời.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Minh chứng quyền năng biến cải tột cùng của Phúc Âm Ân Điển: kẻ bắt bớ khốc liệt nhất trở thành sứ giả nhiệt thành nhất rao truyền sự xưng công bình bởi đức tin.",
+        "christological_typology": "Đại sứ của Đấng Phục Sinh trước các bậc vua chúa và muôn dân ngoại bang; người sống không còn là mình nữa nhưng là Đấng Christ sống trong mình (Ga-la-ti 2:20)."
+    },
+    {
+        "id": "wai-moses",
+        "case_number": 3,
+        "codename": "Hồ Sơ Mật #03: Cậu Bé Chiếc Nôi Sậy & Bụi Gai Cháy",
+        "era": "old_testament",
+        "category": "Patriarchs & Exodus",
+        "difficulty": 1,
+        "target_character": "moi-se",
+        "target_name_vi": "Môi-se",
+        "target_title": "Người giải phóng dân tộc, Người ban Luật pháp, Bạn thân thiết của Đức Chúa Trời",
+        "golden_scripture_ref": "Xuất Ê-díp-tô Ký 3:14",
+        "suspect_options": ["Môi-se", "A-rôn", "Giô-suê", "Ghi-đê-ôn"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Chiếc Nôi Bằng Mây Trên Sông Nile",
+                "text": "Khi vừa chào đời giữa sắc lệnh giết các con trai Hê-bơ-rơ, mẹ giấu tôi ba tháng rồi đặt trong chiếc nôi bằng mây trét chai thả giữa đám lau sậy ven dòng sông Nile.",
+                "clue_text": "Khi vừa chào đời giữa sắc lệnh giết các con trai Hê-bơ-rơ, mẹ giấu tôi ba tháng rồi đặt trong chiếc nôi bằng mây trét chai thả giữa đám lau sậy ven dòng sông Nile.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Bốn Mươi Năm Đầy Tớ Chăn Chiên Sa Mạc",
+                "text": "Sau khi giết một giám thị Ai Cập để bênh vực đồng bào, tôi phải trốn chạy sang đồng vắng Ma-đi-an làm nghề chăn chiên suốt 40 năm cho cha vợ là Giê-trô.",
+                "clue_text": "Sau khi giết một giám thị Ai Cập để bênh vực đồng bào, tôi phải trốn chạy sang đồng vắng Ma-đi-an làm nghề chăn chiên suốt 40 năm cho cha vợ là Giê-trô.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Ngọn Lửa Không Tàn Nơi Đỉnh Hô-rếp",
+                "text": "Tại chân núi Hô-rếp, tôi chứng kiến một bụi gai bốc cháy phừng phực nhưng không hề tàn rụi và nghe tiếng phán: 'Ta là Đấng Tự Hữu Hằng Hữu (I AM WHO I AM)'.",
+                "clue_text": "Tại chân núi Hô-rếp, tôi chứng kiến một bụi gai bốc cháy phừng phực nhưng không hề tàn rụi và nghe tiếng phán: 'Ta là Đấng Tự Hữu Hằng Hữu (I AM WHO I AM)'.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Cây Gậy Rẽ Biển & Hai Bảng Đá Si-na-i",
+                "text": "Cầm cây gậy của Đức Chúa Trời giơ ra trên Biển Đỏ rẽ lối cho hàng triệu tuyển dân, tôi kiêng ăn 40 ngày đêm nhận Thập Tự Bảng Luật Pháp trên đỉnh Si-na-i mây mù sấm sét.",
+                "clue_text": "Cầm cây gậy của Đức Chúa Trời giơ ra trên Biển Đỏ rẽ lối cho hàng triệu tuyển dân, tôi kiêng ăn 40 ngày đêm nhận Thập Tự Bảng Luật Pháp trên đỉnh Si-na-i mây mù sấm sét.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Người trung gian của Giao ước Cũ, người giải cứu dân sự ra khỏi ách nô lệ Ai Cập để bước vào phụng sự Đức Chúa Trời Hằng Sống.",
+        "christological_typology": "Hình bóng tiên tri tối thượng về Đấng Trung Bảo Giao Ước Mới: Chúa Giê-xu là Đấng Tiên Tri vĩ đại hơn Môi-se, giải phóng nhân loại khỏi ách nô lệ của tội lỗi (Phục-truyền 18:15)."
+    },
+    {
+        "id": "wai-david",
+        "case_number": 4,
+        "codename": "Hồ Sơ Mật #04: Chàng Chăn Chiên & Hòn Sỏi Đánh Gục Khổng Lồ",
+        "era": "old_testament",
+        "category": "Kings & Kingdom",
+        "difficulty": 1,
+        "target_character": "vua-da-vit",
+        "target_name_vi": "Vua Đa-vít",
+        "target_title": "Vua thứ hai của Y-sơ-ra-ên, Người vừa lòng Đức Chúa Trời, Tác giả Thi Thiên",
+        "golden_scripture_ref": "Thi-thiên 23:1",
+        "suspect_options": ["Vua Đa-vít", "Vua Sa-lô-môn", "Vua Sau-lơ", "Chàng Giô-na-than"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Con Út Chăn Bầy Chiên Bết-lê-hem",
+                "text": "Tôi là con út trong tám người con trai của Gie-sê, lớn lên giữa những đồi cỏ Bết-lê-hem từng một mình đánh bại sư tử và gấu để bảo vệ bầy chiên nhỏ.",
+                "clue_text": "Tôi là con út trong tám người con trai của Gie-sê, lớn lên giữa những đồi cỏ Bết-lê-hem từng một mình đánh bại sư tử và gấu để bảo vệ bầy chiên nhỏ.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Sừng Dầu Tấn Phong Bí Mật",
+                "text": "Tiên tri Sa-mu-ên vâng lệnh Chúa đến nhà cha tôi, bỏ qua các anh trai vạm vỡ để đổ sừng dầu thánh phong vương tôi trước sự ngỡ ngàng của cả gia đình.",
+                "clue_text": "Tiên tri Sa-mu-ên vâng lệnh Chúa đến nhà cha tôi, bỏ qua các anh trai vạm vỡ để đổ sừng dầu thánh phong vương tôi trước sự ngỡ ngàng của cả gia đình.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Chiếc Ná Bắn Đá Tại Trũng Ê-la",
+                "text": "Từ chối áo giáp đồng nặng nề của Vua Sau-lơ, tôi bước xuống dòng suối nhặt năm hòn sỏi mịn, nhân danh Đức Giê-hô-va vạn quân hạ gục dũng sĩ khổng lồ Gô-li-át chỉ bằng một phát ná.",
+                "clue_text": "Từ chối áo giáp đồng nặng nề của Vua Sau-lơ, tôi bước xuống dòng suối nhặt năm hòn sỏi mịn, nhân danh Đức Giê-hô-va vạn quân hạ gục dũng sĩ khổng lồ Gô-li-át chỉ bằng một phát ná.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Cung Đàn Hạc Thi Thiên & Thành Của Vua",
+                "text": "Tôi gảy đàn hạc xoa dịu tâm thần bấn loạn của Sau-lơ, sáng tác phần lớn các bản Thi Thiên bất hủ và chinh phục thành Si-ôn lập nên thủ đô Giê-ru-sa-lem vinh quang.",
+                "clue_text": "Tôi gảy đàn hạc xoa dịu tâm thần bấn loạn của Sau-lơ, sáng tác phần lớn các bản Thi Thiên bất hủ và chinh phục thành Si-ôn lập nên thủ đô Giê-ru-sa-lem vinh quang.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Minh chứng tấm lòng kính sợ Chúa vượt trên mọi dáng vẻ bề ngoài; người nhận Giao ước Đa-vít bảo đảm ngai vàng đời đời (II Sa-mu-ên 7).",
+        "christological_typology": "Tổ phụ phần xác và khuôn mẫu vị vua của Đấng Mê-si: Chúa Giê-xu chính là 'Con Vua Đa-vít', Vị Vua Chăn Chiên đời đời của Vương Quốc Thiên Đàng."
+    },
+    {
+        "id": "wai-abraham",
+        "case_number": 5,
+        "codename": "Hồ Sơ Mật #05: Người Lữ Hành Đức Tin & Ngôi Sao Đêm",
+        "era": "old_testament",
+        "category": "Patriarchs & Exodus",
+        "difficulty": 1,
+        "target_character": "ap-ra-ham",
+        "target_name_vi": "Áp-ra-ham",
+        "target_title": "Tổ phụ của đức tin, Bạn của Đức Chúa Trời, Người nhận Lời Hứa Giao Ước",
+        "golden_scripture_ref": "Sáng-thế Ký 15:6",
+        "suspect_options": ["Áp-ra-ham", "Y-sác", "Gia-cốp", "Mên-chi-xê-đéc"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Từ Bỏ Đại Đô Thị U-rơ Canh-đê",
+                "text": "Tôi sinh ra tại thành phố cảng U-rơ Canh-đê trù phú thờ thần mặt trăng, theo cha di cư đến Ha-ran trước khi bước vào hành trình phiêu lưu đức tin.",
+                "clue_text": "Tôi sinh ra tại thành phố cảng U-rơ Canh-đê trù phú thờ thần mặt trăng, theo cha di cư đến Ha-ran trước khi bước vào hành trình phiêu lưu đức tin.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Lệnh Xuất Hành Tuổi Bảy Mươi Lăm",
+                "text": "Khi đã 75 tuổi, Chúa phán: 'Ngươi hãy ra khỏi quê hương, vòng bà con và nhà cha ngươi, mà đi đến xứ Ta sẽ chỉ cho... các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước.'",
+                "clue_text": "Khi đã 75 tuổi, Chúa phán: 'Ngươi hãy ra khỏi quê hương, vòng bà con và nhà cha ngươi, mà đi đến xứ Ta sẽ chỉ cho... các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước.'",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Ngước Nhìn Bầu Trời Đếm Các Vì Sao",
+                "text": "Dẫu hai vợ chồng tuổi già son sẻ chưa có một mụn con, Chúa dẫn tôi ra ngoài trời phán: 'Ngươi hãy ngó lên trời mà đếm các ngôi sao... dòng dõi ngươi cũng sẽ như thế.' Tôi tin và được kể là công bình.",
+                "clue_text": "Dẫu hai vợ chồng tuổi già son sẻ chưa có một mụn con, Chúa dẫn tôi ra ngoài trời phán: 'Ngươi hãy ngó lên trời mà đếm các ngôi sao... dòng dõi ngươi cũng sẽ như thế.' Tôi tin và được kể là công bình.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Bàn Thờ Dâng Của Lễ Trên Núi Mô-ri-a",
+                "text": "Bởi đức tin sắt son, tôi đã dắt đứa con một tuổi già Y-sác lên đỉnh núi Mô-ri-a trói trên bàn thờ, tin rằng Đức Chúa Trời có quyền khiến kẻ chết sống lại, trước khi Chúa ban chiên đực thay thế.",
+                "clue_text": "Bởi đức tin sắt son, tôi đã dắt đứa con một tuổi già Y-sác lên đỉnh núi Mô-ri-a trói trên bàn thờ, tin rằng Đức Chúa Trời có quyền khiến kẻ chết sống lại, trước khi Chúa ban chiên đực thay thế.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Cha của mọi kẻ tin; thiết lập nguyên lý xưng công bình bởi đức tin đặt nền tảng cho toàn bộ thần học ân điển Tân Ước (Rô-ma 4; Ga-la-ti 3).",
+        "christological_typology": "Hình ảnh Đức Chúa Cha không tiếc chính Con Một của Ngài; con chiên đực mắc sừng trong bụi rậm trên núi Mô-ri-a là hình bóng Chiên Con chuộc tội thay thế cho nhân loại."
+    },
+    {
+        "id": "wai-elijah",
+        "case_number": 6,
+        "codename": "Hồ Sơ Mật #06: Ngọn Lửa Trên Núi Cạt-mên & Cỗ Xe Bão Tố",
+        "era": "old_testament",
+        "category": "Prophets",
+        "difficulty": 2,
+        "target_character": "tien-tri-e-li",
+        "target_name_vi": "Tiên tri Ê-li",
+        "target_title": "Tiên tri lửa của Đức Chúa Trời, Người bảo vệ độc thần giáo trước tà thần Ba-anh",
+        "golden_scripture_ref": "I Các Vua 18:37",
+        "suspect_options": ["Tiên tri Ê-li", "Tiên tri Ê-li-sê", "Tiên tri Ê-sai", "Tiên tri Giê-rê-mi"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Con Người Xứ Ga-la-át Khoác Áo Da Thú",
+                "text": "Tôi là người Thi-sê-be ngụ tại vùng đồi Ga-la-át hiểm trở, khoác áo lông thô ráp và thắt lưng bằng dây da thú đơn sơ.",
+                "clue_text": "Tôi là người Thi-sê-be ngụ tại vùng đồi Ga-la-át hiểm trở, khoác áo lông thô ráp và thắt lưng bằng dây da thú đơn sơ.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Lời Tuyên Bố Khô Hạn Trước Vua A-háp",
+                "text": "Tôi bất thần xông vào hoàng cung đối mặt Vua A-háp tuyên bố đanh thép: 'Nếu ta không nói, trong mấy năm này sẽ chẳng có sương cũng chẳng có mưa!' rồi ẩn mình bên khe Kê-rít được quạ tha bánh nuôi.",
+                "clue_text": "Tôi bất thần xông vào hoàng cung đối mặt Vua A-háp tuyên bố đanh thép: 'Nếu ta không nói, trong mấy năm này sẽ chẳng có sương cũng chẳng có mưa!' rồi ẩn mình bên khe Kê-rít được quạ tha bánh nuôi.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Bàn Thờ Mười Hai Phiến Đá & Lửa Giáng Từ Trời",
+                "text": "Trên đỉnh núi Cạt-mên, tôi thách thức 450 tiên tri Ba-anh, truyền múc 12 vò nước đổ ngập của lễ và mương rãnh; khi tôi kêu cầu, lửa từ trời giáng xuống liếm sạch của lễ và đá sỏi.",
+                "clue_text": "Trên đỉnh núi Cạt-mên, tôi thách thức 450 tiên tri Ba-anh, truyền múc 12 vò nước đổ ngập của lễ và mương rãnh; khi tôi kêu cầu, lửa từ trời giáng xuống liếm sạch của lễ và đá sỏi.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Cỗ Xe Lửa & Ngựa Lửa Cất Lên Trời",
+                "text": "Sau khi nghe tiếng phán êm dịu nhỏ nhẹ nơi hang đá núi Hô-rếp và trao áo choàng cho môn đệ Ê-li-sê bên sông Giô-đanh, một cỗ xe lửa và ngựa lửa thình lình chia rẽ chúng tôi, cất tôi lên trời trong cơn gió lốc.",
+                "clue_text": "Sau khi nghe tiếng phán êm dịu nhỏ nhẹ nơi hang đá núi Hô-rếp và trao áo choàng cho môn đệ Ê-li-sê bên sông Giô-đanh, một cỗ xe lửa và ngựa lửa thình lình chia rẽ chúng tôi, cất tôi lên trời trong cơn gió lốc.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Tuyên xưng tuyệt đối: 'Giê-hô-va là Đức Chúa Trời!' (Ý nghĩa của tên Ê-li); bảo tồn ngọn đèn chân lý cho 7.000 người không hề quỳ gối trước Ba-anh.",
+        "christological_typology": "Đại diện cho dòng dõi các Đấng Tiên Tri hiện diện trên Núi Hóa Hình đàm đạo cùng Chúa Giê-xu (Ma-thi-ơ 17:3); hình bóng Giăng Báp-tít đến dọn đường trong tâm linh và quyền năng của Ê-li."
+    },
+    {
+        "id": "wai-daniel",
+        "case_number": 7,
+        "codename": "Hồ Sơ Mật #07: Bậc Khôn Ngoan & Miệng Sư Tử Bị Khóa",
+        "era": "old_testament",
+        "category": "Prophets",
+        "difficulty": 2,
+        "target_character": "da-ni-en",
+        "target_name_vi": "Đa-ni-ên",
+        "target_title": "Bậc khôn ngoan hoàng cung Ba-by-lôn, Tiên tri khải huyền về các đế quốc thế giới",
+        "golden_scripture_ref": "Đa-ni-ên 6:10",
+        "suspect_options": ["Đa-ni-ên", "Ê-xơ-ra", "Nê-hê-mi", "Mạc-đô-chê"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Thiếu Niên Hoàng Tộc Bị Lưu Đày",
+                "text": "Tôi thuộc dòng dõi quý tộc Giu-đa bị Vua Nê-bu-cát-nết-sa áp giải lưu đày sang Ba-by-lôn khi còn tuổi hoa niên và được đặt tên mới là Bên-tơ-xát-sa.",
+                "clue_text": "Tôi thuộc dòng dõi quý tộc Giu-đa bị Vua Nê-bu-cát-nết-sa áp giải lưu đày sang Ba-by-lôn khi còn tuổi hoa niên và được đặt tên mới là Bên-tơ-xát-sa.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Khước Từ Đồ Ngon & Rượu Của Vua",
+                "text": "Tôi cùng ba bạn kiên quyết không để của ngon vật lạ hoàng triều làm ô uế đời sống biệt riêng, chỉ xin ăn rau uống nước suốt 10 ngày và được Chúa ban sự thông sáng gấp mười lần mọi thuật sĩ.",
+                "clue_text": "Tôi cùng ba bạn kiên quyết không để của ngon vật lạ hoàng triều làm ô uế đời sống biệt riêng, chỉ xin ăn rau uống nước suốt 10 ngày và được Chúa ban sự thông sáng gấp mười lần mọi thuật sĩ.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Giải Mộng Pho Tượng & Bức Tường Xuất Hiện Dòng Chữ",
+                "text": "Đức Chúa Trời mặc khải cho tôi giấc chiêm bao về pho tượng khổng lồ bốn kim loại biểu trưng bốn đế quốc lớn, và giải mã dòng chữ bí ẩn 'Mê-nê, Mê-nê, Tê-kên, U-phác-sin' trong đêm vua Bên-xát-sa tiệc tùng lộng ngôn.",
+                "clue_text": "Đức Chúa Trời mặc khải cho tôi giấc chiêm bao về pho tượng khổng lồ bốn kim loại biểu trưng bốn đế quốc lớn, và giải mã dòng chữ bí ẩn 'Mê-nê, Mê-nê, Tê-kên, U-phác-sin' trong đêm vua Bên-xát-sa tiệc tùng lộng ngôn.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Cửa Sổ Hướng Về Giê-ru-sa-lem & Hang Sư Tử Đói",
+                "text": "Bất chấp sắc lệnh cấm cầu nguyện của Vua Đa-ri-út, tôi vẫn ba lần mỗi ngày mở cửa sổ hướng về Giê-ru-sa-lem quỳ gối tạ ơn Chúa, bị quăng vào hang sư tử nhưng thiên sứ đã bịt miệng chúng gìn giữ tôi nguyên vẹn.",
+                "clue_text": "Bất chấp sắc lệnh cấm cầu nguyện của Vua Đa-ri-út, tôi vẫn ba lần mỗi ngày mở cửa sổ hướng về Giê-ru-sa-lem quỳ gối tạ ơn Chúa, bị quăng vào hang sư tử nhưng thiên sứ đã bịt miệng chúng gìn giữ tôi nguyên vẹn.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Khẳng định chủ quyền tể trị tối cao của Đức Chúa Trời trên lịch sử nhân loại và sự hưng thịnh phế suy của mọi siêu cường đế quốc trần gian.",
+        "christological_typology": "Khải tượng về 'Con Người' ngự mây trời đến trước mặt Đấng Thượng Cổ để nhận vương quyền vinh hiển đời đời không bao giờ bị hủy diệt (Đa-ni-ên 7:13-14) — chính là Chúa Giê-xu Christ."
+    },
+    {
+        "id": "wai-john-baptist",
+        "case_number": 8,
+        "codename": "Hồ Sơ Mật #08: Tiếng Kêu Đồng Vắng & Áo Lông Lạc Đà",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "giang-bap-tit",
+        "target_name_vi": "Giăng Báp-tít",
+        "target_title": "Người dọn đường cho Đấng Mê-si, Tiên tri lớn nhất của Giao Ước Cũ",
+        "golden_scripture_ref": "Giăng 1:29",
+        "suspect_options": ["Giăng Báp-tít", "Sứ đồ Giăng", "Thầy tế lễ Xa-cha-ri", "Si-mê-ôn"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Sự Thai Nghén Lạ Lùng Của Cặp Vợ Chồng Già",
+                "text": "Cha tôi là thầy tế lễ Xa-cha-ri bị câm trong đền thờ cho đến ngày tôi sinh ra, mẹ tôi là Ê-li-sa-bét mang thai tôi khi tuổi xuân đã qua từ lâu.",
+                "clue_text": "Cha tôi là thầy tế lễ Xa-cha-ri bị câm trong đền thờ cho đến ngày tôi sinh ra, mẹ tôi là Ê-li-sa-bét mang thai tôi khi tuổi xuân đã qua từ lâu.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Đời Sống Khổ Hạnh Đồng Vắng Giu-đê",
+                "text": "Tôi không uống rượu hay chất say từ lòng mẹ, mặc áo lông lạc đà thô ráp, thắt lưng da, thức ăn nuôi sống thân thể là châu chấu và mật ong rừng nguyên chất.",
+                "clue_text": "Tôi không uống rượu hay chất say từ lòng mẹ, mặc áo lông lạc đà thô ráp, thắt lưng da, thức ăn nuôi sống thân thể là châu chấu và mật ong rừng nguyên chất.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Phép Báp-têm Ăn Năn Bên Dòng Sông Giô-đanh",
+                "text": "Tôi cất tiếng vang rền như sấm giữa sa mạc: 'Hãy ăn năn, vì Nước Thiên Đàng đã đến gần! Cái rìu đã để kề gốc cây!', khiến dân chúng từ khắp Giê-ru-sa-lem tuôn ra xin dìm mình xuống dòng Giô-đanh.",
+                "clue_text": "Tôi cất tiếng vang rền như sấm giữa sa mạc: 'Hãy ăn năn, vì Nước Thiên Đàng đã đến gần! Cái rìu đã để kề gốc cây!', khiến dân chúng từ khắp Giê-ru-sa-lem tuôn ra xin dìm mình xuống dòng Giô-đanh.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: 'Kìa, Chiên Con Của Đức Chúa Trời!'",
+                "text": "Khi Đấng Cứu Thế bước đến bên sông, tôi làm phép báp-têm cho Ngài và lớn tiếng làm chứng: 'Kìa, Chiên Con của Đức Chúa Trời, là Đấng cất tội lỗi thế gian đi! Ngài phải dấy lên, còn tôi phải hạ xuống.'",
+                "clue_text": "Khi Đấng Cứu Thế bước đến bên sông, tôi làm phép báp-têm cho Ngài và lớn tiếng làm chứng: 'Kìa, Chiên Con của Đức Chúa Trời, là Đấng cất tội lỗi thế gian đi! Ngài phải dấy lên, còn tôi phải hạ xuống.'",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Cầu nối vĩ đại giữa hai thời kỳ: Đấng Tiên tri khép lại kỷ nguyên Cựu Ước và trực tiếp giới thiệu Đấng Mê-si bằng xương bằng thịt cho toàn thể nhân loại.",
+        "christological_typology": "Bạn của Chàng Rể (Giăng 3:29); người trung thành tuyệt đối dọn sạch mọi lối gập ghềnh để Vua Vinh Hiển ngự vào."
+    },
+    {
+        "id": "wai-john-apostle",
+        "case_number": 9,
+        "codename": "Hồ Sơ Mật #09: Môn Đồ Tựa Ngực Thầy & Đảo Bát-mô",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "su-do-giang",
+        "target_name_vi": "Sứ đồ Giăng",
+        "target_title": "Môn đồ được Chúa yêu, Sứ đồ của Tình Yêu Thương, Trước giả Phúc Âm & Khải Huyền",
+        "golden_scripture_ref": "Giăng 21:24",
+        "suspect_options": ["Sứ đồ Giăng", "Giăng Báp-tít", "Sứ đồ Gia-cơ", "Sứ đồ Phi-e-rơ"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Con Trai Của Sấm Sét Bên Thuyền Cá",
+                "text": "Tôi là con trai nhỏ của Sê-bê-đê, em ruột Gia-cơ, từng cùng anh trai được Chúa Giê-xu đặt biệt danh là Bô-a-nẹt (Con trai của sấm sét) vì tính khí nóng nảy đòi xin lửa từ trời thiêu hủy làng Sa-ma-ri.",
+                "clue_text": "Tôi là con trai nhỏ của Sê-bê-đê, em ruột Gia-cơ, từng cùng anh trai được Chúa Giê-xu đặt biệt danh là Bô-a-nẹt (Con trai của sấm sét) vì tính khí nóng nảy đòi xin lửa từ trời thiêu hủy làng Sa-ma-ri.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Tựa Vào Lòng Đấng Cứu Thế",
+                "text": "Trong bữa tiệc Lễ Vượt Qua cuối cùng trước khi Chúa chịu khổ hình, tôi được vinh hạnh ngồi bên cạnh, tựa đầu sát vào ngực Thầy để hỏi ai là kẻ nộp Ngài.",
+                "clue_text": "Trong bữa tiệc Lễ Vượt Qua cuối cùng trước khi Chúa chịu khổ hình, tôi được vinh hạnh ngồi bên cạnh, tựa đầu sát vào ngực Thầy để hỏi ai là kẻ nộp Ngài.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Môn Đồ Duy Nhất Dưới Chân Đồi Gô-gô-tha",
+                "text": "Khi mọi môn đồ khác trốn chạy vì hoảng sợ, tôi là sứ đồ duy nhất can đảm đứng cạnh thân mẫu Ma-ri dưới chân cây gỗ thập tự và nhận lời trăn trối: 'Hỡi bà, đó là con của bà!... Này là mẹ ngươi!'",
+                "clue_text": "Khi mọi môn đồ khác trốn chạy vì hoảng sợ, tôi là sứ đồ duy nhất can đảm đứng cạnh thân mẫu Ma-ri dưới chân cây gỗ thập tự và nhận lời trăn trối: 'Hỡi bà, đó là con của bà!... Này là mẹ ngươi!'",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Khải Tượng Vinh Hiển Nơi Hải Đảo Bát-mô",
+                "text": "Khi tuổi đã ngoài chín mươi bị La Mã lưu đày khổ sai trên đảo đá Bát-mô, tôi nghe tiếng như tiếng kèn lớn sau lưng, ngã quỵ như chết trước Đấng Sống lại vinh quang và ghi chép toàn bộ sách Khải Huyền.",
+                "clue_text": "Khi tuổi đã ngoài chín mươi bị La Mã lưu đày khổ sai trên đảo đá Bát-mô, tôi nghe tiếng như tiếng kèn lớn sau lưng, ngã quỵ như chết trước Đấng Sống lại vinh quang và ghi chép toàn bộ sách Khải Huyền.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Sứ đồ làm chứng sâu sắc nhất về thần tính vinh quang của Ngôi Lời nhập thể ('Ban đầu có Ngôi Lời') và định nghĩa bản tính cứu chuộc: 'Đức Chúa Trời là sự yêu thương' (I Giăng 4:8).",
+        "christological_typology": "Chứng nhân mắt thấy tai nghe tay rờ đến Lời Sự Sống; người chiêm ngưỡng sự toàn thắng chung cuộc của Chiên Con và Tân Nương Thành Thánh Giê-ru-sa-lem Mới."
+    },
+    {
+        "id": "wai-mary",
+        "case_number": 10,
+        "codename": "Hồ Sơ Mật #10: Thiếu Nữ Na-xa-rét & Lời Hát Magnificat",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "ma-ri",
+        "target_name_vi": "Ma-ri",
+        "target_title": "Người nữ được ơn phước nhất trong các người nữ, Thân mẫu phần xác của Chúa Cứu Thế",
+        "golden_scripture_ref": "Lu-ca 1:38",
+        "suspect_options": ["Ma-ri (Thân mẫu Chúa Giê-xu)", "Ê-li-sa-bét", "Ma-ri Ma-đơ-len", "Ma-thê"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Thiếu Nữ Làng Quê Đính Hôn Cùng Chàng Thợ Mộc",
+                "text": "Tôi là một thiếu nữ Do Thái bình dị sống tại ngôi làng Na-xa-rét nghèo nàn xứ Ga-li-lê, đã đính hôn cùng một người thợ mộc công bình tên Giô-sép thuộc dòng dõi Đa-vít.",
+                "clue_text": "Tôi là một thiếu nữ Do Thái bình dị sống tại ngôi làng Na-xa-rét nghèo nàn xứ Ga-li-lê, đã đính hôn cùng một người thợ mộc công bình tên Giô-sép thuộc dòng dõi Đa-vít.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Lời Chào Của Thiên Sứ Gáp-ri-ên",
+                "text": "Một thiên sứ sáng láng thình lình hiện đến phán: 'Hỡi người được ơn, Chúa ở cùng ngươi; ngươi sẽ chịu thai và sinh một con trai, đặt tên là Giê-xu... Ngài sẽ làm Đấng Rất Cao.'",
+                "clue_text": "Một thiên sứ sáng láng thình lình hiện đến phán: 'Hỡi người được ơn, Chúa ở cùng ngươi; ngươi sẽ chịu thai và sinh một con trai, đặt tên là Giê-xu... Ngài sẽ làm Đấng Rất Cao.'",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: 'Linh Hồn Tôi Tôn Cao Chúa!' (Bài Ca Magnificat)",
+                "text": "Bất chấp nỗi sợ hãi về lời dị nghị ném đá của xã hội, tôi thưa: 'Tôi đây là tôi tớ Chúa; xin sự ấy xảy ra cho tôi như lời người truyền' và cất tiếng hát ca ngợi Đức Chúa Trời hạ kẻ quyền thế, nâng người khiêm nhường.",
+                "clue_text": "Bất chấp nỗi sợ hãi về lời dị nghị ném đá của xã hội, tôi thưa: 'Tôi đây là tôi tớ Chúa; xin sự ấy xảy ra cho tôi như lời người truyền' và cất tiếng hát ca ngợi Đức Chúa Trời hạ kẻ quyền thế, nâng người khiêm nhường.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Máng Cỏ Chuồng Chiên Đêm Đông Bết-lê-hem",
+                "text": "Vì quán trọ không còn chỗ trọ, tôi đã hạ sinh Con Đầu Lòng nơi chuồng gia súc tại Bết-lê-hem, lấy khăn bọc con đặt nằm trong máng cỏ, và ghi nhớ mọi lời các người chăn chiên cùng bác sĩ đông phương trong lòng.",
+                "clue_text": "Vì quán trọ không còn chỗ trọ, tôi đã hạ sinh Con Đầu Lòng nơi chuồng gia súc tại Bết-lê-hem, lấy khăn bọc con đặt nằm trong máng cỏ, và ghi nhớ mọi lời các người chăn chiên cùng bác sĩ đông phương trong lòng.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Biểu tượng mẫu mực của sự vâng phục tuyệt đối bởi đức tin; ứng nghiệm lời tiên tri Ê-sai 7:14 rằng gái đồng trinh sẽ chịu thai sinh một Con Trai đặt tên Em-ma-nu-ên.",
+        "christological_typology": "Mẹ phần xác của Đấng Nhập Thể; người mẹ chứng kiến thanh gươm đâm thấu lòng mình khi Con Một chịu đóng đinh chuộc tội nhân loại trên đồi Sọ."
+    },
+    {
+        "id": "wai-joseph",
+        "case_number": 11,
+        "codename": "Hồ Sơ Mật #11: Chiếc Áo Nhiều Màu & Giấc Mộng Hoàng Cung Ai Cập",
+        "era": "old_testament",
+        "category": "Patriarchs & Exodus",
+        "difficulty": 1,
+        "target_character": "gio-sep",
+        "target_name_vi": "Giô-sép",
+        "target_title": "Tể tướng xứ Ai Cập, Người giải cứu gia tộc khỏi nạn đói, Bậc trung tín nhẫn nại",
+        "golden_scripture_ref": "Sáng-thế Ký 50:20",
+        "suspect_options": ["Giô-sép", "Gia-cốp", "Giu-đa", "Bên-gia-min"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Chiếc Áo Xảo Lộng & Giấc Mộng Tuổi Mười Bảy",
+                "text": "Cha yêu tôi hơn các anh nên may cho tôi một chiếc áo nhiều màu rực rỡ; tôi kể cho các anh nghe hai giấc mộng về các bó lúa và mặt trời mặt trăng sụp lạy, khiến họ căm ghét tột cùng.",
+                "clue_text": "Cha yêu tôi hơn các anh nên may cho tôi một chiếc áo nhiều màu rực rỡ; tôi kể cho các anh nghe hai giấc mộng về các bó lúa và mặt trời mặt trăng sụp lạy, khiến họ căm ghét tột cùng.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Hai Mươi Miếng Bạc & Hố Sâu Sa Mạc",
+                "text": "Khi tôi đi thăm các anh tại Đô-than, họ lột áo nhiều màu quăng tôi xuống hố cạn, rồi bán tôi cho đoàn lái buôn Ích-ma-ên sang xứ Ai Cập làm nô lệ với giá hai mươi miếng bạc.",
+                "clue_text": "Khi tôi đi thăm các anh tại Đô-than, họ lột áo nhiều màu quăng tôi xuống hố cạn, rồi bán tôi cho đoàn lái buôn Ích-ma-ên sang xứ Ai Cập làm nô lệ với giá hai mươi miếng bạc.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Giữ Trọn Lòng Thánh Sạch Trong Ngục Tù",
+                "text": "Tại nhà quan thị vệ Phô-ti-pha, tôi khước từ sự cám dỗ tà dâm của bà chủ: 'Sao tôi dám làm điều đại ác mà phạm tội cùng Đức Chúa Trời?', bị vu oan giam vào ngục tối nhưng vẫn giải mộng chuẩn xác cho quan tửu chánh.",
+                "clue_text": "Tại nhà quan thị vệ Phô-ti-pha, tôi khước từ sự cám dỗ tà dâm của bà chủ: 'Sao tôi dám làm điều đại ác mà phạm tội cùng Đức Chúa Trời?', bị vu oan giam vào ngục tối nhưng vẫn giải mộng chuẩn xác cho quan tửu chánh.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Từ Hầm Ngục Trở Thành Tể Tướng Cứu Muôn Dân",
+                "text": "Giải mộng bảy con bò mập và bảy con bò gầy cho Pha-ra-ôn, tôi được phong làm tể tướng toàn quyền tích trữ lúa mì, tha thứ trọn vẹn cho các anh và đón cả gia tộc sang ngụ tại xứ Gô-sen phì nhiêu.",
+                "clue_text": "Giải mộng bảy con bò mập và bảy con bò gầy cho Pha-ra-ôn, tôi được phong làm tể tướng toàn quyền tích trữ lúa mì, tha thứ trọn vẹn cho các anh và đón cả gia tộc sang ngụ tại xứ Gô-sen phì nhiêu.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Minh chứng quyền tể trị mầu nhiệm của Thiên Chúa biến đổi sự dữ của loài người thành điều thiện lành cứu vớt muôn người (Sáng-thế Ký 50:20).",
+        "christological_typology": "Hình bóng trọn vẹn nhất về Đấng Christ trong Cựu Ước: bị chính anh em mình chối bỏ, bán rẻ vì bạc trắng, chịu hạ mình xuống ngục sâu trước khi được tôn cao lên ngôi vị tể trị ban bánh sự sống cho thế giới đói khát."
+    },
+    {
+        "id": "wai-noah",
+        "case_number": 12,
+        "codename": "Hồ Sơ Mật #12: Chiếc Tàu Gỗ Gô-phe & Cầu Vồng Sau Cơn Hồng Thủy",
+        "era": "old_testament",
+        "category": "Patriarchs & Exodus",
+        "difficulty": 1,
+        "target_character": "no-e",
+        "target_name_vi": "Nô-ê",
+        "target_title": "Người công bình giữa thế hệ bại hoại, Người đóng tàu cứu rỗi, Người nhận Giao Ước Cầu Vồng",
+        "golden_scripture_ref": "Sáng-thế Ký 6:8",
+        "suspect_options": ["Nô-ê", "Hê-nóc", "Mê-thu-sê-la", "A-đam"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Người Công Bình Bước Đi Cùng Thượng Đế",
+                "text": "Tôi là thế hệ thứ mười từ A-đam, con trai Lê-méc; giữa một trần gian đầy dẫy tội ác và bạo lực khiến Chúa tự trách đã dựng nên loài người, tôi tìm được ân sủng trước mặt Ngài vì là người trọn vẹn.",
+                "clue_text": "Tôi là thế hệ thứ mười từ A-đam, con trai Lê-méc; giữa một trần gian đầy dẫy tội ác và bạo lực khiến Chúa tự trách đã dựng nên loài người, tôi tìm được ân sủng trước mặt Ngài vì là người trọn vẹn.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Mạng Lệnh Đóng Đại Chiến Hạm Giữa Đất Khô",
+                "text": "Dù chưa từng thấy mưa sa hay lụt lội, tôi vâng lời Chúa đóng một chiếc tàu khổng lồ bằng gỗ gô-phe dài 300 trượng, trét chai trong ngoài, chia ba tầng kiên cố suốt hàng chục năm ròng rã.",
+                "clue_text": "Dù chưa từng thấy mưa sa hay lụt lội, tôi vâng lời Chúa đóng một chiếc tàu khổng lồ bằng gỗ gô-phe dài 300 trượng, trét chai trong ngoài, chia ba tầng kiên cố suốt hàng chục năm ròng rã.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Bốn Mươi Ngày Đêm Nước Dâng Trắng Xóa",
+                "text": "Gia đình tôi gồm 8 linh hồn cùng từng đôi sinh vật bước vào tàu; chính bàn tay Đức Giê-hô-va đóng cửa tàu lại trước khi các nguồn vực lớn nứt toác và các cửa sổ trên trời mở toang tuôn mưa 40 ngày đêm.",
+                "clue_text": "Gia đình tôi gồm 8 linh hồn cùng từng đôi sinh vật bước vào tàu; chính bàn tay Đức Giê-hô-va đóng cửa tàu lại trước khi các nguồn vực lớn nứt toác và các cửa sổ trên trời mở toang tuôn mưa 40 ngày đêm.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Cành Ô-liu Của Chim Bồ Câu & Cầu Vồng Giao Ước",
+                "text": "Sau khi tàu đậu trên đỉnh núi A-ra-rát, con chim bồ câu bay về ngậm nhánh ô-liu tươi; tôi bước ra lập bàn thờ dâng của lễ tạ ơn và chiêm ngưỡng dải cầu vồng rực rỡ Chúa đặt trên mây làm ấn chứng giao ước không hủy diệt trái đất nữa.",
+                "clue_text": "Sau khi tàu đậu trên đỉnh núi A-ra-rát, con chim bồ câu bay về ngậm nhánh ô-liu tươi; tôi bước ra lập bàn thờ dâng của lễ tạ ơn và chiêm ngưỡng dải cầu vồng rực rỡ Chúa đặt trên mây làm ấn chứng giao ước không hủy diệt trái đất nữa.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Tấm gương đức tin kiên định chống lại trào lưu thế tục bại hoại; người rao giảng sự công bình bảo tồn hạt giống nhân loại và lịch sử cứu chuộc.",
+        "christological_typology": "Chiếc tàu cứu rỗi là hình bóng độc nhất về Đấng Christ: chỉ có một cửa duy nhất bước vào, và bất kỳ ai ở trong Ngài đều được bảo toàn an toàn tuyệt đối trước cơn thịnh nộ phán xét của Đức Chúa Trời."
+    },
+    {
+        "id": "wai-joshua",
+        "case_number": 13,
+        "codename": "Hồ Sơ Mật #13: Vị Tướng Vượt Sông Giô-đanh & Tường Thành Giê-ri-cô",
+        "era": "old_testament",
+        "category": "Patriarchs & Exodus",
+        "difficulty": 2,
+        "target_character": "gio-sue",
+        "target_name_vi": "Giô-suê",
+        "target_title": "Người kế vị Môi-se, Vị tướng đức tin chinh phục Đất Hứa Ca-na-an",
+        "golden_scripture_ref": "Giô-suê 1:9",
+        "suspect_options": ["Giô-suê", "Ca-lép", "Ghi-đê-ôn", "Sam-sôn"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Phụ Tá Trẻ Tuổi Trong Lều Hội Mạc",
+                "text": "Tôi là con trai của Nun thuộc chi phái Ép-ra-im, từng làm phụ tá thân cận phục vụ Môi-se và không hề rời khỏi lều hội mạc khi vinh quang Chúa ngự xuống.",
+                "clue_text": "Tôi là con trai của Nun thuộc chi phái Ép-ra-im, từng làm phụ tá thân cận phục vụ Môi-se và không hề rời khỏi lều hội mạc khi vinh quang Chúa ngự xuống.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Một Trong Hai Thám Tử Xé Áo Khuyên Dân",
+                "text": "Cùng với Ca-lép trong đoàn mười hai thám tử đi do thám Ca-na-an, tôi đã xé áo khuyên dân chúng đừng sợ dân vóc dáng to lớn vì Chúa ở cùng chúng ta và họ sẽ là đồ ăn cho chúng ta.",
+                "clue_text": "Cùng với Ca-lép trong đoàn mười hai thám tử đi do thám Ca-na-an, tôi đã xé áo khuyên dân chúng đừng sợ dân vóc dáng to lớn vì Chúa ở cùng chúng ta và họ sẽ là đồ ăn cho chúng ta.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Tiếng Phán: 'Hãy Vững Lòng Bền Chí!'",
+                "text": "Sau khi Môi-se qua đời, Chúa trao quyền lãnh đạo cho tôi với lời hứa vàng son: 'Hãy vững lòng bền chí, chớ run sợ, chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ở cùng ngươi trong mọi nơi ngươi đi.'",
+                "clue_text": "Sau khi Môi-se qua đời, Chúa trao quyền lãnh đạo cho tôi với lời hứa vàng son: 'Hãy vững lòng bền chí, chớ run sợ, chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ở cùng ngươi trong mọi nơi ngươi đi.'",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Bảy Ngày Vòng Quanh Tường Thành Giê-ri-cô",
+                "text": "Dẫn đầu các thầy tế lễ khiêng Hòm Giao Ước rẽ nước sông Giô-đanh, tôi chỉ huy toàn quân đi vòng quanh thành lũy kiên cố Giê-ri-cô bảy ngày; trong tiếng kèn và tiếng la lớn của ngày thứ bảy, tường thành đã sụp đổ tan tành.",
+                "clue_text": "Dẫn đầu các thầy tế lễ khiêng Hòm Giao Ước rẽ nước sông Giô-đanh, tôi chỉ huy toàn quân đi vòng quanh thành lũy kiên cố Giê-ri-cô bảy ngày; trong tiếng kèn và tiếng la lớn của ngày thứ bảy, tường thành đã sụp đổ tan tành.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Minh chứng chiến thắng thuộc linh hoàn toàn thuộc về Đức Giê-hô-va khi con người vâng phục trọn vẹn Lời Hằng Sống; lời tuyên xưng: 'Ta và nhà ta sẽ phụng sự Đức Giê-hô-va' (Giô-suê 24:15).",
+        "christological_typology": "Mang cùng tên gốc với Chúa Giê-xu (Yeshua / Giê-hô-va là Đấng Cứu Rỗi); hình bóng Chúa Giê-xu là Vị Tướng Đạo Binh dẫn dắt dân sự đắc thắng vào miền an nghỉ và cơ nghiệp Đất Hứa đời đời."
+    },
+    {
+        "id": "wai-jonah",
+        "case_number": 14,
+        "codename": "Hồ Sơ Mật #14: Tiên Tri Trốn Chạy & Ba Ngày Đêm Trong Bụng Cá",
+        "era": "old_testament",
+        "category": "Prophets",
+        "difficulty": 1,
+        "target_character": "gio-na",
+        "target_name_vi": "Tiên tri Giô-na",
+        "target_title": "Nhà tiên tri trốn chạy, Dấu lạ của sự chết và phục sinh",
+        "golden_scripture_ref": "Giô-na 2:9",
+        "suspect_options": ["Tiên tri Giô-na", "Tiên tri A-mốt", "Tiên tri Ô-sê", "Tiên tri Mi-chê"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Lệnh Đi Về Hướng Đông Nhưng Xuống Tàu Hướng Tây",
+                "text": "Chúa truyền tôi đi đến Ni-ni-ve (kinh đô Át-si-ri tàn bạo) để rao giảng cảnh cáo, nhưng vì không muốn kẻ thù được cứu nên tôi trốn xuống cảng Giốp-pa mua vé tàu chạy trốn sang Ta-rê-si.",
+                "clue_text": "Chúa truyền tôi đi đến Ni-ni-ve (kinh đô Át-si-ri tàn bạo) để rao giảng cảnh cáo, nhưng vì không muốn kẻ thù được cứu nên tôi trốn xuống cảng Giốp-pa mua vé tàu chạy trốn sang Ta-rê-si.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Cơn Bão Tố Trên Biển Lớn & Thăm Trúng Tôi",
+                "text": "Biển nổi sóng dữ dội dọa vỡ tàu; trong khi tôi ngủ say dưới hầm tàu, các thủy thủ bắt thăm để biết vì ai tai vạ này ập đến và lá thăm đã trúng ngay đích danh tôi.",
+                "clue_text": "Biển nổi sóng dữ dội dọa vỡ tàu; trong khi tôi ngủ say dưới hầm tàu, các thủy thủ bắt thăm để biết vì ai tai vạ này ập đến và lá thăm đã trúng ngay đích danh tôi.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Lời Cầu Nguyện Từ Đáy Vực Âm Phủ",
+                "text": "Tôi bảo họ quăng tôi xuống biển cho sóng yên; Đức Chúa Trời sắm sẵn một con cá lớn nuốt chửng tôi; từ đáy bụng cá tăm tối suốt ba ngày ba đêm, tôi dâng lời khẩn cầu ăn năn tạ ơn Chúa.",
+                "clue_text": "Tôi bảo họ quăng tôi xuống biển cho sóng yên; Đức Chúa Trời sắm sẵn một con cá lớn nuốt chửng tôi; từ đáy bụng cá tăm tối suốt ba ngày ba đêm, tôi dâng lời khẩn cầu ăn năn tạ ơn Chúa.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Bài Giảng Tám Chữ & Sự Ăn Năn Của Cả Kinh Thành",
+                "text": "Con cá mửa tôi ra bãi biển; tôi đi vào Ni-ni-ve rao giảng: 'Còn bốn mươi ngày nữa Ni-ni-ve sẽ bị đổ nhào!'; từ vua chí dân đều mặc bao gai ăn năn và Chúa đã dủ lòng thương xót tha tội cho cả thành phố.",
+                "clue_text": "Con cá mửa tôi ra bãi biển; tôi đi vào Ni-ni-ve rao giảng: 'Còn bốn mươi ngày nữa Ni-ni-ve sẽ bị đổ nhào!'; từ vua chí dân đều mặc bao gai ăn năn và Chúa đã dủ lòng thương xót tha tội cho cả thành phố.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Bày tỏ lòng thương xót bao la vượt biên giới của Đức Chúa Trời dành cho cả Dân Ngoại; bẻ gãy chủ nghĩa dân tộc hẹp hòi của lòng người.",
+        "christological_typology": "'Dấu lạ của tiên tri Giô-na': Giô-na ở trong bụng cá ba ngày ba đêm là hình bóng tiên tri chính xác về việc Con Người ở trong lòng đất ba ngày ba đêm trước khi phục sinh vinh hiển (Ma-thi-ơ 12:40)."
+    },
+    {
+        "id": "wai-judas",
+        "case_number": 15,
+        "codename": "Hồ Sơ Mật #15: Người Giữ Túi Tiền & Cái Hôn Phản Bội",
+        "era": "new_testament",
+        "category": "Gospels & Apostles",
+        "difficulty": 1,
+        "target_character": "giu-da-ich-ca-ri-ot",
+        "target_name_vi": "Giu-đa Ích-ca-ri-ốt",
+        "target_title": "Kẻ phản bội Đấng Cứu Thế, Con của sự hư mất",
+        "golden_scripture_ref": "Ma-thi-ơ 26:15",
+        "suspect_options": ["Giu-đa Ích-ca-ri-ốt", "Giu-đa (Anh em Chúa)", "Si-môn Kê-nát", "Thê-đu-đa"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Sứ Đồ Duy Nhất Thuộc Miền Nam Xứ Giu-đê",
+                "text": "Trong mười hai sứ đồ được gọi theo Chúa, tôi là người duy nhất gốc tích từ thành Kê-ri-ốt xứ Giu-đê chứ không thuộc miền quê Ga-li-lê chất phác phía bắc.",
+                "clue_text": "Trong mười hai sứ đồ được gọi theo Chúa, tôi là người duy nhất gốc tích từ thành Kê-ri-ốt xứ Giu-đê chứ không thuộc miền quê Ga-li-lê chất phác phía bắc.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Chiếc Túi Bạc Chung & Thói Bòn Rút",
+                "text": "Được tín nhiệm giao làm thủ quỹ giữ túi tiền chi tiêu cho cả đoàn môn đồ, nhưng lòng tôi lại nhen nhóm sự tham lam, thường bòn rút tiền người ta dâng cho Chúa.",
+                "clue_text": "Được tín nhiệm giao làm thủ quỹ giữ túi tiền chi tiêu cho cả đoàn môn đồ, nhưng lòng tôi lại nhen nhóm sự tham lam, thường bòn rút tiền người ta dâng cho Chúa.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Bực Tức Trước Chai Dầu Thơm Ba Trăm Đơ-ni-ê",
+                "text": "Khi Ma-ri lấy bình dầu thơm quý giá xức chân Chúa Giê-xu tại Bê-tha-ni, tôi giả vờ đạo đức chỉ trích tại sao không bán ba trăm đồng để chẩn bần người nghèo.",
+                "clue_text": "Khi Ma-ri lấy bình dầu thơm quý giá xức chân Chúa Giê-xu tại Bê-tha-ni, tôi giả vờ đạo đức chỉ trích tại sao không bán ba trăm đồng để chẩn bần người nghèo.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Ba Mươi Miếng Bạc & Cái Hôn Trong Vườn Ghết-sê-ma-nê",
+                "text": "Tôi đến gặp các thầy tế lễ thỏa thuận nộp Thầy với giá ba mươi miếng bạc của một tên nô lệ, rồi dẫn một toán lính cầm đuốc gươm giáo vào vườn Ghết-sê-ma-nê trao cho Thầy một cái hôn ám hiệu.",
+                "clue_text": "Tôi đến gặp các thầy tế lễ thỏa thuận nộp Thầy với giá ba mươi miếng bạc của một tên nô lệ, rồi dẫn một toán lính cầm đuốc gươm giáo vào vườn Ghết-sê-ma-nê trao cho Thầy một cái hôn ám hiệu.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Lời cảnh tỉnh bi kịch nghiêm khắc nhất cho mọi thời đại: có thể ở cạnh Chúa Giê-xu ba năm rưỡi, nghe mọi bài giảng, thấy mọi phép lạ mà lòng vẫn để ma quỷ và tiền bạc dẫn dụ vào sự hư mất đời đời.",
+        "christological_typology": "Ứng nghiệm chính xác lời tiên tri Xa-cha-ri 11:12-13 về ba mươi miếng bạc và Thi-thiên 41:9 về bạn thân cùng ăn bánh lại giơ gót chân lên nghịch đãi."
+    },
+    {
+        "id": "wai-stephen",
+        "case_number": 16,
+        "codename": "Hồ Sơ Mật #16: Gương Mặt Như Thiên Sứ & Cơn Mưa Đá Trận Đạo",
+        "era": "new_testament",
+        "category": "Early Church",
+        "difficulty": 2,
+        "target_character": "te-phan",
+        "target_name_vi": "Chấp sự Tê-phan",
+        "target_title": "Người tử đạo đầu tiên của Hội Thánh, Bậc chứng nhân đức tin đầy dẫy Thánh Linh",
+        "golden_scripture_ref": "Công-vụ các Sứ-đồ 7:59",
+        "suspect_options": ["Chấp sự Tê-phan", "Phi-líp (Chấp sự)", "Ba-na-ba", "A-líp-ba"],
+        "clues": [
+            {
+                "order": 1,
+                "level": 1,
+                "title": "Manh Mối 1: Một Trong Bảy Chấp Sự Ban Đầu",
+                "text": "Tôi là một Cơ Đốc nhân Do Thái gốc Hy Lạp (Hellenist), có danh tiếng tốt, đầy dẫy Thánh Linh và khôn ngoan được toàn Hội Thánh tại Giê-ru-sa-lem tín nhiệm bầu làm một trong bảy chấp sự lo việc cấp dưỡng bàn ăn.",
+                "clue_text": "Tôi là một Cơ Đốc nhân Do Thái gốc Hy Lạp (Hellenist), có danh tiếng tốt, đầy dẫy Thánh Linh và khôn ngoan được toàn Hội Thánh tại Giê-ru-sa-lem tín nhiệm bầu làm một trong bảy chấp sự lo việc cấp dưỡng bàn ăn.",
+                "difficulty_label": "Khởi Đầu (100đ)",
+                "points": 100,
+                "xp_value": 100
+            },
+            {
+                "order": 2,
+                "level": 2,
+                "title": "Manh Mối 2: Quyền Phép Làm Dấu Lạ & Sự Khôn Ngoan Vô Đối",
+                "text": "Không chỉ phục vụ bàn ăn, tôi làm nhiều dấu kỳ phép lạ lớn trong dân chúng; các học giả thuộc hội đường Người Tự Do tranh luận cùng tôi nhưng không thể nào bẻ gãy nổi sự khôn ngoan và Đức Thánh Linh bởi Ngài mà tôi nói.",
+                "clue_text": "Không chỉ phục vụ bàn ăn, tôi làm nhiều dấu kỳ phép lạ lớn trong dân chúng; các học giả thuộc hội đường Người Tự Do tranh luận cùng tôi nhưng không thể nào bẻ gãy nổi sự khôn ngoan và Đức Thánh Linh bởi Ngài mà tôi nói.",
+                "difficulty_label": "Bối Cảnh (75đ)",
+                "points": 75,
+                "xp_value": 75
+            },
+            {
+                "order": 3,
+                "level": 3,
+                "title": "Manh Mối 3: Gương Mặt Sáng Như Thiên Sứ Trước Tòa Công Luận",
+                "text": "Bị vu cáo lộng ngôn nghịch cùng Đền Thờ và Luật pháp, tôi đứng giữa Tòa Sanhedrin với gương mặt sáng rực như mặt thiên sứ, dõng dạc trình bày bản luận án hùng hồn về lịch sử cứu chuộc từ Áp-ra-ham đến Đấng Công Bình.",
+                "clue_text": "Bị vu cáo lộng ngôn nghịch cùng Đền Thờ và Luật pháp, tôi đứng giữa Tòa Sanhedrin với gương mặt sáng rực như mặt thiên sứ, dõng dạc trình bày bản luận án hùng hồn về lịch sử cứu chuộc từ Áp-ra-ham đến Đấng Công Bình.",
+                "difficulty_label": "Quyết Định (50đ)",
+                "points": 50,
+                "xp_value": 50
+            },
+            {
+                "order": 4,
+                "level": 4,
+                "title": "Manh Mối 4: Trời Mở Ra & Lời Cầu Tha Tội Dưới Cơn Mưa Đá",
+                "text": "Khi bị kéo ra ngoài thành ném đá tàn bạo, tôi ngước mắt lên trời thấy vinh hiển Đức Chúa Trời và Chúa Giê-xu đang đứng bên hữu Ngài, quỳ xuống kêu lớn: 'Lạy Chúa, xin đừng đổ tội này cho họ!' rồi ngủ yên trong cánh tay Chúa.",
+                "clue_text": "Khi bị kéo ra ngoài thành ném đá tàn bạo, tôi ngước mắt lên trời thấy vinh hiển Đức Chúa Trời và Chúa Giê-xu đang đứng bên hữu Ngài, quỳ xuống kêu lớn: 'Lạy Chúa, xin đừng đổ tội này cho họ!' rồi ngủ yên trong cánh tay Chúa.",
+                "difficulty_label": "Rõ Nét (25đ)",
+                "points": 25,
+                "xp_value": 25
+            }
+        ],
+        "theological_significance": "Hạt giống đầu tiên gieo xuống mở màn cho làn sóng phát tán Phúc Âm ra khắp Giu-đê, Sa-ma-ri và thế giới Dân Ngoại; tác động sâu sắc lên lương tâm Sau-lơ trẻ tuổi đang đứng giữ áo.",
+        "christological_typology": "Phản chiếu trọn vẹn bản tính của Chúa Giê-xu trên thập tự giá: yêu thương tha thứ cho chính những kẻ hành quyết mình và trao phó linh hồn trong tay Đấng Cứu Thế."
+    }
+]
+
+
+@router.get("/who-am-i", response_model=List[WhoAmIDossier])
+def get_who_am_i_challenges(
+    era: Optional[str] = Query(None, description="all | old_testament | new_testament"),
+    category: Optional[str] = Query(None, description="Category filter"),
+    search: Optional[str] = Query(None, description="Search keyword in codename, target or clues"),
+    db: Session = Depends(get_db)
+):
+    """
+    §3, §7, §46 — "Who Am I?" Biblical Character Mystery & Clue Deduction Engine.
+    Returns 16 curated biblical figure mystery cases with 4 progressive clues,
+    enriching each dossier with authentic Protestant 1925 Vietnamese scripture text from database.
+    """
+    from app.routers.graph import _extract_verse_from_db
+
+    items: List[WhoAmIDossier] = []
+    for d in WHO_AM_I_DATA:
+        # Era filter
+        if era and era != "all" and d["era"] != era:
+            continue
+
+        # Category filter
+        if category and category != "all" and d["category"].lower() != category.lower():
+            continue
+
+        # Search filter
+        if search:
+            q = search.lower().strip()
+            name_match = q in d["target_name_vi"].lower() or q in d["codename"].lower()
+            clue_match = any(q in c["clue_text"].lower() for c in d["clues"])
+            if not (name_match or clue_match):
+                continue
+
+        verse_text = ""
+        if d.get("golden_scripture_ref"):
+            verse_text = _extract_verse_from_db(db, d["golden_scripture_ref"])
+
+        clue_items = [
+            WhoAmIClue(
+                order=c.get("order", c.get("level", 1)),
+                level=c.get("level", c.get("order", 1)),
+                title=c.get("title", f"Manh Mối {c.get('level', 1)}"),
+                text=c.get("text", c.get("clue_text", "")),
+                clue_text=c.get("clue_text", c.get("text", "")),
+                difficulty_label=c.get("difficulty_label", f"{c.get('points', 25)}đ"),
+                points=c.get("points", c.get("xp_value", 25)),
+                xp_value=c.get("xp_value", c.get("points", 25))
+            )
+            for c in d["clues"]
+        ]
+
+        suspects = d["suspect_options"]
+        correct_idx = 0
+        for i, s in enumerate(suspects):
+            if s.lower() == d["target_name_vi"].lower() or d["target_name_vi"].lower() in s.lower():
+                correct_idx = i
+                break
+
+        era_label = "Tân Ước (Gospels & Early Church)" if d["era"] == "new_testament" else "Cựu Ước (Old Testament)"
+
+        items.append(WhoAmIDossier(
+            id=d["id"],
+            case_number=d["case_number"],
+            codename=d["codename"],
+            era=d["era"],
+            category=d["category"],
+            difficulty=d["difficulty"],
+            target_character=d["target_character"],
+            target_name_vi=d["target_name_vi"],
+            target_title=d["target_title"],
+            golden_scripture_ref=d["golden_scripture_ref"],
+            verse_text=verse_text,
+            suspect_options=suspects,
+            clues=clue_items,
+            theological_significance=d["theological_significance"],
+            christological_typology=d["christological_typology"],
+            options=suspects,
+            correct_option=correct_idx,
+            correct_name=d["target_name_vi"],
+            character_slug=d["target_character"],
+            title_or_role=d["target_title"],
+            scripture_reference=d["golden_scripture_ref"],
+            explanation=d["theological_significance"],
+            era_or_testament=era_label
+        ))
+
+    return items
+
+
+@router.post("/who-am-i/verify", response_model=WhoAmIVerifyResponse)
+def verify_who_am_i_case(
+    req: WhoAmIVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    §3, §7, §46 — Verify user's deduction for a "Who Am I?" character mystery case,
+    award XP dynamically scaled to how few clues were unlocked, update streak & profile.
+    """
+    from app.routers.graph import _extract_verse_from_db
+
+    case = next((c for c in WHO_AM_I_DATA if c["id"] == req.case_id), None)
+    if not case:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ thám tử này.")
+
+    # Match user's choice: check against target_name_vi or slug
+    chosen_clean = req.chosen_suspect.strip().lower()
+    target_clean = case["target_name_vi"].strip().lower()
+    slug_clean = case["target_character"].strip().lower()
+
+    is_correct = (
+        chosen_clean == target_clean or
+        chosen_clean in target_clean or
+        target_clean in chosen_clean or
+        chosen_clean == slug_clean
+    )
+
+    # XP scale: Clue 1 -> 100 XP, Clue 2 -> 75 XP, Clue 3 -> 50 XP, Clue 4 -> 25 XP
+    xp_scale = {1: 100, 2: 75, 3: 50, 4: 25}
+    clues_count = max(1, min(4, req.clues_unlocked))
+    score_awarded = xp_scale.get(clues_count, 25) if is_correct else 5
+
+    # Update profile gamification
+    total_xp = score_awarded
+    streak_days = 1
+    user_id = req.user_identifier or "local_user"
+
+    try:
+        prof = db.execute(
+            text("SELECT total_score, daily_streak FROM user_learning_profiles WHERE user_identifier = :u LIMIT 1"),
+            {"u": user_id}
+        ).fetchone()
+
+        if prof:
+            new_score = (prof.total_score or 0) + score_awarded
+            streak_days = (prof.daily_streak or 1) + (1 if is_correct else 0)
+            db.execute(
+                text("""
+                    UPDATE user_learning_profiles
+                    SET total_score = :s, daily_streak = :st, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_identifier = :u
+                """),
+                {"s": new_score, "st": streak_days, "u": user_id}
+            )
+            db.commit()
+            total_xp = new_score
+        else:
+            db.execute(
+                text("""
+                    INSERT INTO user_learning_profiles (user_identifier, total_score, daily_streak)
+                    VALUES (:u, :s, :st)
+                    ON CONFLICT (user_identifier) DO UPDATE
+                    SET total_score = user_learning_profiles.total_score + :s
+                """),
+                {"u": user_id, "s": score_awarded, "st": 1}
+            )
+            db.commit()
+            total_xp = score_awarded
+    except Exception as e:
+        logger.warning(f"Error updating user profile score for who-am-i: {e}")
+
+    verse_text = ""
+    if case.get("golden_scripture_ref"):
+        verse_text = _extract_verse_from_db(db, case["golden_scripture_ref"])
+
+    explanation = (
+        f"Chính xác xuất sắc! Bạn đã phá án chuẩn xác: {case['target_name_vi']} ({case['target_title']}). "
+        f"Bạn giải mã thành công chỉ với {clues_count}/4 manh mối, nhận trọn vẹn +{score_awarded} XP!"
+        if is_correct else
+        f"Chưa chính xác. Đối tượng ẩn danh trong hồ sơ này chính là {case['target_name_vi']} ({case['target_title']}). "
+        f"Hãy đọc kỹ câu gốc {case['golden_scripture_ref']} và các manh mối lịch sử để ghi nhớ sâu sắc hơn."
+    )
+
+    return WhoAmIVerifyResponse(
+        is_correct=is_correct,
+        target_character=case["target_character"],
+        target_name_vi=case["target_name_vi"],
+        target_title=case["target_title"],
+        golden_scripture_ref=case["golden_scripture_ref"],
+        verse_text=verse_text,
+        score_awarded=score_awarded,
+        total_xp=total_xp,
+        streak_days=streak_days,
+        theological_significance=case["theological_significance"],
+        christological_typology=case["christological_typology"],
+        explanation=explanation
+    )
 
 
 # ==============================================================================
@@ -3636,4 +4601,5 @@ def verify_geo_challenge(
         scripture_ref=challenge["scripture_ref"],
         verse_text=verse_text
     )
+
 
