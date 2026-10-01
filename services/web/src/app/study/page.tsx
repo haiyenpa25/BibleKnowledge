@@ -44,6 +44,13 @@ interface LexiconItem {
   key_verses: string[];
 }
 
+interface PassageCitation {
+  source_title: string;
+  chapter_title: string;
+  section_heading?: string;
+  quote: string;
+}
+
 interface PassageStudyResult {
   reference: string;
   passage_text: string;
@@ -52,6 +59,7 @@ interface PassageStudyResult {
   structural_outline: Array<{ section: string; theme: string }>;
   original_language_insights: string;
   application_questions: string[];
+  theological_citations?: PassageCitation[];
 }
 
 interface StudyNote {
@@ -752,10 +760,10 @@ export default function StudyPage() {
 
           {passageResult && (
             <article className="flex flex-col gap-6 animate-in fade-in duration-200">
-              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col gap-4">
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col gap-4 shadow-xl">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <span className="text-xs font-bold uppercase text-blue-400 tracking-wider">
-                    {passageResult.reference} • Kinh Thánh 1925
+                    {passageResult.reference} • Bản Truyền Thống 1925
                   </span>
                   <button
                     type="button"
@@ -765,43 +773,128 @@ export default function StudyPage() {
                     <Plus className="w-3.5 h-3.5" /> Lưu Vào Sổ Tay
                   </button>
                 </div>
-                <p className="text-sm font-serif text-slate-200 italic leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
-                  &ldquo;{passageResult.passage_text}&rdquo;
-                </p>
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-bold uppercase text-slate-400">Bối cảnh văn học &amp; lịch sử:</span>
-                  <p className="text-xs text-slate-300 leading-relaxed">{passageResult.literary_context}</p>
+                
+                {/* Passage Text (Verses) */}
+                <div className="text-sm font-serif text-slate-200 italic leading-relaxed bg-slate-950/70 p-5 rounded-2xl border border-slate-800/80 flex flex-col gap-2">
+                  {passageResult.passage_text.split("\n").map((line, idx) => (
+                    <p key={idx} className="leading-relaxed">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Literary & Historical Context */}
+                <div className="flex flex-col gap-2 pt-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" /> Bối cảnh văn học &amp; lịch sử cứu chuộc:
+                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans bg-slate-950/40 p-4 rounded-2xl border border-slate-800/60">
+                    {passageResult.literary_context}
+                  </p>
                 </div>
               </div>
 
+              {/* Grid 1: Outline & Themes */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-lg">
                   <h3 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
                     <Layers className="w-4 h-4" /> Cấu Trúc Bố Cục Đoạn Văn
                   </h3>
                   <div className="flex flex-col gap-2">
                     {passageResult.structural_outline.map((sec, i) => (
-                      <div key={i} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs flex flex-col gap-0.5">
-                        <span className="font-bold text-white">{sec.section}</span>
-                        <span className="text-slate-400 text-[11px]">{sec.theme}</span>
+                      <div key={i} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs flex flex-col gap-1">
+                        <span className="font-bold text-amber-300">{sec.section}</span>
+                        <span className="text-slate-300 text-[11px] leading-relaxed">{sec.theme}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-lg">
                   <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4" /> Các Chủ Đề Thần Học Then Chốt
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {passageResult.theological_themes.map((th, i) => (
-                      <span key={i} className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200">
-                        ✨ {th}
+                      <span key={i} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                        <span className="text-emerald-400 font-bold">✨</span>
+                        <span>{th}</span>
                       </span>
                     ))}
                   </div>
                 </div>
               </div>
+
+              {/* Original Language Insights */}
+              {passageResult.original_language_insights && (
+                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-3 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2">
+                      <Languages className="w-4 h-4 text-purple-400" /> Khảo Sát Ngữ Căn Nguyên Ngữ (Hy Lạp / Hê-bơ-rơ)
+                    </h3>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      Nguyên Ngữ &amp; Strong&apos;s
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-800/30 text-xs text-purple-100/90 leading-relaxed font-sans">
+                    {passageResult.original_language_insights}
+                  </div>
+                </div>
+              )}
+
+              {/* Theological Commentary Citations */}
+              {passageResult.theological_citations && passageResult.theological_citations.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-cyan-400" /> Trích Dẫn Chú Giải Thần Học (Hệ Thống 275 Tác Phẩm)
+                    </h3>
+                    <Link href="/library" className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1">
+                      Tra cứu thư viện <ExternalLink className="w-2.5 h-2.5" />
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {passageResult.theological_citations.map((cite, i) => (
+                      <div key={i} className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-cyan-300 line-clamp-1">📚 {cite.source_title}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium">
+                          <span>{cite.chapter_title}</span>
+                          {cite.section_heading && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-500">{cite.section_heading}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed italic border-l-2 border-cyan-500/50 pl-3 pt-0.5">
+                          &ldquo;{cite.quote}&rdquo;
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Application & Reflection Questions */}
+              {passageResult.application_questions && passageResult.application_questions.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-4 shadow-lg">
+                  <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-amber-400" /> Câu Hỏi Suy Ngẫm &amp; Ứng Dụng Đời Sống
+                  </h3>
+                  <div className="flex flex-col gap-2.5">
+                    {passageResult.application_questions.map((q, i) => (
+                      <div key={i} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
+                        <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center shrink-0 border border-amber-500/30">
+                          {i + 1}
+                        </span>
+                        <p className="text-xs text-slate-200 leading-relaxed pt-0.5">{q}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </article>
           )}
         </div>
