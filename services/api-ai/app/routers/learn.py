@@ -7,6 +7,8 @@ import httpx
 import json
 import logging
 from datetime import datetime, timedelta
+import csv
+import io
 
 from app.db.session import get_db
 from app.core.config import settings
@@ -56,6 +58,55 @@ class GenerateFlashcardsRequest(BaseModel):
     topic: str = Field(..., description="Bible character, passage or doctrine, e.g. 'Sứ đồ Phi-e-rơ' or 'Ân Điển'")
     card_type: str = Field("person", description="person, verse, event, or word")
     count: int = Field(3, ge=1, le=5)
+
+
+class FlashcardExportResponse(BaseModel):
+    format: str
+    filename: str
+    card_count: int
+    content: str
+    download_mime: str
+
+
+class ChallengePackQuestion(BaseModel):
+    id: str
+    question_text: str
+    options: List[str]
+    correct_option: int
+    explanation: str
+    scripture_reference: str
+    points: int = 20
+
+
+class ChallengePackItem(BaseModel):
+    id: str
+    slug: str
+    title: str
+    category: str
+    icon_name: str
+    badge_label: str
+    description: str
+    target_doctrine: str
+    estimated_minutes: int
+    difficulty_level: str
+    total_questions: int
+    passing_score: int
+    questions: List[ChallengePackQuestion]
+
+
+class SubmitChallengePackRequest(BaseModel):
+    answers: Dict[str, int]
+
+
+class SubmitChallengePackResponse(BaseModel):
+    pack_id: str
+    total_questions: int
+    correct_count: int
+    score_percentage: float
+    passed: bool
+    badge_earned: Optional[str]
+    feedback_message: str
+    results_detail: List[Dict[str, Any]]
 
 
 # ==============================================================================
@@ -268,6 +319,83 @@ def get_flashcards(
             next_review_at=r.next_review_at.isoformat() if r.next_review_at else ""
         ))
     return results
+
+
+@router.get("/flashcards/export", response_model=FlashcardExportResponse)
+def export_flashcards(
+    format: str = Query("anki", description="anki, csv, or json"),
+    card_type: Optional[str] = Query(None, description="person, verse, event, word, or None for all"),
+    db: Session = Depends(get_db)
+):
+    """
+    Export flashcard collection to Anki deck (.txt/.tsv), CSV (.csv), or JSON format (§4, §46, §50).
+    """
+    query_str = "SELECT id, card_type, front_text, back_text, difficulty_level, repetition_count, interval_days, next_review_at FROM flashcards"
+    params: dict = {}
+    if card_type and card_type != "all":
+        query_str += " WHERE card_type = :card_type"
+        params["card_type"] = card_type
+    query_str += " ORDER BY id ASC"
+
+    rows = db.execute(text(query_str), params).fetchall()
+
+    if format.lower() == "anki":
+        lines = []
+        for r in rows:
+            front = (r.front_text or "").replace("\t", " ").replace("\r\n", "<br>").replace("\n", "<br>")
+            back = (r.back_text or "").replace("\t", " ").replace("\r\n", "<br>").replace("\n", "<br>")
+            tag = f"BibleKnowledge::{r.card_type}"
+            lines.append(f"{front}\t{back}\t{tag}")
+        content = "\n".join(lines)
+        return FlashcardExportResponse(
+            format="anki",
+            filename="bibleknowledge_cards_anki.txt",
+            card_count=len(rows),
+            content=content,
+            download_mime="text/tab-separated-values"
+        )
+    elif format.lower() == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(["ID", "Loại_Thẻ", "Mặt_Trước", "Mặt_Sau", "Độ_Khó", "Số_Lần_Ôn", "Khoảng_Cách_Ngày", "Ngày_Ôn_Kế_Tiếp"])
+        for r in rows:
+            writer.writerow([
+                str(r.id),
+                r.card_type,
+                r.front_text or "",
+                r.back_text or "",
+                r.difficulty_level,
+                r.repetition_count,
+                r.interval_days,
+                r.next_review_at.isoformat() if r.next_review_at else ""
+            ])
+        return FlashcardExportResponse(
+            format="csv",
+            filename="bibleknowledge_cards.csv",
+            card_count=len(rows),
+            content=output.getvalue(),
+            download_mime="text/csv"
+        )
+    else:  # json
+        cards_list = []
+        for r in rows:
+            cards_list.append({
+                "id": str(r.id),
+                "card_type": r.card_type,
+                "front_text": r.front_text,
+                "back_text": r.back_text,
+                "difficulty_level": r.difficulty_level,
+                "repetition_count": r.repetition_count,
+                "interval_days": r.interval_days,
+                "next_review_at": r.next_review_at.isoformat() if r.next_review_at else None
+            })
+        return FlashcardExportResponse(
+            format="json",
+            filename="bibleknowledge_cards.json",
+            card_count=len(rows),
+            content=json.dumps(cards_list, ensure_ascii=False, indent=2),
+            download_mime="application/json"
+        )
 
 
 @router.post("/flashcards/{card_id}/review", response_model=FlashcardItem)
@@ -1512,6 +1640,524 @@ def get_adaptive_analytics(db: Session = Depends(get_db)):
         weakness_summary=weakness_summary,
         adaptive_recommendations=recs,
         due_cards=due_cards_list[:6]
+    )
+
+
+# ==============================================================================
+# Specialized Challenge Packs Catalog & Engine (§3, §4, §46)
+# ==============================================================================
+
+CHALLENGE_PACKS_DATA: List[Dict[str, Any]] = [
+    {
+        "id": "pack-discipleship",
+        "slug": "hanh-trinh-mon-do",
+        "title": "Hành Trình Môn Đồ (Discipleship Trail)",
+        "category": "Thực Hành Môn Đồ Hóa",
+        "icon_name": "Compass",
+        "badge_label": "Môn Đồ Trung Kiên",
+        "description": "Khảo cứu nền tảng ơn gọi, cái giá của việc theo Chúa, vác thập tự giá mỗi ngày và Đại Mạng Lệnh rao truyền Phúc Âm.",
+        "target_doctrine": "Ma-thi-ơ 16, 28; Lu-ca 9, 14; Giăng 21",
+        "estimated_minutes": 5,
+        "difficulty_level": "Trung Cấp",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "cd-1",
+                "question_text": "Theo Ma-thi-ơ 16:24, điều kiện tiên quyết Chúa Giê-xu phán cho bất kỳ ai muốn bước theo Ngài là gì?",
+                "options": [
+                    "Học rộng biết nhiều về luật pháp truyền khẩu",
+                    "Liều mình, vác thập tự giá mình mà theo Ta",
+                    "Dâng hiến toàn bộ tài sản cho hội đường",
+                    "Lánh xa thế tục lên chốn non cao ẩn cư"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa Giê-xu phán: 'Nếu ai muốn theo ta, thì phải liều mình, vác thập tự giá mình mà theo ta.'",
+                "scripture_reference": "Ma-thi-ơ 16:24",
+                "points": 20
+            },
+            {
+                "id": "cd-2",
+                "question_text": "Trong Đại Mạng Lệnh (Ma-thi-ơ 28:19-20), mệnh lệnh trọng tâm Chúa Giê-xu truyền cho các môn đồ là gì?",
+                "options": [
+                    "Xây dựng các thánh đường nguy nga",
+                    "Hãy đi khiến muôn dân trở nên môn đồ Ta",
+                    "Chinh phục các thành phố bằng quyền lực thế gian",
+                    "Thành lập các hội đoàn từ thiện Do Thái"
+                ],
+                "correct_option": 1,
+                "explanation": "Mệnh lệnh cốt lõi là 'Môn đệ hóa muôn dân' (Make disciples of all nations), làm phép báp-tem và dạy họ giữ mọi điều Chúa truyền.",
+                "scripture_reference": "Ma-thi-ơ 28:19-20",
+                "points": 20
+            },
+            {
+                "id": "cd-3",
+                "question_text": "Bên bờ biển Ti-bê-ri-át, Chúa Giê-xu phục sinh đã hỏi Phi-e-rơ ba lần điều gì trước khi tái xác lập chức vụ chăn bầy?",
+                "options": [
+                    "Ngươi có hứa không chối Ta nữa chăng?",
+                    "Ngươi yêu Ta hơn những kẻ này chăng?",
+                    "Ngươi đã đánh được bao nhiêu con cá lớn?",
+                    "Ngươi có thề trung thành trọn đời chăng?"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa hỏi: 'Si-môn, con Giô-na, ngươi yêu ta hơn những kẻ này chăng?' Tình yêu Đấng Christ là động lực và nền tảng duy nhất của sứ mạng chăn bầy.",
+                "scripture_reference": "Giăng 21:15-17",
+                "points": 20
+            },
+            {
+                "id": "cd-4",
+                "question_text": "Trong Lu-ca 14:28-30, Chúa Giê-xu dùng hình ảnh minh họa nào để nhấn mạnh môn đồ cần 'tính phí tổn' trước khi theo Ngài?",
+                "options": [
+                    "Người đánh cá trên biển sâu",
+                    "Người xây một cái tháp phải ngồi tính phí tổn trước",
+                    "Người gieo giống trên các loại đất khác nhau",
+                    "Người làm công trong vườn nho"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa dạy: 'Có ai trong các ngươi muốn xây một cái tháp, mà trước không ngồi tính phí tổn xem mình có đủ tiền hoàn thành chăng?' Theo Chúa đòi hỏi cam kết dâng trọn vẹn.",
+                "scripture_reference": "Lu-ca 14:28-30",
+                "points": 20
+            },
+            {
+                "id": "cd-5",
+                "question_text": "Theo Giăng 13:35, dấu hiệu nhận biết tối thượng mà thiên hạ sẽ dùng để nhận ra môn đồ thật của Chúa Giê-xu là gì?",
+                "options": [
+                    "Nói được các thứ tiếng lạ lưu loát",
+                    "Làm được nhiều phép lạ dấu kỳ lẫy lừng",
+                    "Có lòng yêu thương nhau chân thành",
+                    "Mặc trang phục biệt riêng nghiêm ngặt"
+                ],
+                "correct_option": 2,
+                "explanation": "Chúa phán: 'Nếu các ngươi có lòng yêu thương nhau, thì ấy là tại điều đó mà thiên hạ sẽ nhận biết các ngươi là môn đồ ta.'",
+                "scripture_reference": "Giăng 13:35",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-messianic-prophecy",
+        "slug": "loi-tien-tri-dang-me-si",
+        "title": "Lời Tiên Tri Đấng Mê-si & Sự Ứng Nghiệm (Messianic Prophecies)",
+        "category": "Cơ Đốc Học & Tiên Tri",
+        "icon_name": "Sparkles",
+        "badge_label": "Học Giả Lời Tiên Tri",
+        "description": "Khảo chứng sự ứng nghiệm mầu nhiệm từng chi tiết cuộc đời, sự chết chuộc tội và phục sinh của Đấng Mê-si qua Kinh Thánh Cựu Ước.",
+        "target_doctrine": "Ê-sai 7, 53; Mi-chê 5; Xa-cha-ri 11; Thi-thiên 22",
+        "estimated_minutes": 6,
+        "difficulty_level": "Nâng Cao",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "mp-1",
+                "question_text": "Tiên tri Mi-chê 5:1 (5:2) đã tiên báo chính xác Đấng Cai Trị đời đời của Y-sơ-ra-ên sẽ giáng sinh tại địa danh nào?",
+                "options": [
+                    "Na-xa-rét xứ Ga-li-lê",
+                    "Giê-ru-sa-lem thành thánh",
+                    "Bết-lê-hem Ép-ra-ta",
+                    "Si-chem xứ Sa-ma-ri"
+                ],
+                "correct_option": 2,
+                "explanation": "Mi-chê 5:1 chép: 'Hỡi Bết-lê-hem Ép-ra-ta... từ nơi ngươi sẽ ra cho ta một Đấng cai trị trong Y-sơ-ra-ên, gốc tích của Ngài bởi từ đời xưa, từ trước vô cùng.'",
+                "scripture_reference": "Mi-chê 5:1-2",
+                "points": 20
+            },
+            {
+                "id": "mp-2",
+                "question_text": "Trong Ê-sai 7:14, dấu lạ Đức Giê-hô-va ban cho nhà vua Đa-vít về sự lâm phàm của Đấng Mê-si là gì?",
+                "options": [
+                    "Một ngôi sao băng sáng chói từ phương đông",
+                    "Một gái đồng trinh sẽ chịu thai, sinh một con trai đặt tên là Em-ma-nu-ên",
+                    "Ngai vàng Sa-lô-môn được trùng tu hoàn hảo",
+                    "Tiếng kèn vang dội từ đỉnh núi Si-na-i"
+                ],
+                "correct_option": 1,
+                "explanation": "Ê-sai 7:14: 'Này, một gái đồng trinh sẽ chịu thai, sinh một con trai, và đặt tên là Em-ma-nu-ên' (ứng nghiệm trọn vẹn trong Ma-thi-ơ 1:22-23).",
+                "scripture_reference": "Ê-sai 7:14",
+                "points": 20
+            },
+            {
+                "id": "mp-3",
+                "question_text": "Theo Ê-sai 53:5, mục đích và bản chất sâu xa của sự đau thương mà Người Tôi Tớ Đức Giê-hô-va gánh chịu là gì?",
+                "options": [
+                    "Chịu sửa phạt vì lỗi lầm riêng của cá nhân",
+                    "Vì tội lỗi chúng ta mà bị vết, vì sự gian ác chúng ta mà bị thương",
+                    "Chịu khổ hình để rèn luyện ý chí anh hùng",
+                    "Bị bắt bớ để trốn thoát ách thống trị Ba-by-lôn"
+                ],
+                "correct_option": 1,
+                "explanation": "Ê-sai 53:5 tuyên xưng giáo lý thay thế chuộc tội: 'Ngài vì tội lỗi chúng ta mà bị vết, vì sự gian ác chúng ta mà bị thương; bởi sự sửa phạt Ngài chịu chúng ta được bình an, bởi lằn roi Ngài chịu chúng ta được lành bệnh.'",
+                "scripture_reference": "Ê-sai 53:5",
+                "points": 20
+            },
+            {
+                "id": "mp-4",
+                "question_text": "Tiên tri Xa-cha-ri 11:12-13 đã báo trước giá tiền kẻ bội bạc nhận và số bạc đó sẽ bị ném vào đâu?",
+                "options": [
+                    "50 lạng vàng ném xuống biển sâu",
+                    "30 miếng bạc ném vào nhà người thợ gốm",
+                    "100 đồng tiền đúc ném vào đền thờ",
+                    "20 miếng bạc phân phát cho người hành khất"
+                ],
+                "correct_option": 1,
+                "explanation": "Xa-cha-ri 11:12-13 chép đúng 30 miếng bạc ném vào nhà thợ gốm trong nhà Đức Giê-hô-va, ứng nghiệm từng chữ khi Giu-đa nộp Chúa (Ma-thi-ơ 26:15; 27:3-10).",
+                "scripture_reference": "Xa-cha-ri 11:12-13",
+                "points": 20
+            },
+            {
+                "id": "mp-5",
+                "question_text": "Thi-thiên 22:18 tiên tri chính xác hành động nào của những kẻ hành quyết dưới chân thập tự giá?",
+                "options": [
+                    "Đập gãy hai ống chân của tử tù",
+                    "Chúng chia nhau áo xống tôi, và bắt thăm áo xống tôi",
+                    "Hát bài ca khải hoàn ăn mừng chiến thắng",
+                    "Chôn cất tử tội trong hang đá hoang vu"
+                ],
+                "correct_option": 1,
+                "explanation": "Thi-thiên 22:18 chép: 'Chúng nó chia nhau áo xống tôi, và bắt thăm áo xống tôi', ứng nghiệm chính xác từng chi tiết nơi quân lính La-mã (Giăng 19:23-24).",
+                "scripture_reference": "Thi-thiên 22:18",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-parables",
+        "slug": "du-ngon-nuoc-troi",
+        "title": "Dụ Ngôn Nước Trời (Parables of the Kingdom)",
+        "category": "Lời Dạy Của Chúa Giê-xu",
+        "icon_name": "BookOpen",
+        "badge_label": "Bậc Thầy Ẩn Dụ",
+        "description": "Khám phá các chiều kích mầu nhiệm sâu nhiệm về Nước Thiên Đàng, ân điển cứu rỗi và sự tha thứ qua các ẩn dụ của Chúa Giê-xu.",
+        "target_doctrine": "Ma-thi-ơ 13, 18; Lu-ca 10, 15",
+        "estimated_minutes": 5,
+        "difficulty_level": "Cơ Bản - Trung Cấp",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "pr-1",
+                "question_text": "Trong dụ ngôn Người Gieo Giống (Ma-thi-ơ 13:3-23), hạt giống gieo nhằm 'đất tốt' tượng trưng cho điều gì?",
+                "options": [
+                    "Người nghe đạo nhưng bị sự lo lắng đời này bóp nghẹt",
+                    "Người nghe đạo mừng rỡ nhưng không có rễ, gặp thử thách liền vấp ngã",
+                    "Người nghe đạo hiểu rõ, giữ lấy và kết quả: một trăm, sáu chục, ba chục",
+                    "Người hoàn toàn không chịu mở tai nghe lời giảng"
+                ],
+                "correct_option": 2,
+                "explanation": "Đất tốt tượng trưng người nghe đạo và hiểu đạo, tấm lòng mở ra tiếp nhận và sinh bông trái dồi dào gấp bội.",
+                "scripture_reference": "Ma-thi-ơ 13:23",
+                "points": 20
+            },
+            {
+                "id": "pr-2",
+                "question_text": "Trong dụ ngôn Người Sa-ma-ri Nhân Lành (Lu-ca 10:25-37), ai là người đã dừng lại băng bó vết thương và cứu giúp nạn nhân?",
+                "options": [
+                    "Thầy tế lễ đi ngang qua",
+                    "Người Lê-vi phục vụ đền thờ",
+                    "Người Sa-ma-ri bị người Do Thái coi khinh",
+                    "Quan trấn thủ La-mã"
+                ],
+                "correct_option": 2,
+                "explanation": "Người Sa-ma-ri động lòng thương xót, lấy dầu và rượu xức vết thương, đem đến quán trọ chăm sóc; Chúa dạy 'Hãy đi làm theo như vậy'.",
+                "scripture_reference": "Lu-ca 10:33-35",
+                "points": 20
+            },
+            {
+                "id": "pr-3",
+                "question_text": "Dụ ngôn Người Con Hoang Đàng (Lu-ca 15:11-32) bày tỏ điều gì vĩ đại nhất về tấm lòng của Đức Chúa Trời đối với tội nhân?",
+                "options": [
+                    "Ngài đòi hỏi tội nhân bồi thường gấp bốn lần tài sản",
+                    "Ngài chạy ra ôm hôn tha thứ khi tội nhân ăn năn trở về",
+                    "Ngài giam cầm tội nhân để thử thách lòng thành",
+                    "Ngài chỉ đón nhận người anh cả chăm chỉ làm việc"
+                ],
+                "correct_option": 1,
+                "explanation": "Khi người con còn ở đàng xa, người cha thấy động lòng thương xót, chạy ra ôm cổ hôn, mặc áo tốt nhất và mở tiệc ăn mừng vì 'con ta đây đã chết mà nay lại sống'.",
+                "scripture_reference": "Lu-ca 15:20-24",
+                "points": 20
+            },
+            {
+                "id": "pr-4",
+                "question_text": "Trong Ma-thi-ơ 13:44-46, người tìm được của báu giấu trong ruộng và người buôn tìm ngọc châu quý giá đã hành động như thế nào?",
+                "options": [
+                    "Trộm lấy của báu đem chôn giấu nơi kín đáo khác",
+                    "Vui mừng đi bán hết tài sản mình có để mua lại ruộng và viên ngọc đó",
+                    "Phân vân đắn đo vì giá thành quá đắt đỏ",
+                    "Kêu gọi bạn bè đến chia phần của báu"
+                ],
+                "correct_option": 1,
+                "explanation": "Nước Trời quý giá đến mức người nhận biết sẵn sàng từ bỏ mọi sự tạm bợ của trần gian để chiếm lấy sự sống đời đời vô giá.",
+                "scripture_reference": "Ma-thi-ơ 13:44-46",
+                "points": 20
+            },
+            {
+                "id": "pr-5",
+                "question_text": "Trong Ma-thi-ơ 18:21-35, đầy tớ được tha món nợ mười ngàn ta-lâng nhưng lại siết cổ bạn nợ một trăm đơ-ni-ê đã nhận lấy hậu quả gì?",
+                "options": [
+                    "Được chủ thăng chức quản gia",
+                    "Bị chủ nổi giận giao cho kẻ tra tấn cho đến khi trả hết nợ",
+                    "Được bạn nợ cảm tạ vì bài học nghiêm khắc",
+                    "Được tha bổng hoàn toàn vì luật pháp bảo vệ"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa cảnh cáo: 'Nếu mỗi người trong các ngươi không hết lòng tha thứ anh em mình, thì Cha các ngươi ở trên trời cũng sẽ xử với các ngươi như vậy.'",
+                "scripture_reference": "Ma-thi-ơ 18:34-35",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-covenants",
+        "slug": "cac-giao-uoc-cuu-chuoc",
+        "title": "Các Giao Ước Cứu Chuộc (Redemptive Covenants)",
+        "category": "Thần Học Giao Ước",
+        "icon_name": "Layers",
+        "badge_label": "Trọng Thần Giao Ước",
+        "description": "Nghiên cứu tiến trình mạc khải cứu chuộc qua Giao ước Áp-ra-ham, Giao ước Si-na-i, Giao ước Đa-vít và Giao ước Mới trong huyết Đấng Christ.",
+        "target_doctrine": "Sáng-thế Ký 12, 15; Xuất 19-20; 2 Sa-mu-ên 7; Giê-rê-mi 31; Hê-bơ-rơ 8",
+        "estimated_minutes": 6,
+        "difficulty_level": "Chuyên Sâu",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "cv-1",
+                "question_text": "Trong Sáng-thế Ký 12:1-3, lời hứa tối thượng trong Giao ước Áp-ra-ham có tầm ảnh hưởng toàn cầu là gì?",
+                "options": [
+                    "Dòng dõi Áp-ra-ham sẽ chỉ độc quyền nhận phước hạnh",
+                    "Các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước",
+                    "Áp-ra-ham sẽ cai trị toàn bộ đất Ai Cập",
+                    "Mọi dân tộc phải học ngôn ngữ Hê-bơ-rơ"
+                ],
+                "correct_option": 1,
+                "explanation": "Sáng-thế Ký 12:3: 'Các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước', ứng nghiệm nơi Hạt Giống Đấng Christ đem ơn cứu chuộc cho muôn dân.",
+                "scripture_reference": "Sáng-thế Ký 12:3; Ga-la-ti 3:8, 16",
+                "points": 20
+            },
+            {
+                "id": "cv-2",
+                "question_text": "Tại Núi Si-na-i (Xuất Ê-díp-tô Ký 19:5-6), Đức Chúa Trời đặt định địa vị thánh khiết của dân giao ước là gì nếu họ vâng giữ tiếng Ngài?",
+                "options": [
+                    "Đạo quân bất khả chiến bại của vùng Cận Đông",
+                    "Một vương quốc thầy tế lễ và một dân tộc thánh",
+                    "Các nhà buôn giàu có nhất trên biển lớn",
+                    "Nhóm người được miễn trừ mọi điều răn đạo đức"
+                ],
+                "correct_option": 1,
+                "explanation": "Xuất 19:6: 'Các ngươi sẽ thành một vương quốc thầy tế lễ, cùng một dân tộc thánh cho ta' (tiếp nối trong 1 Phi-e-rơ 2:9).",
+                "scripture_reference": "Xuất Ê-díp-tô Ký 19:5-6",
+                "points": 20
+            },
+            {
+                "id": "cv-3",
+                "question_text": "Trong 2 Sa-mu-ên 7:12-16, Đức Chúa Trời lập Giao ước Đa-vít với lời hứa đời đời cốt lõi nào?",
+                "options": [
+                    "Ngai vàng và vương quốc của dòng dõi Đa-vít sẽ bền vững đời đời",
+                    "Đa-vít sẽ sống mãi mãi trên đất",
+                    "Đền thờ Giê-ru-sa-lem sẽ không bao giờ bị phá hủy",
+                    "Các con trai Đa-vít không ai phạm tội"
+                ],
+                "correct_option": 0,
+                "explanation": "2 Sa-mu-ên 7:16: 'Nhà ngươi và nước ngươi sẽ được bền vững đời đời trước mặt ta; ngôi ngươi sẽ được lập vững bền mãi mãi', ứng nghiệm trong Đấng Christ Đấng ngồi trên ngai Đa-vít (Lu-ca 1:32-33).",
+                "scripture_reference": "2 Sa-mu-ên 7:12-16",
+                "points": 20
+            },
+            {
+                "id": "cv-4",
+                "question_text": "Tiên tri Giê-rê-mi 31:31-34 báo trước đặc tính nội tâm hóa vượt trội của Giao Ước Mới là gì?",
+                "options": [
+                    "Luật pháp tiếp tục khắc trên bảng đá cẩm thạch",
+                    "Ta sẽ ghi tạc luật pháp ta vào lòng và đặt vào tâm trí họ",
+                    "Chỉ các thầy thông giáo mới được quyền đọc luật",
+                    "Loại bỏ hoàn toàn khái niệm công bình thánh khiết"
+                ],
+                "correct_option": 1,
+                "explanation": "Giê-rê-mi 31:33: 'Ta sẽ đặt luật pháp ta trong bụng chúng nó và chép vào lòng; ta sẽ làm Đức Chúa Trời chúng nó, chúng nó sẽ làm dân ta.'",
+                "scripture_reference": "Giê-rê-mi 31:31-34",
+                "points": 20
+            },
+            {
+                "id": "cv-5",
+                "question_text": "Trong Lễ Tiệc Thánh (Lu-ca 22:20; 1 Cô-rinh-tô 11:25), Chúa Giê-xu đã xác lập Giao Ước Mới bằng phương tiện thánh nào?",
+                "options": [
+                    "Huyết của bò đực và dê đực hàng năm",
+                    "Huyết Ngài đổ ra vì nhân loại",
+                    "Vàng bạc dâng hiến trong hòm giao ước",
+                    "Bản văn tự ký kết với các sứ đồ"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa Giê-xu cầm chén phán: 'Chén này là Giao ước mới trong huyết ta, vì các ngươi mà đổ ra.' Huyết Chúa là giá chuộc đời đời và bảo chứng trọn vẹn của ân điển cứu rỗi.",
+                "scripture_reference": "Lu-ca 22:20; Hê-bơ-rơ 9:11-15",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-miracles",
+        "slug": "cac-phep-la-chua-cuu-the",
+        "title": "Các Phép Lạ Của Chúa Cứu Thế (Miracles of Christ)",
+        "category": "Thần Tính & Quyền Năng",
+        "icon_name": "Zap",
+        "badge_label": "Chứng Nhân Quyền Năng",
+        "description": "Các dấu kỳ phép lạ minh chứng thần tính tuyệt đối của Chúa Giê-xu trên tạo vật, bệnh tật, tà linh và sự chết.",
+        "target_doctrine": "Giăng 2, 9, 11; Ma-thi-ơ 8, 14; Mác 4",
+        "estimated_minutes": 5,
+        "difficulty_level": "Cơ Bản - Trung Cấp",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "mr-1",
+                "question_text": "Phép lạ đầu tiên Chúa Giê-xu thi thố tại Ca-na xứ Ga-li-lê (Giăng 2:1-11) là gì?",
+                "options": [
+                    "Chữa lành người mù bẩm sinh",
+                    "Hóa nước thành rượu ngon tại tiệc cưới",
+                    "Hóa bánh nuôi 5000 người ăn no nê",
+                    "Dẹp yên cơn bão biển dữ dội"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa hóa sáu ché nước đá thành rượu ngon; Giăng ghi nhận: 'Ấy là phép lạ thứ nhất Chúa Giê-xu đã làm tại Ca-na... bày tỏ sự vinh hiển của Ngài; môn đồ bèn tin Ngài.'",
+                "scripture_reference": "Giăng 2:11",
+                "points": 20
+            },
+            {
+                "id": "mr-2",
+                "question_text": "Khi thuyền môn đồ gặp bão bùng trên Biển Ga-li-lê (Mác 4:35-41), Chúa Giê-xu đã quở gió và phán cùng biển lời gì?",
+                "options": [
+                    "Các ngươi hãy chèo mạnh vào bờ mau!",
+                    "Hãy êm đi, lặng đi!",
+                    "Gió bão hãy thổi sang phương tây!",
+                    "Hỡi biển cả, hãy dâng nước lên cao!"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa thức dậy quở gió và phán: 'Hãy êm đi, lặng đi!' Gió liền dứt và trời biển đều yên lặng như tờ; môn đồ kinh hãi tự hỏi: 'Ngài là ai mà gió và biển đều vâng lệnh Ngài?'",
+                "scripture_reference": "Mác 4:39-41",
+                "points": 20
+            },
+            {
+                "id": "mr-3",
+                "question_text": "Trong phép lạ nuôi 5000 người (Giăng 6:1-14), nguồn thực phẩm ban đầu do một đứa trẻ dâng hiến là bao nhiêu?",
+                "options": [
+                    "Mười ổ bánh mì lúa mạch và năm con cá nướng",
+                    "Năm cái bánh lúa mạch và hai con cá nhỏ",
+                    "Bảy cái bánh và vài con cá nhỏ",
+                    "Một thúng đầy bánh mì tươi ngon"
+                ],
+                "correct_option": 1,
+                "explanation": "Anh-rê thưa: 'Đây có một đứa trẻ có năm cái bánh lúa mạch và hai con cá nhỏ; nhưng ngần ấy có thấm vào đâu cho bấy nhiêu người?' Chúa tạ ơn bẻ ra và còn thu lại 12 giỏ đầy mảnh vụn.",
+                "scripture_reference": "Giăng 6:9-13",
+                "points": 20
+            },
+            {
+                "id": "mr-4",
+                "question_text": "Tại Bê-tha-ni, La-xa-rơ đã qua đời và được an táng trong hang đá bao nhiêu ngày trước khi Chúa Giê-xu gọi ông bước ra?",
+                "options": [
+                    "Một ngày",
+                    "Hai ngày",
+                    "Bốn ngày",
+                    "Bảy ngày"
+                ],
+                "correct_option": 2,
+                "explanation": "La-xa-rơ đã ở trong mộ bốn ngày và có mùi; Chúa Giê-xu tuyên bố: 'Ta là sự sống lại và sự sống' rồi phán lớn tiếng: 'Hỡi La-xa-rơ, hãy ra!' Người chết liền bước ra.",
+                "scripture_reference": "Giăng 11:17, 38-44",
+                "points": 20
+            },
+            {
+                "id": "mr-5",
+                "question_text": "Theo Giăng 20:30-31, mục đích tối hậu của các dấu kỳ phép lạ được ghi chép trong Kinh Thánh Phúc Âm là gì?",
+                "options": [
+                    "Để làm thỏa mãn tính hiếu kỳ của đám đông",
+                    "Để các ngươi tin rằng Đức Chúa Giê-xu là Đấng Christ, Con Đức Chúa Trời, và nhờ tin Ngài mà được sự sống",
+                    "Để chứng minh các môn đồ có phép thuật siêu nhiên",
+                    "Để thách thức chính quyền cai trị La-mã"
+                ],
+                "correct_option": 1,
+                "explanation": "Giăng 20:31: 'Nhưng các điều này đã chép, để các ngươi tin rằng Đức Chúa Giê-xu là Đấng Christ, Con Đức Chúa Trời, và nhờ tin Ngài mà các ngươi được sự sống bởi danh Ngài.'",
+                "scripture_reference": "Giăng 20:30-31",
+                "points": 20
+            }
+        ]
+    }
+]
+
+
+@router.get("/challenge-packs", response_model=List[ChallengePackItem])
+def list_challenge_packs():
+    """
+    Get curated thematic Challenge Packs for interactive learning and mastery (§3, §4, §46).
+    """
+    return CHALLENGE_PACKS_DATA
+
+
+@router.post("/challenge-packs/{pack_id}/submit", response_model=SubmitChallengePackResponse)
+def submit_challenge_pack(
+    pack_id: str,
+    req: SubmitChallengePackRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit answers for a Challenge Pack, evaluate results, compute percentage and award mastery badge.
+    """
+    pack = next((p for p in CHALLENGE_PACKS_DATA if p["id"] == pack_id), None)
+    if not pack:
+        raise HTTPException(status_code=404, detail="Không tìm thấy gói thử thách này.")
+
+    total_q = len(pack["questions"])
+    correct_count = 0
+    results_detail = []
+
+    for q in pack["questions"]:
+        qid = q["id"]
+        chosen = req.answers.get(qid, -1)
+        is_corr = (chosen == q["correct_option"])
+        if is_corr:
+            correct_count += 1
+
+        results_detail.append({
+            "question_id": qid,
+            "question_text": q["question_text"],
+            "chosen_option": chosen,
+            "correct_option": q["correct_option"],
+            "is_correct": is_corr,
+            "scripture_reference": q["scripture_reference"],
+            "explanation": q["explanation"]
+        })
+
+    pct = round((correct_count / total_q) * 100, 1) if total_q > 0 else 0.0
+    passed = pct >= pack["passing_score"]
+    badge_earned = pack["badge_label"] if passed else None
+
+    # Award score in user profile if exists
+    if passed:
+        try:
+            db.execute(
+                text("""
+                UPDATE user_profiles 
+                SET total_score = total_score + :bonus,
+                    total_quizzes_completed = total_quizzes_completed + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_identifier = 'local_user'
+                """),
+                {"bonus": correct_count * 20}
+            )
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Could not update user score: {e}")
+
+    if passed:
+        msg = f"Xuất sắc! Bạn đã vượt qua gói thử thách '{pack['title']}' với điểm số {pct}% và vinh dự nhận Huy hiệu: '{pack['badge_label']}'!"
+    else:
+        msg = f"Bạn đạt {pct}%. Hãy ôn tập kỹ lại các phân đoạn Kinh Thánh {pack['target_doctrine']} và thử sức lại để nhận Huy hiệu '{pack['badge_label']}'!"
+
+    return SubmitChallengePackResponse(
+        pack_id=pack["id"],
+        total_questions=total_q,
+        correct_count=correct_count,
+        score_percentage=pct,
+        passed=passed,
+        badge_earned=badge_earned,
+        feedback_message=msg,
+        results_detail=results_detail
     )
 
 

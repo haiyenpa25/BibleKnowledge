@@ -246,6 +246,11 @@ export default function ExplorePage() {
   const [activeWaypoint, setActiveWaypoint] = useState<Waypoint | null>(null);
   const [loadingMap, setLoadingMap] = useState(true);
   const [isPlayingTour, setIsPlayingTour] = useState(false);
+  const [tourSpeed, setTourSpeed] = useState<number>(1.0);
+  const [journeyEraFilter, setJourneyEraFilter] = useState<string>("all");
+  const [waypointVersesText, setWaypointVersesText] = useState<{ ref: string; text: string } | null>(null);
+  const [loadingWaypointVerses, setLoadingWaypointVerses] = useState(false);
+  const [isWaypointModalOpen, setIsWaypointModalOpen] = useState(false);
   const tourTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -609,6 +614,7 @@ export default function ExplorePage() {
 
     if (tourTimerRef.current) clearInterval(tourTimerRef.current);
 
+    const intervalMs = Math.round(6500 / tourSpeed);
     tourTimerRef.current = setInterval(() => {
       currentIndex++;
       if (!currentJourney || currentIndex >= currentJourney.waypoints.length) {
@@ -618,7 +624,7 @@ export default function ExplorePage() {
         setActiveWaypoint(nextWp);
         speakWaypoint(nextWp);
       }
-    }, 6500);
+    }, intervalMs);
   };
 
   const toggleTour = () => {
@@ -635,6 +641,27 @@ export default function ExplorePage() {
     const j = journeys.find((item) => item.id === journeyId);
     if (j && j.waypoints.length > 0) {
       setActiveWaypoint(j.waypoints[0]);
+    }
+  };
+
+  // Open Scripture Modal for Waypoint
+  const openWaypointScripture = async (scriptureRef: string) => {
+    setIsWaypointModalOpen(true);
+    setLoadingWaypointVerses(true);
+    setWaypointVersesText(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/verse-range?reference=${encodeURIComponent(scriptureRef)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const fullText = (data.verses || []).map((v: any) => `${v.verse}. ${v.text}`).join("\n\n");
+        setWaypointVersesText({ ref: data.reference, text: fullText || "Không tìm thấy văn bản câu gốc." });
+      } else {
+        setWaypointVersesText({ ref: scriptureRef, text: `Phân đoạn Kinh Thánh: ${scriptureRef}` });
+      }
+    } catch (e) {
+      setWaypointVersesText({ ref: scriptureRef, text: "Lỗi kết nối khi tải văn bản Kinh Thánh." });
+    } finally {
+      setLoadingWaypointVerses(false);
     }
   };
 
@@ -1111,49 +1138,101 @@ export default function ExplorePage() {
       {/* ===================================================================== */}
       {activeTab === "map" && (
         <div className="flex flex-col gap-6">
-          {/* Journeys Selector Bar & Tour Action */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Era Filter & Journeys Selector Bar */}
+          <div className="flex flex-col gap-3">
+            {/* Era Category Filter Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              <span className="text-slate-400 whitespace-nowrap">Chọn hành trình:</span>
-              {journeys.map((j) => (
+              <span className="text-slate-400 whitespace-nowrap font-medium">Thời kỳ lịch sử:</span>
+              {[
+                { id: "all", label: "Tất Cả (9 hành trình)" },
+                { id: "ot_patriarch", label: "Tổ Phụ & Xuất Hành" },
+                { id: "ot_monarchy", label: "Vương Triều & Tiên Tri" },
+                { id: "nt_apostolic", label: "Chúa Giê-xu & Sứ Đồ" }
+              ].map((era) => (
                 <button
-                  key={j.id}
-                  onClick={() => handleSelectJourney(j.id)}
-                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                    selectedJourneyId === j.id
-                      ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
-                      : "bg-slate-800/80 text-slate-400 hover:text-white"
+                  key={era.id}
+                  onClick={() => setJourneyEraFilter(era.id)}
+                  className={`px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap ${
+                    journeyEraFilter === era.id
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold"
+                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  <Navigation className="w-3.5 h-3.5" />
-                  <span>{j.title}</span>
+                  {era.label}
                 </button>
               ))}
             </div>
 
-            {/* Guided Tour Play/Pause button */}
-            {currentJourney && (
-              <button
-                onClick={toggleTour}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-                  isPlayingTour
-                    ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
-                    : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/20"
-                }`}
-              >
-                {isPlayingTour ? (
-                  <>
-                    <Pause className="w-3.5 h-3.5" />
-                    <span>Tạm Dừng Mô Phỏng</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Mô Phỏng Tự Động (Guided Tour)</span>
-                  </>
-                )}
-              </button>
-            )}
+            {/* Journeys List & Tour Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                {journeys
+                  .filter((j) => {
+                    if (journeyEraFilter === "all") return true;
+                    if (journeyEraFilter === "ot_patriarch") return j.id === "journey-abraham" || j.id === "journey-exodus";
+                    if (journeyEraFilter === "ot_monarchy") return j.id === "journey-david-fugitive" || j.id === "journey-elijah";
+                    if (journeyEraFilter === "nt_apostolic") return j.id.startsWith("journey-jesus") || j.id.startsWith("journey-paul");
+                    return true;
+                  })
+                  .map((j) => (
+                    <button
+                      key={j.id}
+                      onClick={() => handleSelectJourney(j.id)}
+                      className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                        selectedJourneyId === j.id
+                          ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
+                          : "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/40"
+                      }`}
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>{j.title}</span>
+                    </button>
+                  ))}
+              </div>
+
+              {/* Guided Tour Play/Pause & Speed Controller */}
+              {currentJourney && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Speed Controller */}
+                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
+                    {[1.0, 1.5, 2.0].map((spd) => (
+                      <button
+                        key={spd}
+                        onClick={() => setTourSpeed(spd)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                          tourSpeed === spd
+                            ? "bg-rose-600 text-white"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {spd}x
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={toggleTour}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                      isPlayingTour
+                        ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
+                        : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/20"
+                    }`}
+                  >
+                    {isPlayingTour ? (
+                      <>
+                        <Pause className="w-3.5 h-3.5" />
+                        <span>Tạm Dừng Mô Phỏng</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Mô Phỏng Tự Động (Guided Tour)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1356,13 +1435,24 @@ export default function ExplorePage() {
                             <span>Đọc Thuyết Minh</span>
                           </button>
                         </div>
-                        <Link
-                          href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
-                          className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          <span>{activeWaypoint.scripture}</span>
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => openWaypointScripture(activeWaypoint.scripture)}
+                            className="px-2 py-0.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 text-[11px] flex items-center gap-1 transition-colors"
+                            title="Đọc trực tiếp phân đoạn Kinh Thánh trạm dừng này"
+                          >
+                            <BookOpen className="w-3 h-3 text-amber-400" />
+                            <span>Đọc Phân Đoạn</span>
+                          </button>
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
+                            className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                            title="Mở trong Bible Reader đầy đủ"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>{activeWaypoint.scripture}</span>
+                          </Link>
+                        </div>
                       </div>
 
                       <div>
@@ -2411,6 +2501,52 @@ export default function ExplorePage() {
                 </>
               ) : null}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waypoint Scripture Preview Modal (§9) */}
+      {isWaypointModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 max-w-xl w-full rounded-3xl p-6 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">
+                  {waypointVersesText?.ref || "Văn Bản Kinh Thánh"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsWaypointModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {loadingWaypointVerses ? (
+              <div className="p-10 flex flex-col items-center justify-center gap-3 text-slate-400 text-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                <span>Đang tải nguyên văn câu Kinh Thánh...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-sm text-slate-200 leading-relaxed font-serif whitespace-pre-line max-h-96 overflow-y-auto">
+                  {waypointVersesText?.text}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span className="italic">Bản dịch truyền thống 1925</span>
+                  <Link
+                    href={`/bible?ref=${encodeURIComponent(waypointVersesText?.ref || "")}`}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1"
+                  >
+                    <span>Mở Trong Trình Đọc Toàn Diện</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

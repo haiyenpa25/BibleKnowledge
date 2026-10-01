@@ -374,6 +374,55 @@ def list_biblical_journeys():
             ]
         },
         {
+            "id": "journey-paul-3",
+            "title": "Chuyến Truyền Giáo Thứ Ba Của Phao-lô (Ê-phê-sô & Tiểu Á)",
+            "period": "Early Church (khoảng 53 - 57 SCN)",
+            "description": "Chức vụ quyền năng 3 năm tại thành phố Ê-phê-sô, củng cố các Hội Thánh Hy Lạp, viết 1 & 2 Cô-rinh-tô, Ga-la-ti, La-mã và lời từ biệt đẫm lệ tại Mi-lê.",
+            "color": "#06b6d4",
+            "waypoints": [
+                {"order": 1, "name": "An-ti-ốt xứ Sy-ri (Antioch in Syria)", "modern": "Antakya, Thổ Nhĩ Kỳ", "lat": 36.2021, "lng": 36.1606, "scripture": "Công vụ 18:23", "notes": "Khởi hành chuyến truyền giáo thứ ba; đi khắp xứ Ga-la-ti và Phi-ri-ghi làm vững lòng môn đồ."},
+                {"order": 2, "name": "Ê-phê-sô (Ephesus)", "modern": "Selcuk, Thổ Nhĩ Kỳ", "lat": 37.9483, "lng": 27.3681, "scripture": "Công vụ 19:1-41", "notes": "Giảng dạy 3 năm tại trường Ti-ra-nu; ma quỷ bị trục xuất; cuộc náo loạn của phường thợ bạc đền nữ thần Đi-anh."},
+                {"order": 3, "name": "Phi-líp & Ma-xê-đoan (Philippi & Macedonia)", "modern": "Kavala, Hy Lạp", "lat": 41.0131, "lng": 24.2864, "scripture": "Công vụ 20:1-3", "notes": "Qua Ma-xê-đoan khuyên bảo môn đồ; lưu lại Hy Lạp 3 tháng quyên góp tiền giúp tín hữu nghèo tại Giê-ru-sa-lem."},
+                {"order": 4, "name": "Trô-ách (Troas)", "modern": "Canakkale, Thổ Nhĩ Kỳ", "lat": 39.7525, "lng": 26.1611, "scripture": "Công vụ 20:6-12", "notes": "Phao-lô giảng giải đến nửa đêm; chàng trai Ơ-tích ngủ gục ngã từ tầng ba tử vong, được Phao-lô ôm lấy và phục sinh."},
+                {"order": 5, "name": "Mi-lê (Miletus)", "modern": "Balat, Thổ Nhĩ Kỳ", "lat": 37.5308, "lng": 27.2783, "scripture": "Công vụ 20:17-38", "notes": "Gặp gỡ và giã từ cảm động các trưởng lão Ê-phê-sô: 'Tôi chẳng quí tính mạng mình, miễn chạy cho xong cuộc đua'."},
+                {"order": 6, "name": "Ty-rơ (Tyre)", "modern": "Sour, Li-băng", "lat": 33.2708, "lng": 35.1961, "scripture": "Công vụ 21:3-6", "notes": "Cập bến xứ Phe-ni-xi; các môn đồ cùng vợ con tiễn đoàn ra bờ biển quỳ gối cầu nguyện thiết tha."},
+                {"order": 7, "name": "Sê-sa-rê (Caesarea)", "modern": "Caesarea, Israel", "lat": 32.5000, "lng": 34.8900, "scripture": "Công vụ 21:8-14", "notes": "Ở nhà người giảng Tin Lành Phi-líp; tiên tri A-ga-bút lấy dây thắt lưng trói tay chân báo trước Phao-lô sẽ bị nộp cho La-mã."},
+                {"order": 8, "name": "Giê-ru-sa-lem (Jerusalem)", "modern": "Jerusalem, Israel", "lat": 31.7683, "lng": 35.2137, "scripture": "Công vụ 21:15-36", "notes": "Về thăm Gia-cơ và các trưởng lão; bị người Do Thái kích động bắt giữ nơi Đền Thờ; quan cơ binh La-mã can thiệp giải cứu."}
+            ]
+        },
+        {
+            "id": "journey-david-fugitive",
+            "title": "Hành Trình Lưu Lạc & Rèn Luyện Của Vua Đa-vít",
+            "period": "United Monarchy (khoảng 1020 - 1010 TCN)",
+            "description": "Những năm tháng trốn chạy sự ghen ghét của vua Sau-lơ trong các hang đá đồng vắng, nơi Đa-vít viết nhiều bài Thi Thiên bất hủ và tôi luyện tấm lòng kính sợ Chúa.",
+            "color": "#eab308",
+            "waypoints": [
+                {"order": 1, "name": "Ghi-bê-a (Gibeah)", "modern": "Tell el-Ful, Israel", "lat": 31.8236, "lng": 35.2308, "scripture": "1 Sa-mu-ên 19:9-10", "notes": "Cung điện Sau-lơ; Đa-vít gảy đàn xua ác thần và né mũi giáo ám sát của Sau-lơ."},
+                {"order": 2, "name": "Nốp (Nob)", "modern": "Gần Jerusalem", "lat": 31.7850, "lng": 35.2450, "scripture": "1 Sa-mu-ên 21:1-9", "notes": "Nơi thầy tế lễ A-hi-mê-léc ban bánh thánh trần thiết và thanh gươm của Gô-li-át cho Đa-vít."},
+                {"order": 3, "name": "Gát (Gath)", "modern": "Tell es-Safi, Israel", "lat": 31.6997, "lng": 34.8475, "scripture": "1 Sa-mu-ên 21:10-15", "notes": "Xứ người Phi-li-tin; Đa-vít giả điên cào cửa thành và nhỏ dãi để thoát khỏi tay vua A-kích."},
+                {"order": 4, "name": "Hang A-đu-lam (Cave of Adullam)", "modern": "Khirbet 'Id el-Minya", "lat": 31.6500, "lng": 34.9700, "scripture": "1 Sa-mu-ên 22:1-2", "notes": "Nơi ẩn náu đầu tiên; 400 người khốn cùng, mắc nợ và cay đắng linh hồn tụ họp tôn Đa-vít làm thủ lĩnh."},
+                {"order": 5, "name": "Kê-y-la (Keilah)", "modern": "Khirbet Qila, Bờ Tây", "lat": 31.6111, "lng": 34.9722, "scripture": "1 Sa-mu-ên 23:1-5", "notes": "Đa-vít cầu hỏi Chúa đem quân giải cứu dân thành Kê-y-la khỏi quân Phi-li-tin cướp bóc sân đạp lúa."},
+                {"order": 6, "name": "Hang En-ghê-đi (En-gedi)", "modern": "Ein Gedi, Biển Chết", "lat": 31.4650, "lng": 35.3900, "scripture": "1 Sa-mu-ên 24:1-22", "notes": "Đa-vít lén cắt vạt áo Sau-lơ nhưng không giết vua: 'Đức Giê-hô-va cấm tôi tra tay vào Đấng Được Xức Dầu'."},
+                {"order": 7, "name": "Đồng Vắng Xíp & Đồi Hác-ki-la (Ziph)", "modern": "Tell Zif, Bờ Tây", "lat": 31.4800, "lng": 35.1500, "scripture": "1 Sa-mu-ên 26:7-12", "notes": "Lần thứ hai tha mạng Sau-lơ khi vua ngủ say giữa đạo binh; chỉ lấy ngọn giáo và bình nước đầu giường."},
+                {"order": 8, "name": "Xiếc-lác (Ziklag)", "modern": "Tel Sera, Israel", "lat": 31.3850, "lng": 34.6200, "scripture": "1 Sa-mu-ên 27:6; 30:1-26", "notes": "Căn cứ của Đa-vít; đánh bại quân A-ma-léc giải cứu thân quyến trước khi được xức dầu làm vua tại Hếp-rôn."}
+            ]
+        },
+        {
+            "id": "journey-elijah",
+            "title": "Hành Trình Lửa Của Tiên Tri Ê-li",
+            "period": "Divided Kingdom (khoảng 875 - 848 TCN)",
+            "description": "Cuộc đối đầu lịch sử với thần Ba-anh, ngọn lửa từ trời thiêu rụi của tế lễ, tiếng êm dịu nhỏ nhẹ nơi Núi Hô-rếp và sự phục hưng đức tin độc thần.",
+            "color": "#f97316",
+            "waypoints": [
+                {"order": 1, "name": "Khe Kê-rít (Brook Cherith)", "modern": "Wadi al-Yabis / Qelt", "lat": 31.8400, "lng": 35.4300, "scripture": "1 Các Vua 17:1-6", "notes": "Chúa sai quạ tha bánh và thịt nuôi Ê-li sáng chiều; uống nước khe trong suốt nạn hạn hán."},
+                {"order": 2, "name": "Sa-rép-ta (Zarephath)", "modern": "Sarafand, Li-băng", "lat": 33.3989, "lng": 35.2978, "scripture": "1 Các Vua 17:8-24", "notes": "Hũ bột không vơi, vò dầu không cạn; Đức Chúa Trời qua lời cầu xin của Ê-li khiến con trai người góa phụ sống lại."},
+                {"order": 3, "name": "Núi Cạt-mên (Mount Carmel)", "modern": "Mount Carmel, Haifa", "lat": 32.7300, "lng": 35.0500, "scripture": "1 Các Vua 18:20-40", "notes": "Trận chiến đức tin với 450 tiên tri Ba-anh; lửa giáng từ trời; dân chúng sấp mặt tung hô 'Giê-hô-va là Đức Chúa Trời!'."},
+                {"order": 4, "name": "Gie-xơ-rê-ên (Jezreel)", "modern": "Zir'in, Thung lũng Jezreel", "lat": 32.5594, "lng": 35.3289, "scripture": "1 Các Vua 18:45-46", "notes": "Tay Chúa đặt trên Ê-li, ông thắt lưng chạy bộ vượt trước xe ngựa chiến của vua A-háp dưới cơn mưa dông lớn."},
+                {"order": 5, "name": "Bê-e-sê-ba (Beersheba)", "modern": "Be'er Sheva, Israel", "lat": 31.2500, "lng": 34.7900, "scripture": "1 Các Vua 19:3-8", "notes": "Ngồi dưới cây kim tước xin chết vì sợ Giê-sa-bên; thiên sứ ban bánh nướng và bình nước bổ sức cho chặng đường dài."},
+                {"order": 6, "name": "Núi Hô-rếp (Mount Horeb / Sinai)", "modern": "Jabal Musa, Ai Cập", "lat": 28.5394, "lng": 33.9753, "scripture": "1 Các Vua 19:8-18", "notes": "Đi 40 ngày 40 đêm đến núi Chúa; nghe tiếng êm dịu nhỏ nhẹ của Đấng Tự Hữu; nhận lệnh xức dầu cho Ê-li-sê kế vị."}
+            ]
+        },
+        {
             "id": "journey-paul-rome",
             "title": "Chuyến Đi La-mã & Chìm Tàu Tại Đảo Man-tơ",
             "period": "Early Church (khoảng 59 - 62 SCN)",

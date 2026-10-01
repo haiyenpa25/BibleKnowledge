@@ -32,8 +32,47 @@ import {
   Activity,
   BarChart3,
   Target,
-  ShieldCheck
+  ShieldCheck,
+  Download,
+  Copy,
+  FileText,
+  Trophy,
+  UserCheck,
+  X
 } from "lucide-react";
+
+interface ChallengePackQuestionItem {
+  id: string;
+  question_text: string;
+  options: string[];
+  correct_option: number;
+  explanation: string;
+  scripture_reference: string;
+  points: number;
+}
+
+interface ChallengePackItem {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  icon_name: string;
+  badge_label: string;
+  description: string;
+  target_doctrine: string;
+  estimated_minutes: number;
+  difficulty_level: string;
+  total_questions: number;
+  passing_score: number;
+  questions: ChallengePackQuestionItem[];
+}
+
+interface FlashcardExportModalData {
+  format: "anki" | "csv" | "json";
+  filename: string;
+  card_count: number;
+  content: string;
+}
 
 interface TopicMasteryItem {
   topic_key: string;
@@ -178,7 +217,24 @@ interface TimelineChallenge {
 }
 
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "challenge_packs" | "generator">("quiz");
+
+  // Challenge Packs State (§46)
+  const [challengePacks, setChallengePacks] = useState<ChallengePackItem[]>([]);
+  const [selectedPack, setSelectedPack] = useState<ChallengePackItem | null>(null);
+  const [packAnswers, setPackAnswers] = useState<Record<string, number>>({});
+  const [packSubmitted, setPackSubmitted] = useState(false);
+  const [packResult, setPackResult] = useState<any>(null);
+  const [loadingPacks, setLoadingPacks] = useState(false);
+  const [submittingPack, setSubmittingPack] = useState(false);
+
+  // Flashcards Export Modal State (§4, §50)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"anki" | "csv" | "json">("anki");
+  const [exportCardType, setExportCardType] = useState<string>("all");
+  const [exportData, setExportData] = useState<FlashcardExportModalData | null>(null);
+  const [loadingExport, setLoadingExport] = useState(false);
+  const [copiedExport, setCopiedExport] = useState(false);
 
   // Adaptive Learning Analytics State (§5)
   const [adaptiveData, setAdaptiveData] = useState<AdaptiveAnalyticsData | null>(null);
@@ -282,7 +338,105 @@ export default function LearnPage() {
     if (activeTab === "adaptive") {
       fetchAdaptiveAnalytics();
     }
+    if (activeTab === "challenge_packs" && challengePacks.length === 0) {
+      fetchChallengePacks();
+    }
   }, [activeTab]);
+
+  // Fetch Challenge Packs (§46)
+  const fetchChallengePacks = async () => {
+    setLoadingPacks(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/challenge-packs`);
+      if (res.ok) {
+        const data = await res.json();
+        setChallengePacks(data);
+      }
+    } catch (e) {
+      console.error("Failed to load challenge packs:", e);
+    } finally {
+      setLoadingPacks(false);
+    }
+  };
+
+  const handleSelectPack = (pack: ChallengePackItem) => {
+    setSelectedPack(pack);
+    setPackAnswers({});
+    setPackSubmitted(false);
+    setPackResult(null);
+  };
+
+  const handleSubmitPack = async (packId: string) => {
+    if (!selectedPack) return;
+    setSubmittingPack(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/challenge-packs/${packId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: packAnswers })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPackResult(data);
+        setPackSubmitted(true);
+        if (data.passed) {
+          setScore((prev) => prev + (data.correct_count * 20));
+          fetchProfile();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to submit pack:", e);
+    } finally {
+      setSubmittingPack(false);
+    }
+  };
+
+  // Flashcards Export Handlers (§4, §50)
+  const openExportModal = (initialFormat: "anki" | "csv" | "json" = "anki") => {
+    setExportFormat(initialFormat);
+    setIsExportModalOpen(true);
+    loadExportData(initialFormat, exportCardType);
+  };
+
+  const loadExportData = async (fmt: "anki" | "csv" | "json", cardType: string) => {
+    setLoadingExport(true);
+    setCopiedExport(false);
+    try {
+      let url = `${apiUrl}/api/learn/flashcards/export?format=${fmt}`;
+      if (cardType && cardType !== "all") {
+        url += `&card_type=${encodeURIComponent(cardType)}`;
+      }
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: FlashcardExportModalData = await res.json();
+        setExportData(data);
+      }
+    } catch (e) {
+      console.error("Failed to load export data:", e);
+    } finally {
+      setLoadingExport(false);
+    }
+  };
+
+  const handleDownloadFile = () => {
+    if (!exportData) return;
+    const blob = new Blob([exportData.content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = exportData.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyExport = () => {
+    if (!exportData) return;
+    navigator.clipboard.writeText(exportData.content);
+    setCopiedExport(true);
+    setTimeout(() => setCopiedExport(false), 2500);
+  };
 
   // Fetch Quiz Questions
   const fetchQuiz = async (type?: string) => {
@@ -1153,6 +1307,22 @@ export default function LearnPage() {
           <Clock className="w-4 h-4 text-purple-200" />
           <span>Sắp Xếp Niên Đại</span>
           <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-400/20 text-purple-300">Mới §3</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("challenge_packs");
+            if (challengePacks.length === 0) fetchChallengePacks();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "challenge_packs"
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-amber-300" />
+          <span>Gói Thử Thách (Packs)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-400/20 text-rose-300 font-bold">Hot §46</span>
         </button>
 
         <button
@@ -2203,29 +2373,40 @@ export default function LearnPage() {
       {/* ===================================================================== */}
       {activeTab === "flashcards" && (
         <div className="flex flex-col gap-6 items-center">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs self-start">
-            <span className="text-slate-400 whitespace-nowrap">Lọc loại thẻ:</span>
-            {[
-              { id: "all", label: "Tất cả" },
-              { id: "person", label: "Nhân vật" },
-              { id: "verse", label: "Câu gốc" },
-              { id: "word", label: "Từ ngữ gốc" }
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => {
-                  setCardFilter(f.id);
-                  fetchFlashcards(f.id);
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  cardFilter === f.id
-                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium"
-                    : "bg-slate-800/80 text-slate-400 hover:text-white"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full pb-1 text-xs">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <span className="text-slate-400 whitespace-nowrap">Lọc loại thẻ:</span>
+              {[
+                { id: "all", label: "Tất cả" },
+                { id: "person", label: "Nhân vật" },
+                { id: "verse", label: "Câu gốc" },
+                { id: "word", label: "Từ ngữ gốc" }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setCardFilter(f.id);
+                    fetchFlashcards(f.id);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-colors ${
+                    cardFilter === f.id
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium"
+                      : "bg-slate-800/80 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => openExportModal("anki")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-semibold transition-all shadow-sm shrink-0"
+              title="Xuất thẻ ra định dạng Anki TSV, CSV hoặc JSON"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Xuất Thẻ Anki / CSV / JSON (§4, §50)</span>
+            </button>
           </div>
 
           {loadingCards ? (
@@ -2775,6 +2956,461 @@ export default function LearnPage() {
               <span>{genError}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 9. SPECIALIZED CHALLENGE PACKS (§46)                                 */}
+      {/* ===================================================================== */}
+      {activeTab === "challenge_packs" && (
+        <div className="flex flex-col gap-6">
+          {/* Header banner */}
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-rose-950/40 via-slate-900/90 to-amber-950/40 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-rose-600/30">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">Học Tập Chuyên Sâu • §46</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-mono font-bold">
+                    Thưởng +20 XP / câu đúng
+                  </span>
+                </div>
+                <h2 className="text-lg md:text-xl font-extrabold text-white">
+                  Gói Thử Thách Kinh Thánh Chuyên Đề (Challenge Packs)
+                </h2>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  5 chuyên đề khảo cứu trọng tâm • Đạt 80% để mở khóa Huy Hiệu Danh Dự cá nhân
+                </p>
+              </div>
+            </div>
+
+            {selectedPack && (
+              <button
+                onClick={() => {
+                  setSelectedPack(null);
+                  setPackAnswers({});
+                  setPackSubmitted(false);
+                  setPackResult(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Xem Tất Cả Gói</span>
+              </button>
+            )}
+          </div>
+
+          {loadingPacks ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+              <p className="text-sm">Đang tải các gói thử thách chuyên đề...</p>
+            </div>
+          ) : !selectedPack ? (
+            /* List of 5 Packs */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {challengePacks.map((pack) => (
+                <div
+                  key={pack.id}
+                  className="rounded-3xl glass-panel border border-slate-800 hover:border-rose-500/50 p-6 flex flex-col justify-between gap-5 transition-all duration-300 hover:shadow-xl hover:shadow-rose-950/20 group"
+                >
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                        {pack.category}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        ~{pack.estimated_minutes} phút
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-bold text-white group-hover:text-rose-300 transition-colors flex items-center gap-2">
+                        {pack.title}
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed mt-1 font-serif">
+                        {pack.description}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-800 text-[11px]">
+                      <div className="flex justify-between text-slate-400">
+                        <span>Phân đoạn trọng tâm:</span>
+                        <span className="text-slate-200 font-medium">{pack.target_doctrine}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Huy hiệu đạt được:</span>
+                        <span className="text-amber-400 font-semibold flex items-center gap-1">
+                          <Award className="w-3 h-3" />
+                          {pack.badge_label}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Quy mô &amp; Điểm qua:</span>
+                        <span className="text-emerald-400 font-medium">{pack.total_questions} câu ({pack.passing_score}% để đỗ)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleSelectPack(pack)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/25 transition-all"
+                  >
+                    <span>Bắt Đầu Thử Thách</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Selected Pack Active Test & Grading */
+            <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
+              {/* Active Pack Info */}
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex justify-between items-center">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">
+                    {selectedPack.category} &bull; Độ khó: {selectedPack.difficulty_level}
+                  </span>
+                  <h3 className="text-lg font-bold text-white mt-0.5">
+                    {selectedPack.title}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedPack.description}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[11px] text-slate-400">Đã trả lời:</div>
+                  <div className="text-sm font-bold text-white font-mono">
+                    {Object.keys(packAnswers).length} / {selectedPack.questions.length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Result Banner if submitted */}
+              {packSubmitted && packResult && (
+                <div
+                  className={`p-6 rounded-3xl border flex flex-col gap-3 shadow-xl animate-in fade-in ${
+                    packResult.passed
+                      ? "bg-gradient-to-br from-emerald-950/60 via-slate-900 to-emerald-950/30 border-emerald-500/50"
+                      : "bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-900 border-amber-500/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-lg ${
+                        packResult.passed
+                          ? "bg-emerald-500 text-slate-950 shadow-emerald-500/30"
+                          : "bg-amber-500 text-slate-950 shadow-amber-500/30"
+                      }`}
+                    >
+                      {packResult.passed ? <Trophy className="w-6 h-6" /> : "📖"}
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-slate-400">Kết quả đánh giá AI:</div>
+                      <div className="text-xl font-extrabold text-white flex items-center gap-2">
+                        <span>Đạt {packResult.score_percentage}%</span>
+                        <span className="text-xs font-medium text-slate-300">
+                          ({packResult.correct_count}/{packResult.total_questions} câu chuẩn xác)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-200 leading-relaxed font-sans pt-1">
+                    {packResult.feedback_message}
+                  </p>
+
+                  {packResult.badge_earned && (
+                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-300 font-semibold">
+                      <Award className="w-5 h-5 text-amber-400 shrink-0" />
+                      <span>Huy Hiệu Vinh Dự Mới Mở Khóa: &ldquo;{packResult.badge_earned}&rdquo;</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setPackAnswers({});
+                        setPackSubmitted(false);
+                        setPackResult(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span>Thử Sức Lại Gói Này</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedPack(null);
+                        setPackAnswers({});
+                        setPackSubmitted(false);
+                        setPackResult(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>Chọn Gói Thử Thách Khác</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Questions List */}
+              <div className="flex flex-col gap-5">
+                {selectedPack.questions.map((q, qIdx) => {
+                  const chosenOpt = packAnswers[q.id];
+                  const detail = packResult?.results_detail?.find((d: any) => d.question_id === q.id);
+
+                  return (
+                    <div
+                      key={q.id}
+                      className={`p-6 rounded-3xl glass-panel border transition-all ${
+                        packSubmitted
+                          ? detail?.is_correct
+                            ? "border-emerald-500/60 bg-emerald-950/10"
+                            : "border-rose-500/60 bg-rose-950/10"
+                          : "border-slate-800"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2 mb-3">
+                        <span className="w-7 h-7 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center text-xs font-bold font-mono">
+                          {qIdx + 1}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(q.scripture_reference)}`}
+                            className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono font-medium"
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            <span>{q.scripture_reference}</span>
+                          </Link>
+                          {packSubmitted && (
+                            detail?.is_correct ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Đúng (+20 XP)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold flex items-center gap-1">
+                                <XCircle className="w-3 h-3" /> Chưa đúng
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <h4 className="text-sm md:text-base font-bold text-white mb-4 leading-relaxed">
+                        {q.question_text}
+                      </h4>
+
+                      {/* Options */}
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {q.options.map((opt, optIdx) => {
+                          const isSelected = chosenOpt === optIdx;
+                          const isCorrect = q.correct_option === optIdx;
+
+                          let btnStyle = "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white";
+                          if (packSubmitted) {
+                            if (isCorrect) {
+                              btnStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-200 font-semibold";
+                            } else if (isSelected && !isCorrect) {
+                              btnStyle = "bg-rose-950/60 border-rose-500 text-rose-200";
+                            } else {
+                              btnStyle = "bg-slate-900/40 border-slate-800/40 text-slate-500";
+                            }
+                          } else if (isSelected) {
+                            btnStyle = "bg-rose-950/40 border-rose-500 text-white font-semibold ring-1 ring-rose-500";
+                          }
+
+                          return (
+                            <button
+                              key={optIdx}
+                              disabled={packSubmitted}
+                              onClick={() => setPackAnswers((prev) => ({ ...prev, [q.id]: optIdx }))}
+                              className={`p-3.5 rounded-2xl border text-left text-xs md:text-sm flex items-center justify-between transition-all ${btnStyle}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[11px] font-bold shrink-0">
+                                  {String.fromCharCode(65 + optIdx)}
+                                </span>
+                                <span>{opt}</span>
+                              </div>
+                              {packSubmitted && isCorrect && (
+                                <Check className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />
+                              )}
+                              {packSubmitted && isSelected && !isCorrect && (
+                                <X className="w-4 h-4 text-rose-400 shrink-0 ml-2" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Explanation if submitted */}
+                      {packSubmitted && (
+                        <div className="mt-4 p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 leading-relaxed flex flex-col gap-1 animate-in fade-in">
+                          <span className="font-bold text-amber-300 flex items-center gap-1">
+                            💡 Luận Giải Thần Học &amp; Căn Cứ:
+                          </span>
+                          <p className="font-serif text-slate-300">{q.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Submit Button */}
+              {!packSubmitted && (
+                <div className="flex justify-end pt-2">
+                  <button
+                    disabled={submittingPack || Object.keys(packAnswers).length === 0}
+                    onClick={() => handleSubmitPack(selectedPack.id)}
+                    className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-40 text-white font-extrabold text-sm flex items-center gap-2 shadow-xl shadow-rose-600/30 transition-all"
+                  >
+                    {submittingPack ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang Chấm Điểm Thử Thách...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trophy className="w-4 h-4 text-amber-300" />
+                        <span>Nộp Bài Thử Thách ({Object.keys(packAnswers).length}/{selectedPack.questions.length} câu)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* FLASHCARDS EXPORT MODAL (§4, §50)                                     */}
+      {/* ===================================================================== */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 max-w-2xl w-full rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Xuất Bộ Thẻ Ghi Nhớ (Export Flashcards)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Hỗ trợ Anki Deck (.txt), Bảng tính CSV (.csv) và Dữ liệu JSON chuẩn (§4, §50)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Filter and Format Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {/* Format Tabs */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+                {[
+                  { id: "anki", label: "Anki (.txt / .tsv)" },
+                  { id: "csv", label: "CSV (.csv)" },
+                  { id: "json", label: "JSON (.json)" }
+                ].map((fmt) => (
+                  <button
+                    key={fmt.id}
+                    onClick={() => {
+                      const f = fmt.id as "anki" | "csv" | "json";
+                      setExportFormat(f);
+                      loadExportData(f, exportCardType);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      exportFormat === fmt.id
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {fmt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Filter */}
+              <select
+                value={exportCardType}
+                onChange={(e) => {
+                  setExportCardType(e.target.value);
+                  loadExportData(exportFormat, e.target.value);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none"
+              >
+                <option value="all">Tất cả các thẻ</option>
+                <option value="person">Thẻ nhân vật</option>
+                <option value="verse">Thẻ câu gốc</option>
+                <option value="word">Thẻ từ ngữ gốc</option>
+              </select>
+            </div>
+
+            {/* Format Description Banner */}
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                {exportFormat === "anki" && "Định dạng Tab-Separated Values (TSV) chuẩn hóa cho Anki Desktop & Mobile, hỗ trợ ngắt dòng HTML <br>."}
+                {exportFormat === "csv" && "Định dạng bảng tính chuẩn RFC 4180, mở trực tiếp bằng Microsoft Excel, Google Sheets, Apple Numbers hoặc Notion."}
+                {exportFormat === "json" && "Định dạng JSON cấu trúc đầy đủ, phù hợp cho lập trình viên, tích hợp API hoặc sao lưu dữ liệu cá nhân."}
+              </span>
+            </div>
+
+            {/* Content Preview Box */}
+            <div className="relative">
+              <div className="flex items-center justify-between text-xs text-slate-400 pb-1.5 px-1">
+                <span>Bản xem trước ({exportData?.card_count || 0} thẻ):</span>
+                <span className="font-mono text-[11px] text-slate-500">{exportData?.filename}</span>
+              </div>
+              {loadingExport ? (
+                <div className="h-48 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-500 text-xs">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2 text-emerald-400" />
+                  Đang khởi tạo tệp xuất...
+                </div>
+              ) : (
+                <pre className="h-48 rounded-2xl bg-slate-950 border border-slate-800 p-4 text-[11px] font-mono text-slate-300 overflow-x-auto overflow-y-auto whitespace-pre leading-relaxed select-all">
+                  {exportData?.content || "Không có dữ liệu thẻ để hiển thị."}
+                </pre>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={handleCopyExport}
+                disabled={!exportData}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                {copiedExport ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedExport ? "Đã Sao Chép!" : "Sao Chép Vào Bộ Nhớ"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadFile}
+                disabled={!exportData}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>Tải Tệp Về Máy ({exportData?.filename || "export"})</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

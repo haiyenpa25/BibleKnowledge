@@ -270,15 +270,23 @@ async function main() {
   const studyProjectsCount = parseInt(runPsqlQuery('SELECT count(*) FROM study_projects;') || '0', 10);
 
   // ==========================================
-  // 6. GOSPEL HARMONY & CITATIONS ENGINE (§8, §18, §38, §52)
+  // 6. GOSPEL HARMONY, CITATIONS & JOURNEYS (§8, §9, §18, §38, §46, §50, §52)
   // ==========================================
   let harmonyEventsCount = 0;
   let totalHarmonyPassages = 0;
   let authorsCount = 0;
   let seriesCount = 0;
+  let journeysCount = 0;
+  let challengePacksCount = 0;
+  let flashcardsExportOk = false;
 
   try {
-    const hRes = await fetch('http://localhost:8000/api/bible/harmony-events', { signal: AbortSignal.timeout(4000) });
+    const [hRes, jRes, cpRes, feRes] = await Promise.all([
+      fetch('http://localhost:8000/api/bible/harmony-events', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/graph/journeys', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/learn/challenge-packs', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/learn/flashcards/export?format=anki', { signal: AbortSignal.timeout(4000) })
+    ]);
     if (hRes.ok) {
       const hData = await hRes.json();
       harmonyEventsCount = hData.total_events || 0;
@@ -286,8 +294,26 @@ async function main() {
         totalHarmonyPassages += Object.keys(ev.passages || {}).length;
       }
     }
+    if (jRes.ok) {
+      const jData = await jRes.json();
+      journeysCount = Array.isArray(jData) ? jData.length : (jData.total || (jData.journeys ? jData.journeys.length : 0));
+    }
+    if (cpRes.ok) {
+      const cpData = await cpRes.json();
+      challengePacksCount = Array.isArray(cpData) ? cpData.length : (cpData.total_packs || (cpData.packs ? cpData.packs.length : 0));
+    }
+    if (feRes.ok) {
+      flashcardsExportOk = true;
+    }
   } catch (e) {
-    warnings.push(`Không thể kiểm tra /api/bible/harmony-events: ${e.message}`);
+    warnings.push(`Không thể kiểm tra /api/bible/harmony-events hoặc journeys/packs: ${e.message}`);
+  }
+
+  if (journeysCount < 9) {
+    warnings.push(`Số hành trình Kinh Thánh là ${journeysCount} (kỳ vọng ít nhất 9 hành trình).`);
+  }
+  if (challengePacksCount < 5) {
+    warnings.push(`Số gói thử thách là ${challengePacksCount} (kỳ vọng ít nhất 5 gói).`);
   }
 
   try {
@@ -426,14 +452,16 @@ async function main() {
   // 5. Learning & Study
   console.log('5. TÀI NGUYÊN HỌC TẬP & NGHIÊN CỨU (LEARNING & STUDY ASSETS)');
   console.log(`   • Câu hỏi trắc nghiệm:    ${quizCount} câu hỏi đa cấp độ`);
-  console.log(`   • Thẻ ghi nhớ Spaced-Rep:  ${flashcardsCount} thẻ SM-2`);
+  console.log(`   • Thẻ ghi nhớ Spaced-Rep:  ${flashcardsCount} thẻ SM-2 (Xuất Anki/CSV: ${flashcardsExportOk ? '✔ Sẵn sàng' : '✖ Lỗi'})`);
+  console.log(`   • Gói thử thách chủ đề:   ${challengePacksCount} gói bài tập chuyên đề (§46) ${challengePacksCount >= 5 ? '✔' : '⚠'}`);
   console.log(`   • Từ vựng Strong Hy-Hê:    ${strongCount} mục từ nguyên ngữ`);
   console.log(`   • Hồ sơ Nghiên Cứu Lớn:    ${studyProjectsCount} dự án chuyên sâu`);
   console.log('');
 
-  // 6. Gospel Harmony & Academic Citations
-  console.log('6. ĐỐI CHIẾU SONG SONG & TRÍCH DẪN HỌC THUẬT (HARMONY & CITATIONS)');
+  // 6. Gospel Harmony, Citations & Journeys
+  console.log('6. ĐỐI CHIẾU SONG SONG & HÀNH TRÌNH ĐỊA LÝ (HARMONY, CARTOGRAPHY & CITATIONS)');
   console.log(`   • Sự kiện đối chiếu:      ${harmonyEventsCount} đại sự kiện (${totalHarmonyPassages} phân đoạn song song) ✔`);
+  console.log(`   • Hành trình Kinh Thánh:  ${journeysCount} tuyến hành trình tương tác (§9) ${journeysCount >= 9 ? '✔' : '⚠'}`);
   console.log(`   • Tuyển tập tác giả:      ${authorsCount} tác giả thần học kinh điển ✔`);
   console.log(`   • Bộ ấn phẩm đa tập:      ${seriesCount} bộ sách lớn (TOTC, TNTC, Wiersbe, IVP...) ✔`);
   console.log(`   • Chuẩn trích dẫn:        5 chuẩn học thuật (SBL, Chicago 9th, APA 7th, MLA 9th, BibTeX) ✔`);
