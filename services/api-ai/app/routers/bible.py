@@ -167,6 +167,16 @@ def get_verse_range(
             b.osis.lower(),
             b.name_en.lower()
         ]
+        # Common aliases
+        if b.code.lower() == "cong":
+            patterns.extend(["công-vụ", "công vụ", "cv", "cong-vu"])
+        if b.name_vi.lower().startswith("i "):
+            patterns.extend([b.name_vi.lower().replace("i ", "1 "), b.name_vi.lower().replace("i ", "1")])
+        elif b.name_vi.lower().startswith("ii "):
+            patterns.extend([b.name_vi.lower().replace("ii ", "2 "), b.name_vi.lower().replace("ii ", "2")])
+        elif b.name_vi.lower().startswith("iii "):
+            patterns.extend([b.name_vi.lower().replace("iii ", "3 "), b.name_vi.lower().replace("iii ", "3")])
+
         for p in patterns:
             if ref_clean.lower().startswith(p):
                 # Ensure word boundary or space
@@ -179,17 +189,18 @@ def get_verse_range(
             break
 
     if not book_match:
-        # Try regex fallback for books like "Ma-thi-ơ", "Giăng", "Sáng-thế Ký"
+        # Try regex fallback for books like "Ma-thi-ơ", "Giăng", "Sáng-thế Ký", "Công-vụ"
         first_word = ref_clean.split()[0].lower() if ' ' in ref_clean else ''
         for b in sorted_books:
             if b.name_vi.lower().startswith(first_word) or b.code.lower() == first_word:
                 book_match = b
+                matched_book_str = ref_clean[:len(first_word)]
                 break
 
     if not book_match:
         raise HTTPException(status_code=400, detail=f"Không nhận diện được tên sách trong chuỗi: '{ref}'")
 
-    rem = ref_clean[len(matched_book_str):].strip() if matched_book_str else ref_clean.replace(book_match.name_vi, "").strip()
+    rem = ref_clean[len(matched_book_str):].strip()
 
     start_chap, start_v, end_chap, end_v = 1, 1, 1, 1
 

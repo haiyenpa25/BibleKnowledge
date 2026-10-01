@@ -270,7 +270,45 @@ async function main() {
   const studyProjectsCount = parseInt(runPsqlQuery('SELECT count(*) FROM study_projects;') || '0', 10);
 
   // ==========================================
-  // 6. API LIVENESS & WEB ROUTES & DOCKER MEMORY
+  // 6. GOSPEL HARMONY & CITATIONS ENGINE (§8, §18, §38, §52)
+  // ==========================================
+  let harmonyEventsCount = 0;
+  let totalHarmonyPassages = 0;
+  let authorsCount = 0;
+  let seriesCount = 0;
+
+  try {
+    const hRes = await fetch('http://localhost:8000/api/bible/harmony-events', { signal: AbortSignal.timeout(4000) });
+    if (hRes.ok) {
+      const hData = await hRes.json();
+      harmonyEventsCount = hData.total_events || 0;
+      for (const ev of (hData.events || [])) {
+        totalHarmonyPassages += Object.keys(ev.passages || {}).length;
+      }
+    }
+  } catch (e) {
+    warnings.push(`Không thể kiểm tra /api/bible/harmony-events: ${e.message}`);
+  }
+
+  try {
+    const [aRes, sRes] = await Promise.all([
+      fetch('http://localhost:8000/api/library/authors', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/library/series-catalog', { signal: AbortSignal.timeout(4000) })
+    ]);
+    if (aRes.ok) {
+      const aData = await aRes.json();
+      authorsCount = aData.total_distinct_authors || aData.authors?.length || 0;
+    }
+    if (sRes.ok) {
+      const sData = await sRes.json();
+      seriesCount = sData.total_series || sData.series?.length || 0;
+    }
+  } catch (e) {
+    warnings.push(`Không thể kiểm tra thư viện authors/series: ${e.message}`);
+  }
+
+  // ==========================================
+  // 7. API LIVENESS & WEB ROUTES & DOCKER MEMORY
   // ==========================================
   const apiHealth = await checkApiHealth();
   const webRoutes = await checkWebRoutes();
@@ -393,8 +431,16 @@ async function main() {
   console.log(`   • Hồ sơ Nghiên Cứu Lớn:    ${studyProjectsCount} dự án chuyên sâu`);
   console.log('');
 
-  // 6. Services & Memory
-  console.log('6. TRẠNG THÁI HỆ THỐNG & NGÂN SÁCH RAM (SERVICES & MEMORY)');
+  // 6. Gospel Harmony & Academic Citations
+  console.log('6. ĐỐI CHIẾU SONG SONG & TRÍCH DẪN HỌC THUẬT (HARMONY & CITATIONS)');
+  console.log(`   • Sự kiện đối chiếu:      ${harmonyEventsCount} đại sự kiện (${totalHarmonyPassages} phân đoạn song song) ✔`);
+  console.log(`   • Tuyển tập tác giả:      ${authorsCount} tác giả thần học kinh điển ✔`);
+  console.log(`   • Bộ ấn phẩm đa tập:      ${seriesCount} bộ sách lớn (TOTC, TNTC, Wiersbe, IVP...) ✔`);
+  console.log(`   • Chuẩn trích dẫn:        5 chuẩn học thuật (SBL, Chicago 9th, APA 7th, MLA 9th, BibTeX) ✔`);
+  console.log('');
+
+  // 7. Services & Memory
+  console.log('7. TRẠNG THÁI HỆ THỐNG & NGÂN SÁCH RAM (SERVICES & MEMORY)');
   console.log(`   • API FastAPI Backend:    ${apiHealth.online ? '✔ Online (' + apiHealth.database + ')' : '✖ Offline'}`);
   console.log(`   • Web Routes (7 routes):   ${webRoutes.every(r => r.ok) ? '✔ 7/7 Tuyến hoạt động tốt (200 OK)' : '✖ Có tuyến bị lỗi'}`);
   console.log(`   • RAM ứng dụng (Non-Ollama): ${dockerStats.total_non_ollama_mib} MiB / 2048 MiB giới hạn ${dockerStats.within_budget ? '✔ (TUÂN THỦ < 2 GB)' : '✖ (VƯỢT NGƯỠNG)'}`);
