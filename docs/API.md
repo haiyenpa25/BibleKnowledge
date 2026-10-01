@@ -427,7 +427,62 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - Level 2: Đời Sống Môn Đồ & Đức Tin (`Ga-la-ti 2:20`, `Hê-bơ-rơ 11:1`, `Châm-ngôn 3:5-6`).
   - Level 3: Chiến Đấu Thuộc Linh & Bình An (`Phi-líp 4:6-7`, `I Cô-rinh-tô 10:13`, `Thi-thiên 23:1-3`).
   - Level 4: Trưởng Thành & Sứ Mạng (`II Ti-mô-thê 3:16-17`, `Ma-thi-ơ 28:19-20`, `Công-vụ 1:8`).
-- **Interactive Features**: Word occlusion masking (25%, 50%, 75%, 100%), real-time accuracy scoring, and Vietnamese Text-to-Speech audio support.
+### 5.6 Interactive Biblical Geography & Spatial Cartography Challenges (§3, §9, §46)
+- **Challenges Endpoint**: `GET /api/learn/geo-challenges?category={category}&search={search}`
+  - **Description**: Returns 16 curated biblical spatial geography challenges spanning 6 canonical eras: Patriarchs, Exodus, Kingdom, Exile, Gospels, and Apostles. Each challenge projects latitude/longitude to a $900 \times 600$ SVG vector cartographic space, enriches with authentic 1925 Vietnamese scripture verses extracted directly from PostgreSQL `bible_verses`, provides 4 multiple-choice location options with coordinates, archaeological excavation details, and strategic covenant theology.
+  - **Payload Structure**:
+    ```json
+    [
+      {
+        "id": "geo-1",
+        "title": "Khởi Đầu Đức Tin Của Áp-ra-ham",
+        "category": "Patriarchs",
+        "period": "Thời Kỳ Tổ Phụ (~2091 TCN)",
+        "narrative_clue": "Thành phố cảng Sumer cổ đại trù phú bên bờ vịnh Ba Tư nơi Áp-ram nhận lời kêu gọi rời bỏ quê hương.",
+        "scripture_ref": "Sáng-thế Ký 12:1",
+        "verse_text": "Vả, Đức Giê-hô-va có phán cùng Áp-ram rằng: Ngươi hãy ra khỏi quê hương, vòng bà con và nhà cha ngươi, mà đi đến xứ ta sẽ chỉ cho.",
+        "target_site": "U-rơ Canh-đê",
+        "ancient_site": "Ur of the Chaldees",
+        "modern_name": "Tell el-Muqayyar, Iraq",
+        "target_coords": { "lat": 30.9628, "lng": 46.1031, "svg_x": 818, "svg_y": 413 },
+        "options": [
+          { "name": "U-rơ Canh-đê", "ancient_name": "Ur of the Chaldees", "modern_name": "Tell el-Muqayyar, Iraq", "lat": 30.9628, "lng": 46.1031, "svg_x": 818, "svg_y": 413 },
+          { "name": "Ha-ran", "ancient_name": "Haran", "modern_name": "Harran, Thổ Nhĩ Kỳ", "lat": 36.8667, "lng": 39.0333, "svg_x": 586, "svg_y": 145 },
+          { "name": "Ba-by-lôn", "ancient_name": "Babylon", "modern_name": "Hillah, Iraq", "lat": 32.5364, "lng": 44.4208, "svg_x": 762, "svg_y": 341 },
+          { "name": "Si-chem", "ancient_name": "Shechem", "modern_name": "Nablus, Bờ Tây", "lat": 32.2138, "lng": 35.2858, "svg_x": 456, "svg_y": 356 }
+        ],
+        "correct_index": 0,
+        "archaeological_fact": "Di chỉ Tell el-Muqayyar do Sir Leonard Woolley khai quật phát hiện Tháp Ziggurat Ur...",
+        "strategic_theology": "Cuộc gọi Áp-ram rời khỏi một trong những đại đô thị phát triển nhất thế giới cổ đại...",
+        "xp_reward": 100
+      }
+    ]
+    ```
+- **Verification & Gamification Endpoint**: `POST /api/learn/geo-challenges/verify`
+  - **Request Body**:
+    ```json
+    {
+      "challenge_id": "geo-1",
+      "selected_option": 0,
+      "selected_option_id": "opt-1-a",
+      "user_identifier": "local_user"
+    }
+    ```
+  - **Response Structure**:
+    ```json
+    {
+      "is_correct": true,
+      "score_awarded": 100,
+      "total_xp": 100,
+      "explanation": "Chính xác! U-rơ Canh-đê (Ur of the Chaldees) là câu trả lời đúng. Vị trí hiện đại: Tell el-Muqayyar, Iraq.",
+      "target_site": "U-rơ Canh-đê",
+      "modern_name": "Tell el-Muqayyar, Iraq",
+      "archaeological_fact": "Di chỉ Tell el-Muqayyar do Sir Leonard Woolley khai quật...",
+      "strategic_theology": "Cuộc gọi Áp-ram rời khỏi một trong những đại đô thị...",
+      "scripture_ref": "Sáng-thế Ký 12:1",
+      "verse_text": "Vả, Đức Giê-hô-va có phán cùng Áp-ram rằng..."
+    }
+    ```
 
 ---
 

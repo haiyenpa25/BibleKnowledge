@@ -28,6 +28,10 @@ import {
   Undo2,
   Volume2,
   Compass,
+  MapPin,
+  Globe,
+  Navigation,
+  Crosshair,
   Link2,
   Activity,
   BarChart3,
@@ -285,8 +289,64 @@ interface TimelineChallenge {
   narrative_explanation: string;
 }
 
+
+interface GeoOption {
+  id: string;
+  name: string;
+  name_vn: string;
+  latitude: number;
+  longitude: number;
+  svg_x: number;
+  svg_y: number;
+  is_correct: boolean;
+}
+
+interface GeoChallengeItem {
+  id: string;
+  category: string;
+  question: string;
+  clue: string;
+  scripture_ref: string;
+  verse_text: string;
+  target_lat: number;
+  target_lng: number;
+  target_svg_x: number;
+  target_svg_y: number;
+  options: GeoOption[];
+  archaeological_context: string;
+  theological_significance: string;
+  correct_option_id: string;
+}
+
+interface GeoVerifyResponse {
+  is_correct: boolean;
+  correct_option_id: string;
+  correct_name: string;
+  explanation: string;
+  archaeological_context: string;
+  theological_significance: string;
+  xp_earned: number;
+  total_xp: number;
+  streak: number;
+  message: string;
+}
+
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "challenge_packs" | "generator" | "memorize" | "reading_plans">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "challenge_packs" | "generator" | "memorize" | "reading_plans" | "geo">("quiz");
+
+
+  // Biblical Geography & Spatial Cartography State (§3, §9, §46)
+  const [geoChallenges, setGeoChallenges] = useState<GeoChallengeItem[]>([]);
+  const [currentGeoIndex, setCurrentGeoIndex] = useState(0);
+  const [geoCategoryFilter, setGeoCategoryFilter] = useState<string>("all");
+  const [selectedGeoOption, setSelectedGeoOption] = useState<string | null>(null);
+  const [geoSubmitted, setGeoSubmitted] = useState(false);
+  const [geoResult, setGeoResult] = useState<GeoVerifyResponse | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoSubmitting, setGeoSubmitting] = useState(false);
+  const [geoScore, setGeoScore] = useState(0);
+  const [geoStreak, setGeoStreak] = useState(0);
+  const [hoveredGeoPin, setHoveredGeoPin] = useState<string | null>(null);
 
   // Scripture Memorization State (§3, §4)
   const [memorizeVerses, setMemorizeVerses] = useState<MemorizeVerseItem[]>([]);
@@ -434,7 +494,92 @@ export default function LearnPage() {
     if (activeTab === "challenge_packs" && challengePacks.length === 0) {
       fetchChallengePacks();
     }
+    if (activeTab === "geo" && geoChallenges.length === 0) {
+      fetchGeoChallenges();
+    }
   }, [activeTab]);
+
+
+  // --- Biblical Geography & Spatial Cartography Handlers (§3, §9, §46) ---
+  const fetchGeoChallenges = async (category?: string) => {
+    setGeoLoading(true);
+    setCurrentGeoIndex(0);
+    setSelectedGeoOption(null);
+    setGeoSubmitted(false);
+    setGeoResult(null);
+    try {
+      let url = `${apiUrl}/api/learn/geo-challenges`;
+      if (category && category !== "all") {
+        url += `?category=${encodeURIComponent(category)}`;
+      }
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: GeoChallengeItem[] = await res.json();
+        setGeoChallenges(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch geo challenges:", err);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  const handleSelectGeoOption = (optionId: string) => {
+    if (geoSubmitted) return;
+    setSelectedGeoOption(optionId);
+  };
+
+  const handleVerifyGeoChallenge = async () => {
+    const filtered = geoCategoryFilter === "all"
+      ? geoChallenges
+      : geoChallenges.filter((c) => c.category === geoCategoryFilter);
+    const currentQ = filtered[currentGeoIndex];
+    if (!currentQ || !selectedGeoOption || geoSubmitted) return;
+
+    setGeoSubmitting(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/geo-challenges/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge_id: currentQ.id,
+          selected_option_id: selectedGeoOption
+        })
+      });
+      if (res.ok) {
+        const data: GeoVerifyResponse = await res.json();
+        setGeoResult(data);
+        setGeoSubmitted(true);
+        if (data.is_correct) {
+          setGeoScore((prev) => prev + data.xp_earned);
+          setGeoStreak((prev) => prev + 1);
+        } else {
+          setGeoStreak(0);
+        }
+        fetchProfile();
+      }
+    } catch (err) {
+      console.error("Failed to verify geo challenge:", err);
+    } finally {
+      setGeoSubmitting(false);
+    }
+  };
+
+  const handleNextGeoChallenge = () => {
+    const filtered = geoCategoryFilter === "all"
+      ? geoChallenges
+      : geoChallenges.filter((c) => c.category === geoCategoryFilter);
+
+    if (currentGeoIndex + 1 < filtered.length) {
+      setCurrentGeoIndex((prev) => prev + 1);
+      setSelectedGeoOption(null);
+      setGeoSubmitted(false);
+      setGeoResult(null);
+      setHoveredGeoPin(null);
+    } else {
+      fetchGeoChallenges(geoCategoryFilter);
+    }
+  };
 
   // Fetch Challenge Packs (§46)
   const fetchChallengePacks = async () => {
@@ -1640,6 +1785,23 @@ export default function LearnPage() {
           <Calendar className="w-4 h-4 text-emerald-200" />
           <span>Lịch Đọc Kinh Thánh (§3, §46)</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 font-bold">Lộ Trình §46</span>
+        </button>
+
+
+        <button
+          onClick={() => {
+            setActiveTab("geo");
+            if (geoChallenges.length === 0) fetchGeoChallenges();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "geo"
+              ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 font-bold"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Compass className="w-4 h-4 text-cyan-300" />
+          <span>Địa Lý & Không Gian (§3, §9)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 font-bold">Mới §3, §9</span>
         </button>
 
         <button
@@ -4241,6 +4403,609 @@ export default function LearnPage() {
           )}
         </div>
       )}
+
+
+      {/* ===================================================================== */}
+      {/* 13. BIBLICAL GEOGRAPHY & SPATIAL CARTOGRAPHY CHALLENGE (§3, §9, §46)   */}
+      {/* ===================================================================== */}
+      {activeTab === "geo" && (() => {
+        const filteredList = geoCategoryFilter === "all"
+          ? geoChallenges
+          : geoChallenges.filter((c) => c.category === geoCategoryFilter);
+        const currentQ = filteredList[currentGeoIndex];
+        const selectedOpt = currentQ?.options.find((o) => o.id === selectedGeoOption);
+        const correctOpt = currentQ?.options.find((o) => o.id === currentQ.correct_option_id);
+
+        return (
+          <div className="flex flex-col gap-6">
+            {/* Top Control Bar: Category Filters & Gamification Readouts */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl glass-panel border border-cyan-500/20 bg-slate-900/60">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-cyan-400" /> Thời kỳ:
+                </span>
+                {[
+                  { id: "all", label: "Tất Cả Niên Đại" },
+                  { id: "Patriarchs", label: "Thời Kỳ Tổ Phụ" },
+                  { id: "Exodus", label: "Hành Trình Xuất Hành" },
+                  { id: "Kingdom", label: "Thời Kỳ Vương Quốc" },
+                  { id: "Exile", label: "Lưu Đày & Hồi Hương" },
+                  { id: "Gospels", label: "Thời Kỳ Tin Lành" },
+                  { id: "Apostles", label: "Thời Kỳ Các Sứ Đồ" }
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setGeoCategoryFilter(cat.id);
+                      setCurrentGeoIndex(0);
+                      setSelectedGeoOption(null);
+                      setGeoSubmitted(false);
+                      setGeoResult(null);
+                      fetchGeoChallenges(cat.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                      geoCategoryFilter === cat.id
+                        ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30"
+                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/50"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Badges: Score, Streak, Question Index */}
+              <div className="flex items-center gap-3 self-end md:self-auto">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>+{geoScore} XP</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold">
+                  <Flame className={`w-4 h-4 text-rose-400 ${geoStreak > 0 ? "animate-pulse" : ""}`} />
+                  <span>{geoStreak} Chuỗi</span>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono font-bold">
+                  {filteredList.length > 0 ? `${currentGeoIndex + 1} / ${filteredList.length}` : "0 / 0"}
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Area */}
+            {geoLoading ? (
+              <div className="p-20 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400 border border-slate-800">
+                <Loader2 className="w-10 h-10 animate-spin text-cyan-400" />
+                <p className="text-sm">Đang tải bản đồ tọa độ và dữ liệu địa lý cổ...</p>
+              </div>
+            ) : !currentQ ? (
+              <div className="p-16 rounded-3xl glass-panel border border-slate-800 text-center flex flex-col items-center gap-4">
+                <Compass className="w-12 h-12 text-slate-600" />
+                <h3 className="text-lg font-bold text-white">Không Có Thử Thách Cho Thời Kỳ Này</h3>
+                <p className="text-sm text-slate-400 max-w-md">Vui lòng chọn thời kỳ khác hoặc bấm "Tất Cả Niên Đại" để tiếp tục trải nghiệm.</p>
+                <button
+                  onClick={() => {
+                    setGeoCategoryFilter("all");
+                    fetchGeoChallenges("all");
+                  }}
+                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold"
+                >
+                  Tất Cả Niên Đại
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* LEFT COLUMN (lg:col-span-7): Interactive SVG Vector Biblical Map */}
+                <div className="lg:col-span-7 flex flex-col gap-3">
+                  <div className="relative rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950 shadow-2xl">
+                    {/* SVG Map Canvas */}
+                    <svg
+                      viewBox="0 0 900 600"
+                      className="w-full h-auto max-h-[620px] bg-slate-950 select-none block"
+                      style={{ filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.7))" }}
+                    >
+                      <defs>
+                        {/* Map Grid Pattern */}
+                        <pattern id="ancientGrid" width="60" height="60" patternUnits="userSpaceOnUse">
+                          <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="2 4" />
+                        </pattern>
+
+                        {/* Radial Illumination */}
+                        <radialGradient id="centerGlow" cx="50%" cy="50%" r="60%">
+                          <stop offset="0%" stopColor="#082f49" stopOpacity="0.35" />
+                          <stop offset="100%" stopColor="#020617" stopOpacity="0.9" />
+                        </radialGradient>
+
+                        {/* Pin Shadows & Glow Filters */}
+                        <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#06b6d4" floodOpacity="0.8" />
+                        </filter>
+                        <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#10b981" floodOpacity="0.9" />
+                        </filter>
+                        <filter id="glowRose" x="-50%" y="-50%" width="200%" height="200%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#f43f5e" floodOpacity="0.8" />
+                        </filter>
+                      </defs>
+
+                      {/* Deep Background Canvas */}
+                      <rect width="900" height="600" fill="#030712" />
+                      <rect width="900" height="600" fill="url(#centerGlow)" />
+                      <rect width="900" height="600" fill="url(#ancientGrid)" opacity="0.7" />
+
+                      {/* Topographical / Water Bodies */}
+                      {/* 1. Mediterranean Sea (Biển Địa Trung Hải / Biển Lớn) */}
+                      <path
+                        d="M 0,0 L 340,0 Q 300,120 270,200 Q 230,280 270,360 Q 310,410 380,450 L 0,450 Z"
+                        fill="#0c2340"
+                        fillOpacity="0.65"
+                        stroke="#1e3a5f"
+                        strokeWidth="1.5"
+                      />
+                      <text x="70" y="210" fill="#38bdf8" fontSize="13" fontWeight="bold" letterSpacing="4" opacity="0.35" transform="rotate(-30 70 210)">
+                        BIỂN ĐỊA TRUNG HẢI (BIỂN LỚN)
+                      </text>
+
+                      {/* 2. Sea of Galilee (Biển Hồ Ga-li-lê / Ti-bê-ri-át) */}
+                      <ellipse cx="450" cy="165" rx="14" ry="20" fill="#0284c7" fillOpacity="0.6" stroke="#38bdf8" strokeWidth="1.5" />
+                      <text x="472" y="168" fill="#7dd3fc" fontSize="10" fontWeight="bold" opacity="0.8">
+                        Hồ Ga-li-lê
+                      </text>
+
+                      {/* 3. Dead Sea (Biển Chết / Biển Muối) */}
+                      <ellipse cx="456" cy="340" rx="15" ry="48" fill="#0369a1" fillOpacity="0.65" stroke="#38bdf8" strokeWidth="1.5" />
+                      <text x="478" y="345" fill="#7dd3fc" fontSize="10" fontWeight="bold" opacity="0.8">
+                        Biển Chết (Biển Muối)
+                      </text>
+
+                      {/* 4. Jordan River (Sông Giô-đanh) */}
+                      <path
+                        d="M 450,185 Q 448,225 453,255 Q 449,275 455,292"
+                        fill="none"
+                        stroke="#38bdf8"
+                        strokeWidth="2"
+                        strokeDasharray="4 2"
+                      />
+                      <text x="408" y="240" fill="#38bdf8" fontSize="9" fontStyle="italic" opacity="0.7">
+                        S. Giô-đanh
+                      </text>
+
+                      {/* 5. Gulf of Suez & Gulf of Aqaba (Bán Đảo Si-na-i) */}
+                      <path
+                        d="M 320,600 L 335,500 Q 345,475 365,510 L 380,600 Z"
+                        fill="#0c2340"
+                        fillOpacity="0.5"
+                        stroke="#1e3a5f"
+                        strokeWidth="1.2"
+                      />
+                      <path
+                        d="M 445,600 L 452,525 Q 458,505 466,525 L 475,600 Z"
+                        fill="#0c2340"
+                        fillOpacity="0.5"
+                        stroke="#1e3a5f"
+                        strokeWidth="1.2"
+                      />
+                      <text x="365" y="585" fill="#7dd3fc" fontSize="10" letterSpacing="2" opacity="0.5">
+                        BÁN ĐẢO SI-NA-I
+                      </text>
+
+                      {/* Regional Watermark Labels */}
+                      <text x="420" y="275" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        XỨ CANAAN / ISRAEL
+                      </text>
+                      <text x="140" y="515" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        AI CẬP (GOSHEN)
+                      </text>
+                      <text x="710" y="140" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        LƯỠNG HÀ (MESOPOTAMIA)
+                      </text>
+                      <text x="730" y="380" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        BABYLON & UR
+                      </text>
+                      <text x="530" y="90" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        SYRIA & DAMASCUS
+                      </text>
+                      <text x="250" y="65" fill="#94a3b8" fontSize="11" fontWeight="bold" letterSpacing="3" opacity="0.3">
+                        TIỂU Á (ASIA MINOR)
+                      </text>
+
+                      {/* Coordinate Lat/Lng Lines */}
+                      <text x="865" y="100" fill="#475569" fontSize="9" fontFamily="monospace">36°N</text>
+                      <text x="865" y="250" fill="#475569" fontSize="9" fontFamily="monospace">33°N</text>
+                      <text x="865" y="420" fill="#475569" fontSize="9" fontFamily="monospace">30°N</text>
+                      <text x="865" y="570" fill="#475569" fontSize="9" fontFamily="monospace">27°N</text>
+
+                      {/* Compass Rose (Hoa Tiêu Hướng Bắc) at Top Right */}
+                      <g transform="translate(820, 60)" opacity="0.75">
+                        <circle cx="0" cy="0" r="24" fill="#0f172a" stroke="#0ea5e9" strokeWidth="1" strokeDasharray="3 3" />
+                        <polygon points="0,-22 5,-5 22,0 5,5 0,22 -5,5 -22,0 -5,-5" fill="#1e293b" stroke="#38bdf8" strokeWidth="0.8" />
+                        <polygon points="0,-22 4,-5 0,0" fill="#38bdf8" />
+                        <text x="0" y="-26" fill="#38bdf8" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">N</text>
+                      </g>
+
+                      {/* Trajectory / Connection Arc if Submitted and Incorrect */}
+                      {geoSubmitted && selectedOpt && !selectedOpt.is_correct && correctOpt && (
+                        <g>
+                          <line
+                            x1={selectedOpt.svg_x}
+                            y1={selectedOpt.svg_y}
+                            x2={correctOpt.svg_x}
+                            y2={correctOpt.svg_y}
+                            stroke="#f59e0b"
+                            strokeWidth="2.5"
+                            strokeDasharray="5 5"
+                            opacity="0.8"
+                          />
+                        </g>
+                      )}
+
+                      {/* Interactive Option Pins */}
+                      {currentQ.options.map((opt, idx) => {
+                        const optLetter = ["A", "B", "C", "D"][idx] || "?";
+                        const isSelected = selectedGeoOption === opt.id;
+                        const isHovered = hoveredGeoPin === opt.id;
+                        const isCorrectPin = opt.is_correct;
+
+                        let ringColor = isSelected ? "#06b6d4" : isHovered ? "#38bdf8" : "#64748b";
+                        let innerFill = isSelected ? "#083344" : "#1e293b";
+                        let textColor = isSelected ? "#e0f2fe" : "#cbd5e1";
+                        let filterAttr = isSelected ? "url(#glowCyan)" : undefined;
+
+                        if (geoSubmitted) {
+                          if (isCorrectPin) {
+                            ringColor = "#10b981";
+                            innerFill = "#064e3b";
+                            textColor = "#ecfdf5";
+                            filterAttr = "url(#glowGreen)";
+                          } else if (isSelected && !isCorrectPin) {
+                            ringColor = "#f43f5e";
+                            innerFill = "#881337";
+                            textColor = "#ffe4e6";
+                            filterAttr = "url(#glowRose)";
+                          } else {
+                            ringColor = "#475569";
+                            innerFill = "#0f172a";
+                            textColor = "#64748b";
+                            filterAttr = undefined;
+                          }
+                        }
+
+                        return (
+                          <g
+                            key={opt.id}
+                            className="cursor-pointer transition-all duration-300"
+                            onClick={() => handleSelectGeoOption(opt.id)}
+                            onMouseEnter={() => setHoveredGeoPin(opt.id)}
+                            onMouseLeave={() => setHoveredGeoPin(null)}
+                          >
+                            {/* Pulse Wave on Selected Pin */}
+                            {isSelected && !geoSubmitted && (
+                              <circle
+                                cx={opt.svg_x}
+                                cy={opt.svg_y}
+                                r="22"
+                                fill="#06b6d4"
+                                opacity="0.25"
+                                className="animate-ping"
+                              />
+                            )}
+
+                            {/* Sonar Beacon on Correct Pin when Submitted */}
+                            {geoSubmitted && isCorrectPin && (
+                              <g>
+                                <circle
+                                  cx={opt.svg_x}
+                                  cy={opt.svg_y}
+                                  r="26"
+                                  fill="none"
+                                  stroke="#10b981"
+                                  strokeWidth="2"
+                                  strokeDasharray="3 3"
+                                  className="animate-spin"
+                                />
+                                <circle
+                                  cx={opt.svg_x}
+                                  cy={opt.svg_y}
+                                  r="20"
+                                  fill="#10b981"
+                                  opacity="0.2"
+                                  className="animate-ping"
+                                />
+                              </g>
+                            )}
+
+                            {/* Outer Pin Body Ring */}
+                            <circle
+                              cx={opt.svg_x}
+                              cy={opt.svg_y}
+                              r={isSelected || (geoSubmitted && isCorrectPin) ? 17 : 14}
+                              fill={innerFill}
+                              stroke={ringColor}
+                              strokeWidth={isSelected || (geoSubmitted && isCorrectPin) ? 3 : 2}
+                              filter={filterAttr}
+                            />
+
+                            {/* Option Letter Icon */}
+                            <text
+                              x={opt.svg_x}
+                              y={opt.svg_y + 4}
+                              fill={textColor}
+                              fontSize={isSelected || (geoSubmitted && isCorrectPin) ? "12" : "11"}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              fontFamily="sans-serif"
+                            >
+                              {optLetter}
+                            </text>
+
+                            {/* Location Label Pill Below Pin */}
+                            <g transform={`translate(${opt.svg_x}, ${opt.svg_y + 24})`}>
+                              <rect
+                                x="-60"
+                                y="-10"
+                                width="120"
+                                height="20"
+                                rx="6"
+                                fill="#090d16"
+                                fillOpacity="0.85"
+                                stroke={ringColor}
+                                strokeWidth="0.8"
+                              />
+                              <text
+                                x="0"
+                                y="3"
+                                fill={textColor}
+                                fontSize="9"
+                                fontWeight="bold"
+                                textAnchor="middle"
+                                fontFamily="sans-serif"
+                              >
+                                {opt.name_vn}
+                              </text>
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {/* Bottom Map Legend Bar */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[11px] text-slate-300">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1.5 text-cyan-400 font-mono">
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Chiếu Tọa Độ Lồi (Equirectangular WGS84)</span>
+                        </span>
+                        <span className="hidden sm:inline text-slate-500">|</span>
+                        <span className="hidden sm:inline text-slate-400">
+                          {selectedOpt ? `Đã chọn: ${selectedOpt.name_vn} (${selectedOpt.latitude.toFixed(2)}°N, ${selectedOpt.longitude.toFixed(2)}°E)` : "Nhấp vào 1 trong 4 điểm A, B, C, D trên bản đồ"}
+                        </span>
+                      </div>
+                      <Link
+                        href="/explore?tab=map"
+                        target="_blank"
+                        className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Bản đồ 3D</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN (lg:col-span-5): Deductive Question, Golden Verse, Option Cards & Exegesis */}
+                <div className="lg:col-span-5 flex flex-col gap-4">
+                  {/* Question & Scripture Card */}
+                  <div className="p-6 rounded-3xl glass-panel border border-cyan-500/20 bg-slate-900/70 flex flex-col gap-4">
+                    {/* Category & Reference Header */}
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>{currentQ.category}</span>
+                      </span>
+                      <Link
+                        href={`/bible?passage=${encodeURIComponent(currentQ.scripture_ref)}`}
+                        target="_blank"
+                        className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono font-bold hover:bg-amber-500/20 transition-colors flex items-center gap-1"
+                      >
+                        <BookOpen className="w-3 h-3" />
+                        <span>{currentQ.scripture_ref}</span>
+                      </Link>
+                    </div>
+
+                    {/* Question Prompt */}
+                    <h2 className="text-base sm:text-lg font-bold text-white leading-relaxed">
+                      {currentQ.question}
+                    </h2>
+
+                    {/* Clue Box */}
+                    <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+                      <Crosshair className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <strong className="text-cyan-300">Gợi ý địa lý: </strong>
+                        <span>{currentQ.clue}</span>
+                      </div>
+                    </div>
+
+                    {/* Authentic 1925 Vietnamese Scripture Verse Card */}
+                    <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex flex-col gap-2 relative">
+                      <div className="flex items-center justify-between text-xs text-amber-400 font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Kinh Văn Bản Dịch Truyền Thống 1925</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSpeechSpeak(currentQ.verse_text, currentQ.id)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-medium transition-colors"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                          <span>{speakingVerseId === currentQ.id ? "Đang đọc..." : "Nghe"}</span>
+                        </button>
+                      </div>
+                      <p className="text-xs sm:text-sm text-amber-100/90 italic font-serif leading-relaxed">
+                        "{currentQ.verse_text}"
+                      </p>
+                    </div>
+
+                    {/* 4 Interactive Option Cards */}
+                    <div className="flex flex-col gap-2.5 pt-1">
+                      <span className="text-xs font-semibold text-slate-400">Chọn địa danh tương ứng trên bản đồ:</span>
+                      {currentQ.options.map((opt, idx) => {
+                        const optLetter = ["A", "B", "C", "D"][idx] || "?";
+                        const isSelected = selectedGeoOption === opt.id;
+                        const isCorrectOpt = opt.is_correct;
+
+                        let cardStyle = "bg-slate-950/70 border-slate-800 text-slate-200 hover:border-cyan-500/50 hover:bg-slate-800/50";
+                        if (isSelected && !geoSubmitted) {
+                          cardStyle = "bg-cyan-950/50 border-cyan-400 text-white shadow-lg shadow-cyan-500/20 font-semibold";
+                        }
+                        if (geoSubmitted) {
+                          if (isCorrectOpt) {
+                            cardStyle = "bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold shadow-lg shadow-emerald-500/20";
+                          } else if (isSelected && !isCorrectOpt) {
+                            cardStyle = "bg-rose-950/80 border-rose-500 text-rose-200 line-through opacity-80";
+                          } else {
+                            cardStyle = "bg-slate-950/40 border-slate-900 text-slate-500 opacity-60";
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            disabled={geoSubmitted}
+                            onClick={() => handleSelectGeoOption(opt.id)}
+                            className={`p-3.5 rounded-2xl border text-left flex items-center justify-between transition-all ${cardStyle}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
+                                isSelected ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-300"
+                              }`}>
+                                {optLetter}
+                              </span>
+                              <div>
+                                <div className="text-xs sm:text-sm font-semibold">{opt.name_vn}</div>
+                                <div className="text-[11px] text-slate-400 font-mono">
+                                  {opt.name} ({opt.latitude.toFixed(2)}°N, {opt.longitude.toFixed(2)}°E)
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status Icon */}
+                            {geoSubmitted ? (
+                              isCorrectOpt ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                              ) : isSelected && !isCorrectOpt ? (
+                                <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                              ) : null
+                            ) : isSelected ? (
+                              <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Verification / Next Actions */}
+                    {!geoSubmitted ? (
+                      <button
+                        type="button"
+                        disabled={!selectedGeoOption || geoSubmitting}
+                        onClick={handleVerifyGeoChallenge}
+                        className={`w-full py-3.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
+                          selectedGeoOption && !geoSubmitting
+                            ? "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/30 cursor-pointer"
+                            : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                        }`}
+                      >
+                        {geoSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                            <span>Đang Đối Chiếu Tọa Độ Khảo Cổ...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Target className="w-4 h-4" />
+                            <span>Xác Nhận Tọa Độ Này (+100 XP)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-4 animate-in fade-in">
+                        {/* Result Notification Banner */}
+                        <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                          geoResult?.is_correct
+                            ? "bg-emerald-950/60 border-emerald-500/60 text-emerald-200"
+                            : "bg-rose-950/60 border-rose-500/60 text-rose-200"
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            {geoResult?.is_correct ? (
+                              <CheckCircle2 className="w-7 h-7 text-emerald-400 shrink-0" />
+                            ) : (
+                              <XCircle className="w-7 h-7 text-rose-400 shrink-0" />
+                            )}
+                            <div>
+                              <p className="text-xs sm:text-sm font-bold">
+                                {geoResult?.is_correct ? "Định Vị Chính Xác Tuyệt Đối!" : "Chưa Đúng Tọa Độ!"}
+                              </p>
+                              <p className="text-xs opacity-90">{geoResult?.message}</p>
+                            </div>
+                          </div>
+                          {geoResult?.is_correct && (
+                            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold text-xs shrink-0">
+                              +{geoResult.xp_earned} XP
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Archaeological Context Card */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col gap-1.5 text-xs">
+                          <span className="font-bold text-cyan-400 flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Bối Cảnh Khảo Cổ Học:</span>
+                          </span>
+                          <p className="text-slate-300 leading-relaxed">
+                            {geoResult?.archaeological_context || currentQ.archaeological_context}
+                          </p>
+                        </div>
+
+                        {/* Theological Significance Card */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col gap-1.5 text-xs">
+                          <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Ý Nghĩa Thần Học & Giao Ước:</span>
+                          </span>
+                          <p className="text-slate-300 leading-relaxed">
+                            {geoResult?.theological_significance || currentQ.theological_significance}
+                          </p>
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div className="flex items-center justify-between gap-3 pt-2">
+                          <Link
+                            href="/explore?tab=map"
+                            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Globe className="w-4 h-4" />
+                            <span>Xem Trên Bản Đồ 3D</span>
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={handleNextGeoChallenge}
+                            className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-500/30 transition-all cursor-pointer"
+                          >
+                            <span>Thử Thách Tiếp Theo</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===================================================================== */}
       {/* FLASHCARDS EXPORT MODAL (§4, §50)                                     */}

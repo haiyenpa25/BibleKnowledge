@@ -40,9 +40,9 @@ function report(testName, passed, detail = '') {
   }
 }
 
-async function testEndpoint(path, validator = null) {
+async function testEndpoint(path, validator = null, fetchOpts = {}) {
   try {
-    const res = await fetch(`${API_BASE}${path}`);
+    const res = await fetch(`${API_BASE}${path}`, fetchOpts);
     if (!res.ok) {
       return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
     }
@@ -229,6 +229,20 @@ async function main() {
 
   const rMemorize = await testEndpoint('/api/learn/memorize-verses', d => (!Array.isArray(d) || d.length !== 12) && `Expected 12 memory verses, got ${d?.length}`);
   report('GET /api/learn/memorize-verses (Scripture memorization assistant)', rMemorize.ok, rMemorize.error);
+
+  const rGeoChallenges = await testEndpoint('/api/learn/geo-challenges', d => (!Array.isArray(d) || d.length !== 16) && `Expected 16 geo challenges, got ${d?.length}`);
+  report('GET /api/learn/geo-challenges (16 Spatial Cartography challenges with projected WGS84 coordinates & 1925 verses)', rGeoChallenges.ok, rGeoChallenges.error);
+
+  const rGeoVerify = await testEndpoint('/api/learn/geo-challenges/verify', d => (!d.strategic_theology || !d.archaeological_fact || typeof d.is_correct !== 'boolean') && 'Invalid geo verify response', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      challenge_id: 'geo-1',
+      selected_option: 0,
+      user_identifier: 'local_user'
+    })
+  });
+  report('POST /api/learn/geo-challenges/verify (Spatial coordinates verification, gamification XP & archaeological insights)', rGeoVerify.ok, rGeoVerify.error);
 
   // Exegetical Workspace Module
   const rHarmony = await testEndpoint('/api/study/harmony', d => (d.total_events !== 16 && d.events?.length !== 16) && `Expected 16 harmony events, got ${d?.total_events}`);

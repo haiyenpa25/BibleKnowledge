@@ -2782,7 +2782,575 @@ def toggle_reading_plan_day_learn(
     )
     return toggle_reading_plan_day(plan_id=plan_id, req=req, db=db)
 
+# ==============================================================================
+# §3, §9, §46 — Interactive Biblical Geography & Spatial Challenges
+# ==============================================================================
+
+class GeoOption(BaseModel):
+    name: str
+    ancient_name: str
+    modern_name: str
+    lat: float
+    lng: float
+    svg_x: int
+    svg_y: int
 
 
+class GeoChallengeItem(BaseModel):
+    id: str
+    title: str
+    category: str
+    period: str
+    narrative_clue: str
+    scripture_ref: str
+    verse_text: str
+    target_site: str
+    ancient_site: str
+    modern_name: str
+    target_coords: Dict[str, Any]
+    options: List[GeoOption]
+    correct_index: int
+    archaeological_fact: str
+    strategic_theology: str
+    xp_reward: int
 
+
+class GeoVerifyRequest(BaseModel):
+    challenge_id: str
+    selected_option: Optional[int] = None
+    selected_option_id: Optional[str] = None
+    user_identifier: Optional[str] = "local_user"
+
+
+class GeoVerifyResponse(BaseModel):
+    is_correct: bool
+    score_awarded: int
+    total_xp: int
+    explanation: str
+    target_site: str
+    modern_name: str
+    archaeological_fact: str
+    strategic_theology: str
+    scripture_ref: str
+    verse_text: str
+
+
+GEO_CHALLENGES_DATA = [
+    {
+        "id": "geo-1",
+        "title": "Tiếng Kêu Gọi Rời Bỏ Quê Hương U-rơ",
+        "category": "Patriarchs",
+        "period": "Patriarchs (~2091 TCN)",
+        "narrative_clue": "Nơi tổ phụ Áp-ra-ham được Đức Chúa Trời kêu gọi từ bỏ nơi chôn nhau cắt rốn của nền văn minh Lưỡng Hà rực rỡ để bước đi bởi đức tin đến vùng Đất Hứa xa lạ.",
+        "scripture_ref": "Sáng-thế Ký 12:1",
+        "target_site": "U-rơ Canh-đê",
+        "ancient_site": "Ur of the Chaldees",
+        "modern_name": "Tell el-Muqayyar, Dhi Qar, Iraq",
+        "lat": 30.9628,
+        "lng": 46.1031,
+        "options": [
+            {"name": "U-rơ Canh-đê", "ancient_name": "Ur of the Chaldees", "modern_name": "Tell el-Muqayyar, Iraq", "lat": 30.9628, "lng": 46.1031},
+            {"name": "Ha-ran", "ancient_name": "Haran", "modern_name": "Harran, Thổ Nhĩ Kỳ", "lat": 36.8667, "lng": 39.0333},
+            {"name": "Ba-by-lôn", "ancient_name": "Babylon", "modern_name": "Hillah, Iraq", "lat": 32.5364, "lng": 44.4208},
+            {"name": "Si-chem", "ancient_name": "Shechem", "modern_name": "Nablus, Bờ Tây", "lat": 32.2138, "lng": 35.2858}
+        ],
+        "correct_index": 0,
+        "archaeological_fact": "Di chỉ Tell el-Muqayyar lưu giữ tháp Ziggurat khổng lồ thờ thần mặt trăng Nanna bằng gạch nung xây dựng từ thiên niên kỷ 3 TCN.",
+        "strategic_theology": "Bước đi đức tin của Áp-ra-ham là bước ngoặt quyết định của lịch sử cứu chuộc, tách biệt khỏi tôn giáo đa thần Lưỡng Hà để trở thành cha của mọi kẻ tin.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-2",
+        "title": "Bàn Thờ Đầu Tiên Tại Đất Hứa Si-chem",
+        "category": "Patriarchs",
+        "period": "Patriarchs (~2090 TCN)",
+        "narrative_clue": "Nằm kẹp giữa Núi Ê-banh và Núi Ga-ri-xim, đây là trạm dừng chân đầu tiên khi Áp-ra-ham đặt chân vào xứ Ca-na-an và lập bàn thờ đầu tiên thờ phượng Đức Giê-hô-va.",
+        "scripture_ref": "Sáng-thế Ký 12:6-7",
+        "target_site": "Si-chem",
+        "ancient_site": "Shechem",
+        "modern_name": "Tell Balata, Nablus, Bờ Tây",
+        "lat": 32.2138,
+        "lng": 35.2858,
+        "options": [
+            {"name": "Bê-tên", "ancient_name": "Bethel", "modern_name": "Beitin, Bờ Tây", "lat": 31.9300, "lng": 35.2200},
+            {"name": "Si-chem", "ancient_name": "Shechem", "modern_name": "Tell Balata, Bờ Tây", "lat": 32.2138, "lng": 35.2858},
+            {"name": "Hếp-rôn", "ancient_name": "Hebron", "modern_name": "Al-Khalil, Bờ Tây", "lat": 31.5326, "lng": 35.0998},
+            {"name": "Bê-e-sê-ba", "ancient_name": "Beersheba", "modern_name": "Tel Sheva, Israel", "lat": 31.2589, "lng": 34.7997}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Khai quật khảo cổ Tell Balata phát hiện cổng thành cự thạch đồ sộ (Cyclopean Wall) thời Đồ Đồng và đền thờ Ba-anh Bê-rít được mô tả trong sách Các Quan Xét.",
+        "strategic_theology": "Khẳng định chủ quyền thuộc linh tối thượng của Đức Giê-hô-va trên xứ Ca-na-an, thiết lập trung tâm giao ước giữa lòng Đất Hứa.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-3",
+        "title": "Ngọn Núi Ban Luật Pháp Si-na-i (Hô-rếp)",
+        "category": "Exodus",
+        "period": "Exodus & Wilderness (~1446 TCN)",
+        "narrative_clue": "Ngọn núi đá hoa cương đỏ sừng sững giữa sa mạc bán đảo Sinai, nơi Đức Chúa Trời giáng lâm trong sấm sét và khói lửa ban bố Thập Tự Bảng (Mười Điều Răn) cho Môi-se.",
+        "scripture_ref": "Xuất Ê-díp-tô Ký 19:1-2",
+        "target_site": "Núi Si-na-i (Hô-rếp)",
+        "ancient_site": "Mount Sinai (Horeb)",
+        "modern_name": "Jabal Musa, Nam Sinai, Ai Cập",
+        "lat": 28.5394,
+        "lng": 33.9753,
+        "options": [
+            {"name": "Núi Nê-bô", "ancient_name": "Mount Nebo", "modern_name": "Madaba, Jordan", "lat": 31.7680, "lng": 35.7258},
+            {"name": "Ca-đe Ba-nê-a", "ancient_name": "Kadesh Barnea", "modern_name": "Ein el-Qudeirat, Sinai", "lat": 30.6500, "lng": 34.4167},
+            {"name": "Núi Si-na-i", "ancient_name": "Mount Sinai", "modern_name": "Jabal Musa, Ai Cập", "lat": 28.5394, "lng": 33.9753},
+            {"name": "Ram-se", "ancient_name": "Ramses", "modern_name": "Qantir, Đồng bằng sông Nile", "lat": 30.7833, "lng": 31.8333}
+        ],
+        "correct_index": 2,
+        "archaeological_fact": "Tu viện Thánh Catherine dưới chân núi là tu viện Cơ Đốc hoạt động liên tục lâu đời nhất thế giới, nơi lưu giữ Cổ bản Codex Sinaiticus thế kỷ 4.",
+        "strategic_theology": "Nơi một đám đông nô lệ bị áp bức được biến đổi thành 'vương quốc thầy tế lễ và một dân tộc thánh' cho Đức Chúa Trời.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-4",
+        "title": "Thành Giê-ri-cô & Tường Thành Sụp Đổ",
+        "category": "Exodus",
+        "period": "Conquest & Settlement (~1406 TCN)",
+        "narrative_clue": "Thành phố ốc đảo có tường thành kiên cố bảo vệ lối vào cao nguyên trung tâm, nơi tường thành sụp đổ mầu nhiệm sau 7 ngày dân sự đi vòng quanh và thổi kèn.",
+        "scripture_ref": "Giô-suê 6:1",
+        "target_site": "Thành Giê-ri-cô",
+        "ancient_site": "Jericho",
+        "modern_name": "Tell es-Sultan, Jericho, Bờ Tây",
+        "lat": 31.8700,
+        "lng": 35.4442,
+        "options": [
+            {"name": "Thành Ai", "ancient_name": "Ai", "modern_name": "Et-Tell, Bờ Tây", "lat": 31.9167, "lng": 35.2667},
+            {"name": "Ghinh-ganh", "ancient_name": "Gilgal", "modern_name": "Khirbet el-Mefjir, Bờ Tây", "lat": 31.8833, "lng": 35.5000},
+            {"name": "Giê-ri-cô", "ancient_name": "Jericho", "modern_name": "Tell es-Sultan, Bờ Tây", "lat": 31.8700, "lng": 35.4442},
+            {"name": "Ga-ba-ôn", "ancient_name": "Gibeon", "modern_name": "Al-Jib, Bờ Tây", "lat": 31.8489, "lng": 35.1889}
+        ],
+        "correct_index": 2,
+        "archaeological_fact": "Nhà khảo cổ học Kathleen Kenyon phát hiện các bức tường thành bằng gạch bùn sụp đổ hướng ra ngoài và các hũ chứa đầy lúa mì cháy đen, khớp hoàn hảo với ký thuật Giô-suê 6.",
+        "strategic_theology": "Minh chứng chiến thắng thuộc linh hoàn toàn thuộc về Đức Giê-hô-va; đức tin vâng phục vượt trên mọi vũ khí và thành trì trần thế.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-5",
+        "title": "Si-lô & Trung Tâm Thờ Phượng Thời Quan Xét",
+        "category": "Exodus",
+        "period": "Judges (~1380 - 1050 TCN)",
+        "narrative_clue": "Trung tâm tôn giáo đầu tiên của 12 chi phái Y-sơ-ra-ên sau khi chia đất, nơi đặt Hòm Giao Ước và Đền Tạm hơn 300 năm, nơi thiếu nhi Sa-mu-ên nghe tiếng Chúa gọi.",
+        "scripture_ref": "1 Sa-mu-ên 3:21",
+        "target_site": "Si-lô",
+        "ancient_site": "Shiloh",
+        "modern_name": "Khirbet Seilun, Bờ Tây",
+        "lat": 32.0556,
+        "lng": 35.2897,
+        "options": [
+            {"name": "Si-lô", "ancient_name": "Shiloh", "modern_name": "Khirbet Seilun, Bờ Tây", "lat": 32.0556, "lng": 35.2897},
+            {"name": "Mi-xơ-ba", "ancient_name": "Mizpah", "modern_name": "Tell en-Nasbeh, Bờ Tây", "lat": 31.8833, "lng": 35.2167},
+            {"name": "Nốp", "ancient_name": "Nob", "modern_name": "Mount Scopus, Jerusalem", "lat": 31.7833, "lng": 35.2500},
+            {"name": "Ghê-be-a", "ancient_name": "Gibeah", "modern_name": "Tell el-Ful, Jerusalem", "lat": 31.8239, "lng": 35.2319}
+        ],
+        "correct_index": 0,
+        "archaeological_fact": "Khai quật tại Khirbet Seilun tìm thấy nền đá của Đền Tạm tương ứng chính xác kích thước mô tả trong Xuất Ê-díp-tô Ký cùng hàng nghìn mảnh gốm thời Đồ Sắt.",
+        "strategic_theology": "Sự hiện diện thánh của Chúa giữa dân Ngài; cảnh báo sự phán xét khi tuyển dân đánh mất sự kính sợ Chúa và hình thức hóa giao ước.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-6",
+        "title": "Núi Mô-ri-a & Đền Thờ Sa-lô-môn",
+        "category": "Kingdom",
+        "period": "United Kingdom (~966 TCN)",
+        "narrative_clue": "Đỉnh núi thánh nơi Áp-ra-ham dâng Y-sác, nơi sân đập lúa của A-rau-na, và là nơi Vua Sa-lô-môn xây dựng Đền Thờ thứ nhất nguy nga rực rỡ vàng ròng.",
+        "scripture_ref": "1 Các Vua 6:1",
+        "target_site": "Núi Mô-ri-a (Đền Thờ Giê-ru-sa-lem)",
+        "ancient_site": "Mount Moriah (Temple Mount)",
+        "modern_name": "Temple Mount / Haram al-Sharif, Jerusalem",
+        "lat": 31.7780,
+        "lng": 35.2354,
+        "options": [
+            {"name": "Núi Si-ôn", "ancient_name": "Mount Zion", "modern_name": "Núi Si-ôn, Jerusalem", "lat": 31.7722, "lng": 35.2293},
+            {"name": "Núi Mô-ri-a", "ancient_name": "Mount Moriah", "modern_name": "Đền Thờ Jerusalem", "lat": 31.7780, "lng": 35.2354},
+            {"name": "Núi Cạt-mên", "ancient_name": "Mount Carmel", "modern_name": "Dãy Carmel, Israel", "lat": 32.6710, "lng": 35.0880},
+            {"name": "Núi Tha-bô", "ancient_name": "Mount Tabor", "modern_name": "Hạ Ga-li-lê, Israel", "lat": 32.6869, "lng": 35.3900}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Cấu trúc đá bậc thang đồ sộ thời Đa-vít và các dấu tích tường thành thời Đền Thờ thứ nhất được khai quật tại sườn đồi Óp-phen phía nam Đền Thờ.",
+        "strategic_theology": "Tâm điểm thờ phượng giao ước; biểu trưng cho sự ngự trị của Đức Chúa Trời giữa vòng nhân loại và hình bóng về Thân Thể Đấng Christ.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-7",
+        "title": "Núi Cạt-mên & Chiến Thắng Của Tiên Tri Ê-li",
+        "category": "Kingdom",
+        "period": "Divided Kingdom (~860 TCN)",
+        "narrative_clue": "Dãy núi nhìn ra Địa Trung Hải, nơi tiên tri Ê-li đắp lại bàn thờ bằng 12 hòn đá và cầu xin lửa từ trời thiêu đốt của lễ trước mặt 450 tiên tri Ba-anh.",
+        "scripture_ref": "1 Các Vua 18:20",
+        "target_site": "Núi Cạt-mên",
+        "ancient_site": "Mount Carmel",
+        "modern_name": "Muhraqa, Dãy núi Carmel, Israel",
+        "lat": 32.6710,
+        "lng": 35.0880,
+        "options": [
+            {"name": "Núi Ghê-nê-xa-rết", "ancient_name": "Mount Gennesaret", "modern_name": "Ga-li-lê, Israel", "lat": 32.8600, "lng": 35.5300},
+            {"name": "Núi Ghê-ri-xim", "ancient_name": "Mount Gerizim", "modern_name": "Bờ Tây", "lat": 32.1989, "lng": 35.2736},
+            {"name": "Núi Cạt-mên", "ancient_name": "Mount Carmel", "modern_name": "Muhraqa, Israel", "lat": 32.6710, "lng": 35.0880},
+            {"name": "Núi Hẹt-môn", "ancient_name": "Mount Hermon", "modern_name": "Biên giới Lebanon-Syria", "lat": 33.4144, "lng": 35.8569}
+        ],
+        "correct_index": 2,
+        "archaeological_fact": "Đỉnh Muhraqa lưu giữ tu viện cổ tưởng niệm biến cố; thung lũng Kích-sôn dưới chân núi là nơi xử lý các tiên tri giả Ba-anh.",
+        "strategic_theology": "Khẳng định chân lý độc thần tuyệt đối: 'Giê-hô-va là Đức Chúa Trời! Giê-hô-va là Đức Chúa Trời!' (1 Các Vua 18:39).",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-8",
+        "title": "Đô Thành Ba-by-lôn & Cuộc Lưu Đày",
+        "category": "Exile",
+        "period": "Exile (~586 TCN)",
+        "narrative_clue": "Đô thành hùng mạnh bên bờ sông Ơ-phơ-rát, nơi Vua Nê-bu-cát-nết-xa giam cầm tuyển dân Giu-đa, và nơi Đa-ni-ên cùng ba bạn trẻ giữ vững đức tin thanh sạch.",
+        "scripture_ref": "2 Các Vua 25:1",
+        "target_site": "Đô thành Ba-by-lôn",
+        "ancient_site": "Babylon",
+        "modern_name": "Hillah, Tỉnh Babil, Iraq",
+        "lat": 32.5364,
+        "lng": 44.4208,
+        "options": [
+            {"name": "Ni-ni-ve", "ancient_name": "Nineveh", "modern_name": "Mosul, Iraq", "lat": 36.3500, "lng": 43.1500},
+            {"name": "Ba-by-lôn", "ancient_name": "Babylon", "modern_name": "Hillah, Iraq", "lat": 32.5364, "lng": 44.4208},
+            {"name": "Su-sơ", "ancient_name": "Susa", "modern_name": "Shush, Iran", "lat": 32.1906, "lng": 48.2464},
+            {"name": "Đa-mách", "ancient_name": "Damascus", "modern_name": "Damascus, Syria", "lat": 33.5138, "lng": 36.2765}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Cổng Ishtar bằng gạch tráng men xanh lam với hình sư tử và rồng thần, cùng các văn tự khắc hình nêm xác nhận sự trị vì của Nê-bu-cát-nết-xa.",
+        "strategic_theology": "Lò lửa thanh tẩy thuộc linh khiến tuyển dân dứt bỏ vĩnh viễn nạn thờ hình tượng, chuẩn bị lòng dân đón nhận Đấng Mê-si.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-9",
+        "title": "Bết-lê-hem & Nơi Ngôi Lời Giáng Sinh",
+        "category": "Gospels",
+        "period": "Life of Christ (~5 TCN)",
+        "narrative_clue": "Thị trấn nhỏ bé cách Giê-ru-sa-lem 8 km về phía nam, quê hương vua Đa-vít, nơi ứng nghiệm lời tiên tri Mi-chê 5:1 khi Đấng Cứu Thế Giê-xu giáng sinh nơi máng cỏ.",
+        "scripture_ref": "Lu-ca 2:1",
+        "target_site": "Bết-lê-hem xứ Giu-đê",
+        "ancient_site": "Bethlehem of Judea",
+        "modern_name": "Bethlehem, Bờ Tây",
+        "lat": 31.7054,
+        "lng": 35.2024,
+        "options": [
+            {"name": "Na-xa-rét", "ancient_name": "Nazareth", "modern_name": "Nazareth, Israel", "lat": 32.7020, "lng": 35.2979},
+            {"name": "Bết-lê-hem", "ancient_name": "Bethlehem", "modern_name": "Bethlehem, Bờ Tây", "lat": 31.7054, "lng": 35.2024},
+            {"name": "Bê-tha-ni", "ancient_name": "Bethany", "modern_name": "Al-Eizariya, Bờ Tây", "lat": 31.7700, "lng": 35.2600},
+            {"name": "Ca-na", "ancient_name": "Cana", "modern_name": "Kafr Kanna, Israel", "lat": 32.7480, "lng": 35.3380}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Nhà thờ Giáng Sinh (Church of the Nativity) xây dựng từ thế kỷ 4 trên hang đá máng cỏ cổ xưa, bảo tồn nền khảm mosaic rực rỡ thời Constantine.",
+        "strategic_theology": "Sự giáng sinh khiêm nhường của Vua Muôn Vua; Đức Chúa Trời thành người (Incarnation) để cứu chuộc nhân loại hư mất.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-10",
+        "title": "Ca-na Xứ Ga-li-lê & Phép Lạ Đầu Tiên",
+        "category": "Gospels",
+        "period": "Life of Christ (~27 SCN)",
+        "narrative_clue": "Ngôi làng miền núi vùng hạ Ga-li-lê nơi Chúa Giê-xu cùng thân mẫu và môn đồ dự tiệc cưới, và Ngài đã biến nước trong 6 vò đá thành rượu nho hảo hạng.",
+        "scripture_ref": "Giăng 2:1",
+        "target_site": "Ca-na xứ Ga-li-lê",
+        "ancient_site": "Cana of Galilee",
+        "modern_name": "Kafr Kanna / Khirbet Qana, Israel",
+        "lat": 32.7480,
+        "lng": 35.3380,
+        "options": [
+            {"name": "Ca-bê-na-um", "ancient_name": "Capernaum", "modern_name": "Kfar Nahum, Israel", "lat": 32.8803, "lng": 35.5750},
+            {"name": "Na-in", "ancient_name": "Nain", "modern_name": "Nein, Israel", "lat": 32.6300, "lng": 35.3500},
+            {"name": "Ca-na", "ancient_name": "Cana", "modern_name": "Kafr Kanna, Israel", "lat": 32.7480, "lng": 35.3380},
+            {"name": "Bết-sai-đa", "ancient_name": "Bethsaida", "modern_name": "Et-Tell, Israel", "lat": 32.8900, "lng": 35.6200}
+        ],
+        "correct_index": 2,
+        "archaeological_fact": "Các vò đá cổ lớn theo phong tục Do Thái thế kỷ 1 được phát hiện tại Kafr Kanna và Khirbet Qana.",
+        "strategic_theology": "Khai mở kỷ nguyên Tân Ước; bày tỏ vinh hiển thiên thượng và hình bóng về tiệc cưới cứu chuộc của Chiên Con.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-11",
+        "title": "Biển Ga-li-lê & Chúa Đi Bộ Trên Mặt Nước",
+        "category": "Gospels",
+        "period": "Life of Christ (~29 SCN)",
+        "narrative_clue": "Hồ nước ngọt trũng sâu 214m dưới mực nước biển, nơi Chúa Giê-xu đi bộ trên mặt biển trong cơn bão lúc canh tư đêm tối và nâng đỡ Phi-e-rơ.",
+        "scripture_ref": "Ma-thi-ơ 14:22",
+        "target_site": "Biển Ga-li-lê",
+        "ancient_site": "Sea of Galilee",
+        "modern_name": "Hồ Kinneret, Israel",
+        "lat": 32.8250,
+        "lng": 35.5850,
+        "options": [
+            {"name": "Biển Chết", "ancient_name": "Dead Sea", "modern_name": "Biển Muối, Israel-Jordan", "lat": 31.5000, "lng": 35.5000},
+            {"name": "Biển Ga-li-lê", "ancient_name": "Sea of Galilee", "modern_name": "Hồ Kinneret, Israel", "lat": 32.8250, "lng": 35.5850},
+            {"name": "Hồ Hula", "ancient_name": "Lake Hula", "modern_name": "Thung lũng Hula, Israel", "lat": 33.1000, "lng": 35.6000},
+            {"name": "Sông Giô-đanh", "ancient_name": "Jordan River", "modern_name": "Sông Jordan", "lat": 32.0000, "lng": 35.5500}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Năm 1986, các nhà khảo cổ phát hiện 'Thuyền Chúa Giê-xu' bằng gỗ sồi thế kỷ 1 chìm dưới bùn đáy hồ tại Ginosar.",
+        "strategic_theology": "Khẳng định quyền tể trị vũ trụ của Đấng Christ trên thiên nhiên và sự bình an 'Ta Đây, Đừng Sợ' giữa giông bão cuộc đời.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-12",
+        "title": "Đồi Gô-gô-tha & Thập Tự Giá Chuộc Tội",
+        "category": "Gospels",
+        "period": "Life of Christ (~30 SCN)",
+        "narrative_clue": "Địa điểm bên ngoài cổng thành Giê-ru-sa-lem cổ xưa, nơi Chúa Cứu Thế Giê-xu bị đóng đinh trên cây gỗ, mang lấy tội lỗi nhân loại và kêu lên 'Mọi việc đã được trọn!'.",
+        "scripture_ref": "Lu-ca 23:26",
+        "target_site": "Đồi Gô-gô-tha (Núi Sọ)",
+        "ancient_site": "Golgotha / Calvary",
+        "modern_name": "Nhà thờ Mộ Thánh / Garden Tomb, Jerusalem",
+        "lat": 31.7785,
+        "lng": 35.2297,
+        "options": [
+            {"name": "Đồi Gô-gô-tha", "ancient_name": "Golgotha", "modern_name": "Jerusalem", "lat": 31.7785, "lng": 35.2297},
+            {"name": "Núi Ô-liu", "ancient_name": "Mount of Olives", "modern_name": "Đông Jerusalem", "lat": 31.7792, "lng": 35.2420},
+            {"name": "Núi Si-ôn", "ancient_name": "Mount Zion", "modern_name": "Nam Cổ thành Jerusalem", "lat": 31.7722, "lng": 35.2293},
+            {"name": "Thung lũng Hinnom", "ancient_name": "Valley of Hinnom", "modern_name": "Wadi er-Rababi, Jerusalem", "lat": 31.7680, "lng": 35.2250}
+        ],
+        "correct_index": 0,
+        "archaeological_fact": "Mỏ đá vôi thế kỷ 1 bên ngoài tường thành Bắc, chứa các ngôi mộ đục trong vách đá và khu vườn nho cổ phù hợp mô tả các Phúc Âm.",
+        "strategic_theology": "Tâm điểm vũ trụ của lịch sử nhân loại; tế lễ trọn vẹn duy nhất xé toang bức màn phân cách con người với Đức Chúa Trời.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-13",
+        "title": "Núi Ô-liu & Sự Thăng Thiên Vinh Hiển",
+        "category": "Gospels",
+        "period": "Life of Christ (~30 SCN)",
+        "narrative_clue": "Ngọn núi nằm ở phía đông Giê-ru-sa-lem nhìn qua thung lũng Kết-rôn, nơi Chúa Giê-xu thăng thiên trước mắt các môn đồ và các thiên sứ hứa Ngài sẽ trở lại cùng một thể ấy.",
+        "scripture_ref": "Công-vụ các Sứ-đồ 1:9",
+        "target_site": "Núi Ô-liu",
+        "ancient_site": "Mount of Olives",
+        "modern_name": "Jabal az-Zaytūn, Đông Jerusalem",
+        "lat": 31.7792,
+        "lng": 35.2420,
+        "options": [
+            {"name": "Núi Hermon", "ancient_name": "Mount Hermon", "modern_name": "Biên giới Syria-Lebanon", "lat": 33.4144, "lng": 35.8569},
+            {"name": "Núi Ô-liu", "ancient_name": "Mount of Olives", "modern_name": "Đông Jerusalem", "lat": 31.7792, "lng": 35.2420},
+            {"name": "Núi Gerizim", "ancient_name": "Mount Gerizim", "modern_name": "Nablus, Bờ Tây", "lat": 32.1989, "lng": 35.2736},
+            {"name": "Núi Gilboa", "ancient_name": "Mount Gilboa", "modern_name": "Dãy Gilboa, Israel", "lat": 32.4333, "lng": 35.4167}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Nhà nguyện Thăng Thiên và khu vườn cây ô-liu cổ thụ nghìn năm tuổi tại Vườn Ghết-sê-ma-nê dưới chân sườn núi.",
+        "strategic_theology": "Sự tôn cao tột đỉnh của Đấng Christ ngự bên hữu Đức Chúa Trời và niềm hy vọng phước hạnh về sự Tái Lâm vinh quang.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-14",
+        "title": "Đường Đến Đa-mách & Sự Biến Cải Của Phao-lô",
+        "category": "Apostles",
+        "period": "Early Church (~34 SCN)",
+        "narrative_clue": "Con đường thương mại dẫn đến thành phố cổ ở Syria, nơi Sau-lơ đang hằm hằm bắt bớ môn đồ Chúa thì bị ánh sáng chói lòa từ trời quật ngã và nghe tiếng Chúa kêu gọi.",
+        "scripture_ref": "Công-vụ các Sứ-đồ 9:1",
+        "target_site": "Đường Đến Đa-mách",
+        "ancient_site": "Road to Damascus",
+        "modern_name": "Damascus, Syria",
+        "lat": 33.5138,
+        "lng": 36.2765,
+        "options": [
+            {"name": "An-ti-ốt", "ancient_name": "Antioch", "modern_name": "Antakya, Thổ Nhĩ Kỳ", "lat": 36.2000, "lng": 36.1500},
+            {"name": "Tạt-sơ", "ancient_name": "Tarsus", "modern_name": "Tarsus, Thổ Nhĩ Kỳ", "lat": 36.9167, "lng": 34.8833},
+            {"name": "Đa-mách", "ancient_name": "Damascus", "modern_name": "Damascus, Syria", "lat": 33.5138, "lng": 36.2765},
+            {"name": "Xê-xa-rê", "ancient_name": "Caesarea", "modern_name": "Caesarea Maritima, Israel", "lat": 32.5000, "lng": 34.8900}
+        ],
+        "correct_index": 2,
+        "archaeological_fact": "Con phố 'Thẳng' (Straight Street / Bab Sharqi) bảo tồn từ thời La Mã vẫn còn tồn tại đến ngày nay tại thành cổ Damascus.",
+        "strategic_theology": "Ân điển diệu kỳ biến kẻ bắt bớ hung bạo nhất thành Sứ đồ truyền giáo vĩ đại cho toàn thể Dân Ngoại.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-15",
+        "title": "Đồi A-rê-ô-ba (A-thên) & Đức Chúa Trời Chưa Biết",
+        "category": "Apostles",
+        "period": "Early Church (~51 SCN)",
+        "narrative_clue": "Ngọn đồi đá cẩm thạch gần đền Parthenon tại thủ đô tri thức Hy Lạp, nơi Sứ đồ Phao-lô đối thoại với các triết gia Khắc Kỷ và Biển Đức về Đấng Tạo Hóa dựng nên muôn loài.",
+        "scripture_ref": "Công-vụ các Sứ-đồ 17:22",
+        "target_site": "Đồi A-rê-ô-ba (A-thên)",
+        "ancient_site": "Areopagus (Mars Hill)",
+        "modern_name": "Athens, Hy Lạp",
+        "lat": 37.9722,
+        "lng": 23.7236,
+        "options": [
+            {"name": "Cô-rinh-tô", "ancient_name": "Corinth", "modern_name": "Corinth, Hy Lạp", "lat": 37.9064, "lng": 22.8800},
+            {"name": "A-thên", "ancient_name": "Athens", "modern_name": "Athens, Hy Lạp", "lat": 37.9722, "lng": 23.7236},
+            {"name": "Phi-líp", "ancient_name": "Philippi", "modern_name": "Kavala, Hy Lạp", "lat": 41.0131, "lng": 24.2864},
+            {"name": "Tê-sa-lô-ni-ca", "ancient_name": "Thessalonica", "modern_name": "Thessaloniki, Hy Lạp", "lat": 40.6401, "lng": 22.9444}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Mỏm đá Areopagus nguyên vẹn dưới chân Acropolis với bia đồng khắc toàn văn bài giảng Hy Lạp của Sứ đồ Phao-lô.",
+        "strategic_theology": "Mẫu mực biện giáo học Cơ Đốc (Apologetics); đem Tin Lành đối thoại và bẻ gãy thế giới quan triết học ngoại giáo.",
+        "xp_reward": 25
+    },
+    {
+        "id": "geo-16",
+        "title": "Đảo Bát-mô & Khải Huyền Về Trời Mới Đất Mới",
+        "category": "Apostles",
+        "period": "Apostolic & Revelation (~95 SCN)",
+        "narrative_clue": "Hòn đảo núi lửa đá cằn cỗi trên Biển Ê-giê nơi Sứ đồ Giăng bị Đế quốc La Mã lưu đày, và nơi ông thấy khải tượng vĩ đại về Chiên Con toàn thắng và Trời Mới Đất Mới.",
+        "scripture_ref": "Khải-huyền 1:9",
+        "target_site": "Đảo Bát-mô (Biển Ê-giê)",
+        "ancient_site": "Isle of Patmos",
+        "modern_name": "Patmos, Quần đảo Dodecanese, Hy Lạp",
+        "lat": 37.3167,
+        "lng": 26.5500,
+        "options": [
+            {"name": "Đảo Chíp", "ancient_name": "Cyprus", "modern_name": "Cộng hòa Síp", "lat": 35.1264, "lng": 33.4299},
+            {"name": "Đảo Bát-mô", "ancient_name": "Patmos", "modern_name": "Patmos, Hy Lạp", "lat": 37.3167, "lng": 26.5500},
+            {"name": "Đảo Cơ-rết", "ancient_name": "Crete", "modern_name": "Crete, Hy Lạp", "lat": 35.2401, "lng": 24.8093},
+            {"name": "Đảo Manh-tơ", "ancient_name": "Malta", "modern_name": "Cộng hòa Malta", "lat": 35.9375, "lng": 14.3754}
+        ],
+        "correct_index": 1,
+        "archaeological_fact": "Hang Khải Huyền (Cave of the Apocalypse) và Tu viện Thánh Giăng Thần Học xây dựng từ năm 1088 bảo tồn các thủ bản Tân Ước vô giá.",
+        "strategic_theology": "Điểm vinh hiển khép lại 66 sách chính kinh; sự chiến thắng tối hậu của Nước Đức Chúa Trời và Trời Mới Đất Mới.",
+        "xp_reward": 25
+    }
+]
+
+
+@router.get("/geo-challenges", response_model=List[GeoChallengeItem])
+def get_geo_challenges(
+    category: Optional[str] = Query(None, description="Category filter (Patriarchs, Exodus, Kingdom, Exile, Gospels, Apostles)"),
+    search: Optional[str] = Query(None, description="Search keyword in challenge title, site or scripture"),
+    db: Session = Depends(get_db)
+):
+    """
+    §3, §9, §46 — Retrieve Biblical Geography & Spatial Cartography Challenges.
+    Projects GPS coordinates to 900x600 SVG vector canvas and enriches with authentic 1925 Vietnamese Bible verses.
+    """
+    from app.routers.graph import project_geo_coordinates, _extract_verse_from_db
+
+    items: List[GeoChallengeItem] = []
+    for c in GEO_CHALLENGES_DATA:
+        # Category filter
+        if category and category != "all" and c["category"].lower() != category.lower():
+            continue
+
+        # Search filter
+        if search:
+            q = search.lower().strip()
+            t_match = q in c["title"].lower()
+            s_match = q in c["target_site"].lower() or q in c["modern_name"].lower()
+            r_match = q in c["scripture_ref"].lower()
+            if not (t_match or s_match or r_match):
+                continue
+
+        # Extract authentic verse text
+        verse_text = ""
+        if c.get("scripture_ref"):
+            verse_text = _extract_verse_from_db(db, c["scripture_ref"])
+
+        target_sx, target_sy = project_geo_coordinates(c["lat"], c["lng"])
+
+        # Project coordinates for options
+        projected_options: List[GeoOption] = []
+        for opt in c["options"]:
+            opt_sx, opt_sy = project_geo_coordinates(opt["lat"], opt["lng"])
+            projected_options.append(GeoOption(
+                name=opt["name"],
+                ancient_name=opt["ancient_name"],
+                modern_name=opt["modern_name"],
+                lat=opt["lat"],
+                lng=opt["lng"],
+                svg_x=opt_sx,
+                svg_y=opt_sy
+            ))
+
+        items.append(GeoChallengeItem(
+            id=c["id"],
+            title=c["title"],
+            category=c["category"],
+            period=c["period"],
+            narrative_clue=c["narrative_clue"],
+            scripture_ref=c["scripture_ref"],
+            verse_text=verse_text,
+            target_site=c["target_site"],
+            ancient_site=c["ancient_site"],
+            modern_name=c["modern_name"],
+            target_coords={
+                "lat": c["lat"],
+                "lng": c["lng"],
+                "svg_x": target_sx,
+                "svg_y": target_sy
+            },
+            options=projected_options,
+            correct_index=c["correct_index"],
+            archaeological_fact=c["archaeological_fact"],
+            strategic_theology=c["strategic_theology"],
+            xp_reward=c["xp_reward"]
+        ))
+
+    return items
+
+
+@router.post("/geo-challenges/verify", response_model=GeoVerifyResponse)
+def verify_geo_challenge(
+    req: GeoVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    §3, §9 — Verify user's answer for a Biblical Geography challenge and award XP.
+    """
+    from app.routers.graph import _extract_verse_from_db
+
+    challenge = next((c for c in GEO_CHALLENGES_DATA if c["id"] == req.challenge_id), None)
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Không tìm thấy thử thách địa lý.")
+
+    selected_idx = req.selected_option
+    if selected_idx is None and req.selected_option_id is not None:
+        for i, opt in enumerate(challenge.get("options", [])):
+            if opt.get("name") == req.selected_option_id or opt.get("ancient_name") == req.selected_option_id:
+                selected_idx = i
+                break
+        if selected_idx is None:
+            last_char = req.selected_option_id.split("-")[-1].lower()
+            char_map = {"a": 0, "b": 1, "c": 2, "d": 3, "0": 0, "1": 1, "2": 2, "3": 3}
+            selected_idx = char_map.get(last_char, 0)
+
+    is_correct = (selected_idx == challenge["correct_index"])
+    score_awarded = challenge["xp_reward"] if is_correct else 5
+
+    # Update user gamification profile if available
+    total_xp = score_awarded
+    try:
+        prof_row = db.execute(
+            text("SELECT total_score FROM user_profiles WHERE user_identifier = :u LIMIT 1"),
+            {"u": req.user_identifier}
+        ).fetchone()
+
+        if prof_row:
+            new_total = (prof_row[0] or 0) + score_awarded
+            db.execute(
+                text("UPDATE user_profiles SET total_score = :s WHERE user_identifier = :u"),
+                {"s": new_total, "u": req.user_identifier}
+            )
+            db.commit()
+            total_xp = new_total
+    except Exception as e:
+        logger.warning(f"Error updating user profile score for geo challenge: {e}")
+
+    verse_text = ""
+    if challenge.get("scripture_ref"):
+        verse_text = _extract_verse_from_db(db, challenge["scripture_ref"])
+
+    explanation = (
+        f"Chính xác! {challenge['target_site']} ({challenge['ancient_site']}) là câu trả lời đúng. "
+        f"Vị trí hiện đại: {challenge['modern_name']}."
+        if is_correct else
+        f"Chưa chính xác. Đáp án đúng là {challenge['target_site']} ({challenge['ancient_site']}) "
+        f"tại {challenge['modern_name']}."
+    )
+
+    return GeoVerifyResponse(
+        is_correct=is_correct,
+        score_awarded=score_awarded,
+        total_xp=total_xp,
+        explanation=explanation,
+        target_site=challenge["target_site"],
+        modern_name=challenge["modern_name"],
+        archaeological_fact=challenge["archaeological_fact"],
+        strategic_theology=challenge["strategic_theology"],
+        scripture_ref=challenge["scripture_ref"],
+        verse_text=verse_text
+    )
 

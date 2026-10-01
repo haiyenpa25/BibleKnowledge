@@ -2464,6 +2464,8 @@ Các Phân Đoạn: ${compareData.request_passages.join(" | ")}
               ))}
             </div>
           )}
+            </div>
+          )}
 
           {lexiconSubMode === "interlinear" && (
             <div className="flex flex-col gap-6">
