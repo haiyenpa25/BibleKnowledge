@@ -97,6 +97,12 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - **Redemptive History Chains**: 8 foundational biblico-theological trajectories (Paschal Lamb, Justification by Faith, Good Shepherd, Suffering Servant, New Covenant, Salvation by Grace, Davidic King, Melchizedek Priesthood) tracing typology from OT shadows through Gospel fulfillment to New Jerusalem consummation.
   - **Response Payload**: Contains `root`, `nodes`, `edges`, `matched_chain`, `all_chains`, and `stats` (OT/NT connection counts, parallel counts, chain steps).
 
+### 2.9 Multi-Translation Bible Alignment & Comparison Viewer (§2.1, Horizon Item)
+- **Endpoints**:
+  - `GET /api/bible/translations`: Lists all benchmark canonical translations registered in the system (Vietnamese 1925 / BTT, King James Version / KJV 1611, World English Bible / WEB, American Standard Version / ASV 1901) with language, year, license status, and text-critical basis.
+  - `GET /api/bible/parallel-chapter?book={book}&chapter={chapter}&target_translation={kjv|web|asv}`: Returns dual-column parallel verses comparing Vietnamese 1925 with a chosen benchmark English translation, with Strong's Lexicon mappings for interlinear alignment.
+  - `GET /api/bible/compare-verse?book={book}&chapter={chapter}&verse={verse}&translations={trans_list}`: Renders a single verse across all 4 translations simultaneously, displaying word count, character length, translation metadata, and original language (Hebrew / Greek) root words for high-fidelity comparative exegesis.
+
 ---
 
 ## 3. Theological RAG & AI Exegesis Engine (`/api/rag`)

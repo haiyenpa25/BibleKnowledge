@@ -121,6 +121,16 @@ async function main() {
   const rTodayPlan = await testEndpoint('/api/bible/reading-plans/today', d => !d.plan_title && 'Missing today plan title');
   report('GET /api/bible/reading-plans/today (Daily reading assignment)', rTodayPlan.ok, rTodayPlan.error);
 
+  // Multi-Translation Bible Alignment & Comparison Viewer (§2.1, Horizon Item)
+  const rTranslations = await testEndpoint('/api/bible/translations', d => (!Array.isArray(d) || d.length < 4) && `Expected at least 4 translations, got ${d?.length}`);
+  report(`GET /api/bible/translations (${rTranslations.data?.length || 4} Benchmark canonical translations)`, rTranslations.ok, rTranslations.error);
+
+  const rParallelChapter = await testEndpoint('/api/bible/parallel-chapter?book=sa&chapter=1&target_translation=kjv', d => (!d.verses || d.verses.length === 0 || !d.verses[0]?.text_target) && 'Missing parallel verses');
+  report('GET /api/bible/parallel-chapter (BTT 1925 & KJV/WEB parallel alignment)', rParallelChapter.ok, rParallelChapter.error);
+
+  const rCompareVerse = await testEndpoint('/api/bible/compare-verse?book=sa&chapter=1&verse=1', d => (!d.translations || d.translations.length < 4) && 'Invalid comparison translations');
+  report('GET /api/bible/compare-verse (Multi-translation alignment across 4 versions)', rCompareVerse.ok, rCompareVerse.error);
+
   // RAG & Exegesis Module
   const rCtxPresets = await testEndpoint('/api/rag/context-presets', d => (!Array.isArray(d) || d.length === 0) && 'No context presets');
   report('GET /api/rag/context-presets (6-Dimension context presets)', rCtxPresets.ok, rCtxPresets.error);

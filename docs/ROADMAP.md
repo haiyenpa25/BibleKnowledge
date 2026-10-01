@@ -117,6 +117,7 @@
 - [x] Community Sermon Sharing & 3-Dimensional Peer Review Workflows (Roadmap Horizon Item 4) with hermeneutical fidelity, homiletical clarity, and pastoral application scoring.
 - [x] Collaborative Multi-Pastor Study Groups & Cohorts (Roadmap Horizon Item 5) with ministerial cohorts, exegesis insight threads, threaded comments, upvoting, and Markdown minutes export.
 - [x] Small Group Leader Guide & Study Curriculum Generator (§50) with 3H objectives (Head, Heart, Hands), icebreaker question, pinned passage exegesis, entity background, 3-step outline, discussion questions, citations from 275 commentary volumes, and weekly spiritual action plan.
-- [ ] Multi-Translation Bible Alignment & Comparison Viewer (`/bible`): Parallel and interlinear comparison between Vietnamese 1925 (BTT) and benchmark public domain English translations (KJV / WEB).
+- [x] Multi-Translation Bible Alignment & Comparison Viewer (`/bible`): Parallel dual-column chapter viewing, quick target translation switcher (KJV 1611, WEB, ASV 1901), verse-level multi-version alignment drawer tab, and 4-way comparative modal with word counts, character counts, and original Greek/Hebrew lexicon mappings.
 - [ ] Advanced Semantic Audio Search: Searching natural language queries within the Daily Devotional Audio narration transcripts.
+- [ ] Biblical Timeline Era Interactive Filter Expansion: Detailed sub-filters for United Kingdom, Divided Kingdom, and Babylonian Exile eras.
 

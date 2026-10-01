@@ -49,6 +49,88 @@ KEYWORD_MAP: Dict[str, List[str]] = {
     "thánh": ["H6944"]
 }
 
+TRANSLATION_META: Dict[str, Dict[str, Any]] = {
+    "vi_1934": {
+        "id": "vi_1934",
+        "name": "Kinh Thánh Tiếng Việt Bản Dịch 1925 (BTT)",
+        "short_name": "BTT 1925",
+        "language": "vi",
+        "language_label": "Tiếng Việt",
+        "year": 1925,
+        "is_default": True,
+        "license_info": "Bản dịch truyền thống 1925 / 1934 (Public Domain)",
+        "description": "Bản dịch quy chuẩn kinh điển cho cộng đồng Cơ Đốc nhân Việt Nam suốt một thế kỷ qua, dịch từ nguyên ngữ Hê-bơ-rơ và Hy Lạp."
+    },
+    "kjv": {
+        "id": "kjv",
+        "name": "King James Version (KJV 1611)",
+        "short_name": "KJV",
+        "language": "en",
+        "language_label": "English",
+        "year": 1611,
+        "is_default": False,
+        "license_info": "Authorized King James Version (Public Domain)",
+        "description": "Bản dịch tiếng Anh kinh điển và văn phong thi ca chuẩn mực có sức ảnh hưởng sâu rộng nhất lịch sử, dịch từ Textus Receptus."
+    },
+    "web": {
+        "id": "web",
+        "name": "World English Bible (WEB)",
+        "short_name": "WEB",
+        "language": "en",
+        "language_label": "English",
+        "year": 2000,
+        "is_default": False,
+        "license_info": "World English Bible (Public Domain)",
+        "description": "Bản dịch tiếng Anh hiện đại, trung thực, dịch trực tiếp từ Bản văn Đa số Hy Lạp (Majority Text) và Masoretic Cựu Ước."
+    },
+    "asv": {
+        "id": "asv",
+        "name": "American Standard Version (ASV 1901)",
+        "short_name": "ASV",
+        "language": "en",
+        "language_label": "English",
+        "year": 1901,
+        "is_default": False,
+        "license_info": "American Standard Version 1901 (Public Domain)",
+        "description": "Bản dịch học thuật chuẩn xác cao của các học giả Mỹ, bảo lưu danh xưng Đức Giê-hô-va (Jehovah) trong Cựu Ước."
+    }
+}
+
+
+@router.get("/translations")
+def list_bible_translations(db: Session = Depends(get_db)):
+    """
+    List supported Bible translations for multi-version alignment & comparison (§2.1, Horizon Item).
+    Combines database metadata with canonical catalog presets.
+    """
+    db_rows = db.execute(
+        text("SELECT id, name, language, license_info FROM bible_translations ORDER BY (id = 'vi_1934') DESC, id ASC")
+    ).fetchall()
+
+    result = []
+    seen_ids = set()
+    for r in db_rows:
+        tid = r.id.lower()
+        seen_ids.add(tid)
+        meta = TRANSLATION_META.get(tid, {})
+        result.append({
+            "id": r.id,
+            "name": meta.get("name", r.name),
+            "short_name": meta.get("short_name", r.id.upper()),
+            "language": r.language,
+            "language_label": meta.get("language_label", "Tiếng Việt" if r.language == "vi" else "English"),
+            "year": meta.get("year", 1925 if r.language == "vi" else 1611),
+            "is_default": tid in ("vi_1934", "btt"),
+            "license_info": r.license_info or meta.get("license_info", "Public Domain"),
+            "description": meta.get("description", "Bản dịch quy chuẩn phục vụ đối chiếu và nghiên cứu.")
+        })
+
+    for tid, meta in TRANSLATION_META.items():
+        if tid not in seen_ids:
+            result.append(meta)
+
+    return result
+
 
 @router.get("/books")
 def list_books(db: Session = Depends(get_db)):
@@ -2015,10 +2097,150 @@ def get_parallel_chapter(
         },
         "target_translation": {
             "id": target_clean,
-            "name": "King James Version (KJV 1611)" if target_clean == "kjv" else target_clean.upper(),
-            "language": "English"
+            "name": TRANSLATION_META.get(target_clean, {}).get("name", "King James Version (KJV 1611)" if target_clean == "kjv" else target_clean.upper()),
+            "short_name": TRANSLATION_META.get(target_clean, {}).get("short_name", target_clean.upper()),
+            "language": TRANSLATION_META.get(target_clean, {}).get("language", "en"),
+            "language_label": TRANSLATION_META.get(target_clean, {}).get("language_label", "English"),
+            "year": TRANSLATION_META.get(target_clean, {}).get("year", 1611)
         },
         "verses": combined_verses
+    }
+
+
+@router.get("/compare-verse")
+def compare_verse(
+    book: str = Query(..., description="Book code, OSIS, or name (e.g. 'sa', 'Gen', 'mat', 'rom')"),
+    chapter: int = Query(..., ge=1, description="Chapter number"),
+    verse: int = Query(..., ge=1, description="Verse number"),
+    translations: str = Query("vi_1934,kjv,web,asv", description="Comma-separated translation ids"),
+    db: Session = Depends(get_db)
+):
+    """
+    Multi-translation verse alignment & comparative viewer (§2.1, Horizon Item).
+    Compares a single verse across multiple canonical translations (BTT 1925, KJV, WEB, ASV)
+    along with original language lemmas, character lengths, and word counts.
+    """
+    clean = book.strip().lower()
+    sql_book = text("""
+        SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+        FROM bible_books
+        WHERE LOWER(code) = :c OR LOWER(osis) = :c OR LOWER(name_vi) = :c OR LOWER(name_en) = :c
+        LIMIT 1
+    """)
+    b = db.execute(sql_book, {"c": clean}).fetchone()
+    if not b:
+        b = db.execute(
+            text("SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters FROM bible_books WHERE LOWER(name_vi) LIKE :c LIMIT 1"),
+            {"c": f"%{clean}%"}
+        ).fetchone()
+
+    if not b:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy sách: '{book}'")
+
+    # Fetch Vietnamese 1925 verse
+    v_row = db.execute(
+        text("SELECT global_id, verse_code, chapter, verse, section_title, text, cross_references FROM bible_verses WHERE book_id = :b AND chapter = :c AND verse = :v"),
+        {"b": b.id, "c": chapter, "v": verse}
+    ).fetchone()
+
+    if not v_row:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy câu Kinh Thánh {b.name_vi} {chapter}:{verse}")
+
+    req_trans = [t.strip().lower() for t in translations.split(",") if t.strip()]
+    if not req_trans:
+        req_trans = ["vi_1934", "kjv", "web", "asv"]
+
+    # Get KJV verses for chapter
+    kjv_map = get_kjv_chapter_verses(b.book_order, chapter)
+
+    trans_results = []
+    for tid in req_trans:
+        meta = TRANSLATION_META.get(tid, {
+            "id": tid,
+            "name": tid.upper(),
+            "short_name": tid.upper(),
+            "language": "en",
+            "language_label": "English"
+        })
+
+        if tid in ("vi_1934", "vi", "btt"):
+            text_val = v_row.text
+        elif tid == "kjv":
+            text_val = kjv_map.get(verse, "")
+        else:
+            # Check cache or fetch from bible-api
+            cache_key = f"{b.name_en.lower()}_{chapter}_{tid}"
+            cached_chap = PARALLEL_CACHE.get(cache_key)
+            if not cached_chap:
+                try:
+                    clean_book_en = b.name_en.replace(" ", "+")
+                    url = f"https://bible-api.com/{clean_book_en}+{chapter}?translation={urllib.parse.quote(tid)}"
+                    req = urllib.request.Request(url, headers={"User-Agent": "BibleKnowledge/1.0"})
+                    with urllib.request.urlopen(req, timeout=3) as resp:
+                        if resp.status == 200:
+                            api_data = json.loads(resp.read().decode("utf-8"))
+                            cached_chap = {}
+                            for item in api_data.get("verses", []):
+                                if item.get("verse") and item.get("text"):
+                                    cached_chap[item["verse"]] = item["text"].strip()
+                            if cached_chap:
+                                PARALLEL_CACHE[cache_key] = cached_chap
+                except Exception:
+                    cached_chap = {}
+            text_val = cached_chap.get(verse, "") if cached_chap else ""
+
+        trans_results.append({
+            "id": tid,
+            "name": meta.get("name", tid.upper()),
+            "short_name": meta.get("short_name", tid.upper()),
+            "language": meta.get("language", "en"),
+            "language_label": meta.get("language_label", "English"),
+            "year": meta.get("year", None),
+            "text": text_val,
+            "word_count": len(text_val.split()) if text_val else 0,
+            "char_count": len(text_val) if text_val else 0
+        })
+
+    # Fetch original language Strong references
+    lang_filter = "greek" if b.testament == "NT" else "hebrew"
+    lex_rows = db.execute(
+        text("SELECT strong_number, lemma, transliteration, definition FROM strong_lexicon WHERE language = :lang LIMIT 20"),
+        {"lang": lang_filter}
+    ).fetchall()
+
+    matched_lexicon = []
+    text_lower = v_row.text.lower()
+    for lr in lex_rows:
+        for kw, s_nums in KEYWORD_MAP.items():
+            if lr.strong_number in s_nums and kw in text_lower:
+                matched_lexicon.append({
+                    "strong_number": lr.strong_number,
+                    "lemma": lr.lemma,
+                    "transliteration": lr.transliteration,
+                    "definition": lr.definition,
+                    "keyword": kw
+                })
+                break
+
+    return {
+        "reference": f"{b.name_vi} {chapter}:{verse}",
+        "book": {
+            "id": b.id,
+            "code": b.code,
+            "osis": b.osis,
+            "name_vi": b.name_vi,
+            "name_en": b.name_en,
+            "testament": b.testament
+        },
+        "chapter": chapter,
+        "verse": verse,
+        "section_title": v_row.section_title or "",
+        "translations": trans_results,
+        "original_language": {
+            "testament": b.testament,
+            "language": "Hebrew" if b.testament == "OT" else "Greek",
+            "matched_lexicon": matched_lexicon
+        }
     }
 
 

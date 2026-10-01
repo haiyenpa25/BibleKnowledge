@@ -332,6 +332,19 @@ export default function BibleReaderPage() {
   const [readerTheme, setReaderTheme] = useState<"midnight" | "sepia" | "pure-black">("midnight");
   const [redLetter, setRedLetter] = useState(true);
 
+  // Multi-Translation & Parallel Alignment States (§2.1, Horizon Item)
+  const [targetTranslation, setTargetTranslation] = useState<string>("kjv");
+  const [availableTranslations, setAvailableTranslations] = useState<any[]>([
+    { id: "vi_1934", name: "Bản Dịch Truyền Thống 1925", short_name: "BTT 1925", language: "vi", language_label: "Tiếng Việt" },
+    { id: "kjv", name: "King James Version (KJV 1611)", short_name: "KJV", language: "en", language_label: "English" },
+    { id: "web", name: "World English Bible (WEB)", short_name: "WEB", language: "en", language_label: "English" },
+    { id: "asv", name: "American Standard Version (ASV 1901)", short_name: "ASV", language: "en", language_label: "English" }
+  ]);
+  const [comparisonVerse, setComparisonVerse] = useState<any | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [copiedComparisonId, setCopiedComparisonId] = useState<string | null>(null);
+
   // Cross-Reference Preview State
   const [previewRef, setPreviewRef] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CrossRefPreviewData | null>(null);
@@ -359,7 +372,7 @@ export default function BibleReaderPage() {
   // Verse Details (Entities, Strong Lexicon, Notes, Bookmark)
   const [verseDetails, setVerseDetails] = useState<VerseDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "exegesis" | "harmony" | "citations" | "lexicon" | "entities" | "notes">("insight");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "exegesis" | "harmony" | "citations" | "lexicon" | "entities" | "notes" | "translations">("insight");
   const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
 
   // Inline Exegesis State (§13)
@@ -458,6 +471,24 @@ export default function BibleReaderPage() {
     loadChapter();
   }, [currentBookCode, currentChapter, apiUrl]);
 
+  // Fetch available translations on mount (§2.1, Horizon Item)
+  useEffect(() => {
+    async function loadTranslations() {
+      try {
+        const res = await fetch(`${apiUrl}/api/bible/translations`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setAvailableTranslations(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load translations:", err);
+      }
+    }
+    loadTranslations();
+  }, [apiUrl]);
+
   // Load parallel chapter data when parallel or interlinear view is active (§2.1 & §31)
   useEffect(() => {
     if (viewMode !== "parallel" && viewMode !== "interlinear") return;
@@ -466,7 +497,7 @@ export default function BibleReaderPage() {
     async function loadParallel() {
       setParallelLoading(true);
       try {
-        const res = await fetch(`${apiUrl}/api/bible/parallel-chapter?book=${currentBookCode}&chapter=${currentChapter}&target_translation=kjv`);
+        const res = await fetch(`${apiUrl}/api/bible/parallel-chapter?book=${currentBookCode}&chapter=${currentChapter}&target_translation=${targetTranslation}`);
         if (res.ok && isMounted) {
           const data = await res.json();
           setParallelData(data);
@@ -482,7 +513,48 @@ export default function BibleReaderPage() {
     return () => {
       isMounted = false;
     };
-  }, [currentBookCode, currentChapter, viewMode, apiUrl]);
+  }, [currentBookCode, currentChapter, viewMode, targetTranslation, apiUrl]);
+
+  // Verse comparison handlers (§2.1, Horizon Item)
+  const handleOpenVerseComparison = async (verseNum: number) => {
+    setComparisonLoading(true);
+    setIsComparisonModalOpen(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/compare-verse?book=${currentBookCode}&chapter=${currentChapter}&verse=${verseNum}&translations=vi_1934,kjv,web,asv`);
+      if (res.ok) {
+        const data = await res.json();
+        setComparisonVerse(data);
+      }
+    } catch (e) {
+      console.error("Failed to load verse comparison:", e);
+    } finally {
+      setComparisonLoading(false);
+    }
+  };
+
+  const handleCopySingleTranslation = (tr: any, ref: string) => {
+    const textToCopy = `"${tr.text}" — ${ref} (${tr.short_name})`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedComparisonId(tr.id);
+    setTimeout(() => setCopiedComparisonId(null), 2000);
+  };
+
+  const handleCopyAllTranslations = (data: any) => {
+    if (!data || !data.translations) return;
+    const lines = [
+      `### ĐỐI CHIẾU ĐA BẢN DỊCH: ${data.reference}`,
+      ""
+    ];
+    for (const tr of data.translations) {
+      lines.push(`**${tr.name} (${tr.short_name})**:`);
+      lines.push(`> "${tr.text}"`);
+      lines.push("");
+    }
+    lines.push(`*BibleKnowledge — Hệ sinh thái Tri Thức Kinh Thánh*`);
+    navigator.clipboard.writeText(lines.join("\n"));
+    setCopiedComparisonId("all");
+    setTimeout(() => setCopiedComparisonId(null), 2500);
+  };
 
   // Cleanup speech on unmount
   useEffect(() => {
@@ -1150,10 +1222,10 @@ export default function BibleReaderPage() {
                   ? "bg-blue-600 text-white font-semibold shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
               }`}
-              title="Chế độ song song đối chiếu KJV"
+              title="Chế độ đối chiếu đa bản dịch song song (BTT / KJV / WEB / ASV)"
             >
               <Languages className="w-3 h-3 text-emerald-400" />
-              <span>Song Song KJV</span>
+              <span>Đối Chiếu Song Song</span>
             </button>
             <button
               type="button"
@@ -1498,30 +1570,58 @@ export default function BibleReaderPage() {
             {/* View Mode 3: PARALLEL DUAL TRANSLATION MODE (§2.1 & §31) */}
             {viewMode === "parallel" && (
               <div className="flex flex-col gap-4">
-                {/* Column Headers */}
+                {/* Column Headers with Multi-Translation Alignment Selector */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 border-b border-slate-800 text-xs font-bold tracking-wider">
                   <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-blue-300">
                     <span className="flex items-center gap-1.5">
                       <span>🇻🇳</span> Bản Dịch Truyền Thống 1925 (Tiếng Việt)
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                      Gốc 1925
+                      Nguyên Bản 1925
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-emerald-300">
-                    <span className="flex items-center gap-1.5">
-                      <span>🇬🇧</span> King James Version — KJV 1611 (English)
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      Kinh Điển
-                    </span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 text-emerald-300 flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span>{targetTranslation === "kjv" ? "🇬🇧" : targetTranslation === "web" ? "🌐" : "🇺🇸"}</span>
+                      <span>{targetTranslation === "kjv" ? "King James (KJV 1611)" : targetTranslation === "web" ? "World English (WEB)" : "American Standard (ASV)"}</span>
+                    </div>
+                    {/* Quick switch translation buttons */}
+                    <div className="flex items-center gap-1">
+                      {[
+                        { code: "kjv", label: "KJV" },
+                        { code: "web", label: "WEB" },
+                        { code: "asv", label: "ASV" }
+                      ].map(t => (
+                        <button
+                          key={t.code}
+                          type="button"
+                          onClick={() => setTargetTranslation(t.code)}
+                          className={`text-[10px] px-2 py-0.5 rounded-lg font-bold transition-all uppercase ${
+                            targetTranslation === t.code
+                              ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40"
+                              : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenVerseComparison(selectedVerse?.verse || 1)}
+                        className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/60 transition-all font-semibold flex items-center gap-1"
+                        title="So sánh đồng thời 4 bản dịch"
+                      >
+                        <Languages className="w-3 h-3 text-emerald-400" />
+                        <span>4 Bản Dịch</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {parallelLoading ? (
                   <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-3 text-slate-400">
                     <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-                    <p className="text-sm font-medium">Đang chuẩn bị bản dịch đối chiếu song song KJV...</p>
+                    <p className="text-sm font-medium">Đang chuẩn bị bản dịch đối chiếu song song {targetTranslation.toUpperCase()}...</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
@@ -1608,14 +1708,26 @@ export default function BibleReaderPage() {
                               </div>
                             </div>
 
-                            {/* Right Column: English KJV */}
-                            <div className="flex items-start gap-3 md:border-l md:border-slate-800/80 md:pl-4 pt-2 md:pt-0 border-t border-slate-800/60 md:border-t-0">
+                            {/* Right Column: Target Translation (KJV / WEB / ASV) */}
+                            <div className="flex items-start gap-3 md:border-l md:border-slate-800/80 md:pl-4 pt-2 md:pt-0 border-t border-slate-800/60 md:border-t-0 relative">
                               <span className="select-none text-xs font-sans font-semibold pt-1 min-w-[1.5rem] text-right text-emerald-400/80">
                                 {v.verse}
                               </span>
                               <div className="flex-1 leading-relaxed font-serif text-slate-300 text-sm md:text-base italic">
                                 {v.text_target || <span className="text-slate-600 font-sans text-xs">Đang tải câu đối chiếu...</span>}
                               </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenVerseComparison(v.verse);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] px-2 py-1 rounded bg-slate-800/90 text-slate-300 hover:text-emerald-400 border border-slate-700 flex items-center gap-1 whitespace-nowrap self-start"
+                                title="So sánh câu này trên 4 bản dịch"
+                              >
+                                <Languages className="w-3 h-3 text-emerald-400" />
+                                <span>4 Bản</span>
+                              </button>
                             </div>
                           </div>
                         </React.Fragment>
@@ -1961,6 +2073,22 @@ export default function BibleReaderPage() {
             >
               <FileText className="w-3.5 h-3.5 text-cyan-400" />
               <span>Ghi Chú ({verseDetails?.user_notes?.length || 0})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveDrawerTab("translations");
+                if (selectedVerse) handleOpenVerseComparison(selectedVerse.verse);
+              }}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                activeDrawerTab === "translations"
+                  ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Languages className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Đối Chiếu 4 Bản Dịch</span>
             </button>
           </div>
 
@@ -2749,6 +2877,95 @@ export default function BibleReaderPage() {
                 ) : (
                   <div className="text-xs text-slate-500 text-center py-4">
                     Chưa có ghi chú nào cho câu này. Hãy bắt đầu viết suy ngẫm của bạn!
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 8: MULTI-TRANSLATION ALIGNMENT TAB (§2.1, Horizon Item) */}
+            {activeDrawerTab === "translations" && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Languages className="w-4 h-4" />
+                      <span>Đối Chiếu Đa Bản Dịch & Căn Chỉnh Ngữ Nghĩa</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      So sánh câu Kinh Thánh {currentBook?.name_vi} {currentChapter}:{selectedVerse?.verse} trên 4 bản dịch quy chuẩn
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => comparisonVerse && handleCopyAllTranslations(comparisonVerse)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-500/50 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  >
+                    {copiedComparisonId === "all" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedComparisonId === "all" ? "Đã Sao Chép!" : "Sao Chép Cả 4"}</span>
+                  </button>
+                </div>
+
+                {comparisonLoading ? (
+                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                    <span className="text-xs">Đang tải và căn chỉnh các bản dịch Kinh Thánh...</span>
+                  </div>
+                ) : comparisonVerse?.translations ? (
+                  <div className="flex flex-col gap-3">
+                    {comparisonVerse.translations.map((tr: any) => (
+                      <div
+                        key={tr.id}
+                        className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{tr.language === "vi" ? "🇻🇳" : tr.id === "kjv" ? "🇬🇧" : tr.id === "web" ? "🌐" : "🇺🇸"}</span>
+                            <span className="text-xs font-bold text-white">{tr.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                              {tr.short_name} {tr.year ? `(${tr.year})` : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500">{tr.word_count} từ</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopySingleTranslation(tr, comparisonVerse.reference)}
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                              title="Sao chép bản dịch này"
+                            >
+                              {copiedComparisonId === tr.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                        <p className={`text-xs md:text-sm leading-relaxed text-slate-200 ${tr.language === "en" ? "font-serif italic text-slate-300" : "font-sans"}`}>
+                          "{tr.text}"
+                        </p>
+                      </div>
+                    ))}
+
+                    {/* Original Language Keywords */}
+                    {comparisonVerse.original_language?.matched_lexicon?.length > 0 && (
+                      <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex flex-col gap-2">
+                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                          <span>Nguyên Ngữ {comparisonVerse.original_language.language} Đối Ứng</span>
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {comparisonVerse.original_language.matched_lexicon.map((lex: any) => (
+                            <div key={lex.strong_number} className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 text-xs">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-amber-300 font-serif">{lex.lemma}</span>
+                                <span className="font-mono text-[10px] text-slate-400">{lex.strong_number}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 truncate">{lex.transliteration} — {lex.definition}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500 text-center py-6">
+                    Không tìm thấy dữ liệu đối chiếu cho câu này.
                   </div>
                 )}
               </div>
@@ -3859,6 +4076,144 @@ export default function BibleReaderPage() {
                   Nhập từ khóa và nhấn Enter để tìm kiếm toàn bộ 31,081 câu Kinh Thánh.
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: MULTI-TRANSLATION COMPARATIVE ALIGNMENT MODAL (§2.1, Horizon Item) */}
+      {isComparisonModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e1424] border border-emerald-500/40 rounded-3xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-emerald-950/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+                  <Languages className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>Đối Chiếu Đa Bản Dịch & Mạch Ngữ Nghĩa</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Multi-Version Alignment
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Phân đoạn: <span className="text-emerald-400 font-semibold">{comparisonVerse?.reference || `${currentBook?.name_vi} ${currentChapter}:${selectedVerse?.verse || 1}`}</span> • Đối chiếu trực tiếp 4 bản dịch quy chuẩn
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsComparisonModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+              {comparisonLoading ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+                  <span className="text-sm font-medium">Đang đối chiếu văn phong và căn chỉnh nguyên ngữ...</span>
+                </div>
+              ) : comparisonVerse?.translations ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {comparisonVerse.translations.map((tr: any) => (
+                      <div
+                        key={tr.id}
+                        className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between gap-3 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{tr.language === "vi" ? "🇻🇳" : tr.id === "kjv" ? "🇬🇧" : tr.id === "web" ? "🌐" : "🇺🇸"}</span>
+                            <div>
+                              <div className="text-xs font-bold text-white">{tr.name}</div>
+                              <div className="text-[10px] text-slate-400">{tr.language_label} • {tr.year ? `Năm ${tr.year}` : "Quy chuẩn"}</div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                            {tr.short_name}
+                          </span>
+                        </div>
+
+                        <p className={`text-sm leading-relaxed text-slate-100 ${tr.language === "en" ? "font-serif italic text-slate-200" : "font-sans"}`}>
+                          "{tr.text}"
+                        </p>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[11px] text-slate-500">
+                          <span>{tr.word_count} từ ({tr.char_count} ký tự)</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopySingleTranslation(tr, comparisonVerse.reference)}
+                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                          >
+                            {copiedComparisonId === tr.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedComparisonId === tr.id ? "Đã chép" : "Sao chép"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Original Language Lexicon Anchor */}
+                  {comparisonVerse.original_language?.matched_lexicon?.length > 0 && (
+                    <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Nguyên Ngữ {comparisonVerse.original_language.language} & Khóa Từ Strong</span>
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                          {comparisonVerse.original_language.testament === "OT" ? "Masoretic Hebrew" : "Majority / Textus Receptus Greek"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {comparisonVerse.original_language.matched_lexicon.map((lex: any) => (
+                          <div key={lex.strong_number} className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-amber-300 font-serif text-sm">{lex.lemma}</span>
+                              <span className="font-mono text-[10px] text-amber-400/80 px-1.5 py-0.2 rounded bg-amber-500/10">{lex.strong_number}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-300 italic">{lex.transliteration} — {lex.definition}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-400 text-xs">
+                  Không tìm thấy dữ liệu đối chiếu cho câu này.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Đối chiếu song song phục vụ dịch thuật, giải kinh và soạn thảo bài giảng chuyên sâu.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => comparisonVerse && handleCopyAllTranslations(comparisonVerse)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                >
+                  {copiedComparisonId === "all" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedComparisonId === "all" ? "Đã Sao Chép!" : "Sao Chép Toàn Bộ 4 Bản"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsComparisonModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/30"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>
