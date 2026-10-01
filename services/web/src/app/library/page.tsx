@@ -114,11 +114,65 @@ interface StudyNote {
   updated_at: string;
 }
 
+interface BookCitationItem {
+  index: number;
+  id: string;
+  title: string;
+  author: string;
+  category: string;
+  category_vi: string;
+  series: string;
+  chars: number;
+  total_chapters: number;
+  citations: {
+    chicago: string;
+    sbl: string;
+    apa: string;
+    mla: string;
+    bibtex: string;
+    markdown: string;
+    publisher: string;
+    estimated_year: string;
+  };
+}
+
+interface AuthorStatItem {
+  name: string;
+  total_books: number;
+  total_chapters: number;
+  total_chars: number;
+  chars_formatted: string;
+  categories: string[];
+  sample_books: Array<{
+    index: number;
+    title: string;
+    category_vi: string;
+  }>;
+}
+
+interface SeriesItem {
+  series_name: string;
+  total_volumes: number;
+  total_chapters: number;
+  total_chars: number;
+  volumes: BookItem[];
+}
+
 export default function LibraryPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // Tab State: 'catalog' | 'notes'
-  const [activeTab, setActiveTab] = useState<"catalog" | "notes">("catalog");
+  // Tab State: 'catalog' | 'notes' | 'sources'
+  const [activeTab, setActiveTab] = useState<"catalog" | "notes" | "sources">("catalog");
+
+  // Sources & Academic Citations State (§38, §52)
+  const [citationsList, setCitationsList] = useState<BookCitationItem[]>([]);
+  const [citationSearch, setCitationSearch] = useState<string>("");
+  const [loadingCitations, setLoadingCitations] = useState<boolean>(false);
+  const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
+  const [authorsList, setAuthorsList] = useState<AuthorStatItem[]>([]);
+  const [seriesList, setSeriesList] = useState<SeriesItem[]>([]);
+  const [sourcesSubTab, setSourcesSubTab] = useState<"citations" | "series" | "authors">("citations");
+  const [selectedSeriesDetail, setSelectedSeriesDetail] = useState<SeriesItem | null>(null);
 
   // Stats
   const [stats, setStats] = useState<LibraryStats | null>(null);
@@ -170,6 +224,61 @@ export default function LibraryPage() {
       }
     } catch (e) {
       console.error("Failed to fetch library stats:", e);
+    }
+  }
+
+  // Sources & Academic Citations Fetchers (§38, §52)
+  async function fetchCitations(query: string = "") {
+    setLoadingCitations(true);
+    try {
+      const qParam = query.trim() ? `?q=${encodeURIComponent(query.trim())}&limit=30` : `?limit=30`;
+      const res = await fetch(`${apiUrl}/api/library/citations${qParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCitationsList(data.citations || []);
+      }
+    } catch (e) {
+      console.error("Failed to load citations:", e);
+    } finally {
+      setLoadingCitations(false);
+    }
+  }
+
+  async function fetchAuthors() {
+    try {
+      const res = await fetch(`${apiUrl}/api/library/authors`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuthorsList(data.authors || []);
+      }
+    } catch (e) {
+      console.error("Failed to load authors:", e);
+    }
+  }
+
+  async function fetchSeriesCatalog() {
+    try {
+      const res = await fetch(`${apiUrl}/api/library/series-catalog`);
+      if (res.ok) {
+        const data = await res.json();
+        setSeriesList(data.series || []);
+      }
+    } catch (e) {
+      console.error("Failed to load series catalog:", e);
+    }
+  }
+
+  function fetchSourcesAndCitations() {
+    fetchCitations(citationSearch);
+    if (authorsList.length === 0) fetchAuthors();
+    if (seriesList.length === 0) fetchSeriesCatalog();
+  }
+
+  function copyCitationText(key: string, textToCopy: string) {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedCitationKey(key);
+      setTimeout(() => setCopiedCitationKey(null), 2000);
     }
   }
 
@@ -468,6 +577,22 @@ export default function LibraryPage() {
         >
           <Bookmark className="w-4 h-4 text-emerald-200" />
           <span>Ghi Chú Nghiên Cứu Cá Nhân</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("sources");
+            fetchSourcesAndCitations();
+          }}
+          className={`px-4 py-2 rounded-2xl flex items-center gap-2 font-bold transition-all ${
+            activeTab === "sources"
+              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+              : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <FileText className="w-4 h-4 text-purple-200" />
+          <span>Kho Nguồn &amp; Trích Dẫn Học Thuật (§38, §52)</span>
         </button>
       </nav>
 
@@ -1099,6 +1224,435 @@ export default function LibraryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* SECTION 3: ACADEMIC SOURCES & CITATION ENGINE (§38, §52) */}
+      {/* ======================================================== */}
+      {activeTab === "sources" && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner */}
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-indigo-950/40 border border-purple-800/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-purple-300" /> Chuẩn Học Thuật Quốc Tế (§38, §52)
+                </span>
+                <span className="text-xs text-slate-400 font-mono">275 Ấn Phẩm &bull; 171 Tác Giả &bull; 10 Tuyển Tập Lớn</span>
+              </div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-400" />
+                Kho Nguồn Dữ Liệu &amp; Máy Phát Trích Dẫn Học Thuật
+              </h2>
+              <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                Hệ thống chuẩn hóa trích dẫn tự động theo các quy chuẩn Thần học viện: SBL (Society of Biblical Literature), Chicago/Turabian 9th, APA 7th, MLA 9th, BibTeX và Markdown phục vụ bài giảng và luận văn nghiên cứu.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const allBibtex = citationsList.map(c => c.citations?.bibtex).filter(Boolean).join("\n\n");
+                  copyCitationText("all_bibtex", allBibtex);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-purple-600/20"
+              >
+                {copiedCitationKey === "all_bibtex" ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-white" />
+                    <span>Đã Chép Tất Cả BibTeX!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Xuất Toàn Bộ BibTeX</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-Tabs Switcher */}
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setSourcesSubTab("citations")}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                sourcesSubTab === "citations"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                  : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Máy Tạo Trích Dẫn (Citations Engine)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSourcesSubTab("series");
+                if (seriesList.length === 0) fetchSeriesCatalog();
+              }}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                sourcesSubTab === "series"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                  : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Bộ Tuyển Tập Lớn ({seriesList.length || 10} Series)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSourcesSubTab("authors");
+                if (authorsList.length === 0) fetchAuthors();
+              }}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                sourcesSubTab === "authors"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                  : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Danh Mục Tác Giả ({authorsList.length || 171} Authors)</span>
+            </button>
+          </div>
+
+          {/* ======================================================== */}
+          {/* SUB-TAB 1: CITATIONS GENERATOR                           */}
+          {/* ======================================================== */}
+          {sourcesSubTab === "citations" && (
+            <div className="flex flex-col gap-5">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={citationSearch}
+                  onChange={(e) => {
+                    setCitationSearch(e.target.value);
+                    fetchCitations(e.target.value);
+                  }}
+                  placeholder="Tìm tác phẩm để tạo trích dẫn theo tên sách, tác giả hoặc tuyển tập..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-900/80 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+
+              {/* Citations Cards List */}
+              {loadingCitations ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                  <p className="text-xs text-slate-400">Đang tạo trích dẫn học thuật...</p>
+                </div>
+              ) : citationsList.length === 0 ? (
+                <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center flex flex-col items-center gap-3">
+                  <FileText className="w-10 h-10 text-slate-600" />
+                  <p className="text-xs text-slate-400">Không tìm thấy tác phẩm nào khớp với từ khóa tìm kiếm.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {citationsList.map((book) => {
+                    const c = book.citations || {};
+                    return (
+                      <div
+                        key={book.index}
+                        className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 flex flex-col gap-4 shadow-lg transition-all"
+                      >
+                        {/* Book Metadata Header */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-slate-800/80">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold uppercase">
+                                #{book.index} &bull; {book.category_vi}
+                              </span>
+                              {book.series && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {book.series}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="font-bold text-sm text-white">
+                              {book.title}
+                            </h3>
+                            <p className="text-xs text-purple-300 font-medium">
+                              Tác giả: {book.author} &bull; Nhà xuất bản: {c.publisher} ({c.estimated_year})
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenBook(book.index)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shrink-0"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Đọc Mục Lục</span>
+                          </button>
+                        </div>
+
+                        {/* Formatted Citations Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          {/* SBL Style */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                                SBL Handbook of Style (Kinh Viện)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyCitationText(`sbl_${book.index}`, c.sbl || "")}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                              >
+                                {copiedCitationKey === `sbl_${book.index}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCitationKey === `sbl_${book.index}` ? "Đã chép!" : "Sao chép"}</span>
+                              </button>
+                            </div>
+                            <p className="text-slate-300 font-serif leading-relaxed italic">
+                              {c.sbl}
+                            </p>
+                          </div>
+
+                          {/* Chicago / Turabian Style */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                Chicago / Turabian 9th
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyCitationText(`chicago_${book.index}`, c.chicago || "")}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                              >
+                                {copiedCitationKey === `chicago_${book.index}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCitationKey === `chicago_${book.index}` ? "Đã chép!" : "Sao chép"}</span>
+                              </button>
+                            </div>
+                            <p className="text-slate-300 font-serif leading-relaxed">
+                              {c.chicago}
+                            </p>
+                          </div>
+
+                          {/* APA 7th Style */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                                APA 7th Edition
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyCitationText(`apa_${book.index}`, c.apa || "")}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                              >
+                                {copiedCitationKey === `apa_${book.index}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCitationKey === `apa_${book.index}` ? "Đã chép!" : "Sao chép"}</span>
+                              </button>
+                            </div>
+                            <p className="text-slate-300 font-sans leading-relaxed">
+                              {c.apa}
+                            </p>
+                          </div>
+
+                          {/* BibTeX Entry */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                                BibTeX (@book)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyCitationText(`bibtex_${book.index}`, c.bibtex || "")}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                              >
+                                {copiedCitationKey === `bibtex_${book.index}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCitationKey === `bibtex_${book.index}` ? "Đã chép!" : "Sao chép"}</span>
+                              </button>
+                            </div>
+                            <pre className="text-[11px] text-slate-400 font-mono overflow-x-auto whitespace-pre leading-relaxed">
+                              {c.bibtex}
+                            </pre>
+                          </div>
+                        </div>
+
+                        {/* Markdown Copy Row */}
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/50 border border-slate-800 text-[11px] text-slate-400">
+                          <span className="truncate pr-4 italic">
+                            Markdown: {c.markdown}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyCitationText(`md_${book.index}`, c.markdown || "")}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-[10px] flex items-center gap-1 shrink-0 transition-colors"
+                          >
+                            {copiedCitationKey === `md_${book.index}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedCitationKey === `md_${book.index}` ? "Đã chép Markdown!" : "Chép Markdown"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* SUB-TAB 2: SERIES & MULTI-VOLUME COLLECTIONS             */}
+          {/* ======================================================== */}
+          {sourcesSubTab === "series" && (
+            <div className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {seriesList.map((ser, sIdx) => (
+                  <div
+                    key={sIdx}
+                    className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/40 flex flex-col justify-between gap-4 shadow-lg transition-all"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                          {ser.total_volumes} Tập Sách
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {ser.total_chapters} chương
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-sm text-white leading-snug">
+                        {ser.series_name}
+                      </h3>
+
+                      <p className="text-xs text-slate-400">
+                        Quy mô ngữ liệu: {(ser.total_chars / 1000000).toFixed(2)} triệu ký tự (~{(ser.total_chars / 1024 / 1024).toFixed(1)} MB)
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[11px] text-purple-300 font-medium">
+                        Xem chi tiết danh mục
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSeriesDetail(ser)}
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <span>Mở bộ sách</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Series Detail Drawer Modal */}
+              {selectedSeriesDetail && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+                  <div className="bg-[#0b101d] border border-slate-700/80 rounded-3xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                          Bộ Tuyển Tập Lớn &bull; {selectedSeriesDetail.total_volumes} Tập
+                        </span>
+                        <h3 className="text-base font-bold text-white mt-0.5">
+                          {selectedSeriesDetail.series_name}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSeriesDetail(null)}
+                        className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="p-5 flex flex-col gap-2.5 overflow-y-auto">
+                      {selectedSeriesDetail.volumes.map((v) => (
+                        <div
+                          key={v.index}
+                          className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition-colors"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-xs text-slate-100">
+                              #{v.index} &bull; {v.title}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Tác giả: {v.author} &bull; {v.total_chapters} chương &bull; {v.category_vi}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSeriesDetail(null);
+                              handleOpenBook(v.index);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+                          >
+                            <span>Xem sách</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* SUB-TAB 3: AUTHORS DIRECTORY                             */}
+          {/* ======================================================== */}
+          {sourcesSubTab === "authors" && (
+            <div className="flex flex-col gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {authorsList.map((author, aIdx) => (
+                  <div
+                    key={aIdx}
+                    className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between gap-3 shadow-lg"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                          {author.total_books} Tác Phẩm
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {author.chars_formatted}
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-sm text-white">
+                        {author.name}
+                      </h3>
+
+                      <p className="text-xs text-slate-400">
+                        Tổng số chương đóng góp: {author.total_chapters} chương
+                      </p>
+
+                      {/* Sample Books */}
+                      {author.sample_books && author.sample_books.length > 0 && (
+                        <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-slate-800/80">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tác phẩm tiêu biểu:</span>
+                          {author.sample_books.map((sb, sbIdx) => (
+                            <button
+                              key={sbIdx}
+                              type="button"
+                              onClick={() => handleOpenBook(sb.index)}
+                              className="text-left text-xs text-purple-300 hover:text-purple-200 truncate hover:underline"
+                            >
+                              &bull; {sb.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
