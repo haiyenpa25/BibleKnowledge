@@ -121,7 +121,7 @@ interface TimelineChallenge {
 }
 
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
 
   // User Profile Gamification State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -144,6 +144,18 @@ export default function LearnPage() {
   const [whoAmISelected, setWhoAmISelected] = useState<number | null>(null);
   const [whoAmIAnswered, setWhoAmIAnswered] = useState(false);
   const [whoAmILoading, setWhoAmILoading] = useState(false);
+
+  // True / False State (§3)
+  const [tfQuestions, setTfQuestions] = useState<QuizQuestion[]>([]);
+  const [tfIndex, setTfIndex] = useState(0);
+  const [tfSelectedOption, setTfSelectedOption] = useState<number | null>(null);
+  const [tfIsAnswered, setTfIsAnswered] = useState(false);
+  const [tfScore, setTfScore] = useState(0);
+  const [tfStreak, setTfStreak] = useState(0);
+  const [tfTimer, setTfTimer] = useState(15);
+  const [tfTimerActive, setTfTimerActive] = useState(false);
+  const [tfFinished, setTfFinished] = useState(false);
+  const [loadingTF, setLoadingTF] = useState(false);
 
   // Flashcards State
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -290,6 +302,101 @@ export default function LearnPage() {
       console.error("Failed to fetch timeline challenges:", err);
     } finally {
       setTimelineLoading(false);
+    }
+  };
+
+  // Fetch True / False Questions (§3)
+  const fetchTrueFalse = async () => {
+    setLoadingTF(true);
+    setTfIndex(0);
+    setTfSelectedOption(null);
+    setTfIsAnswered(false);
+    setTfFinished(false);
+    setTfScore(0);
+    setTfStreak(0);
+    setTfTimer(15);
+    setTfTimerActive(true);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/quiz?question_type=true_false&limit=15`);
+      if (res.ok) {
+        const data = await res.json();
+        setTfQuestions(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch true_false questions:", err);
+    } finally {
+      setLoadingTF(false);
+    }
+  };
+
+  // Timer Countdown Effect for True/False Lightning Mode
+  useEffect(() => {
+    let timerId: NodeJS.Timeout | null = null;
+    if (activeTab === "true_false" && tfTimerActive && !tfIsAnswered && !tfFinished && tfQuestions.length > 0) {
+      timerId = setInterval(() => {
+        setTfTimer((prev) => {
+          if (prev <= 1) {
+            handleTfAnswer(-1); // Timeout
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [activeTab, tfTimerActive, tfIsAnswered, tfFinished, tfQuestions.length, tfIndex]);
+
+  // Handle True / False Answer Selection
+  const handleTfAnswer = async (selected: number) => {
+    if (tfIsAnswered) return;
+    setTfTimerActive(false);
+    setTfSelectedOption(selected);
+    setTfIsAnswered(true);
+
+    const currentQ = tfQuestions[tfIndex];
+    if (!currentQ) return;
+
+    const isCorrect = selected === currentQ.correct_option;
+    if (isCorrect) {
+      const timeBonus = Math.max(0, tfTimer * 5);
+      const points = 100 + timeBonus;
+      setTfScore((prev) => prev + points);
+      setTfStreak((prev) => prev + 1);
+
+      // Submit score to profile
+      try {
+        await fetch(`${apiUrl}/api/learn/profile/score`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ points: points, quiz_completed: false })
+        });
+        fetchProfile();
+      } catch (err) {
+        console.error("Failed to submit score:", err);
+      }
+    } else {
+      setTfStreak(0);
+    }
+  };
+
+  const handleNextTfQuestion = () => {
+    if (tfIndex + 1 < tfQuestions.length) {
+      setTfIndex((prev) => prev + 1);
+      setTfSelectedOption(null);
+      setTfIsAnswered(false);
+      setTfTimer(15);
+      setTfTimerActive(true);
+    } else {
+      setTfFinished(true);
+      setTfTimerActive(false);
+      fetch(`${apiUrl}/api/learn/profile/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points: 50, quiz_completed: true })
+      }).then(() => fetchProfile());
     }
   };
 
@@ -741,6 +848,22 @@ export default function LearnPage() {
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab("true_false");
+            if (tfQuestions.length === 0) fetchTrueFalse();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "true_false"
+              ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Zap className="w-4 h-4 text-amber-300 fill-amber-400" />
+          <span>Đúng / Sai Phản Xạ</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400/30 text-amber-200 font-bold">15s Mới §3</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("flashcards")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
             activeTab === "flashcards"
@@ -1109,6 +1232,233 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="p-12 text-center text-slate-500">Chưa có câu đố nào.</div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 1.5 TRUE / FALSE LIGHTNING CHALLENGE (§3 Phản Xạ 15s)                 */}
+      {/* ===================================================================== */}
+      {activeTab === "true_false" && (
+        <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
+          {/* Top Status & Speedometer Bar */}
+          <div className="flex items-center justify-between p-4 rounded-2xl glass-panel border border-slate-800 text-xs md:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Tiến trình:</span>
+              <span className="font-bold text-white bg-slate-800 px-2.5 py-1 rounded-lg">
+                {tfQuestions.length > 0 ? `${tfIndex + 1} / ${tfQuestions.length}` : "0 / 0"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* 15s Countdown Clock */}
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border transition-all ${
+                  tfTimer <= 3
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse font-extrabold"
+                    : tfTimer <= 7
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold"
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>{tfTimer}s</span>
+              </div>
+
+              {/* Streak */}
+              <div className="flex items-center gap-1 px-3 py-1 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/30 font-semibold">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span>{tfStreak} chuỗi</span>
+              </div>
+
+              {/* Total Score */}
+              <div className="flex items-center gap-1 px-3 py-1 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span>{tfScore} đ</span>
+              </div>
+            </div>
+          </div>
+
+          {loadingTF ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+              <p className="text-sm font-medium">Đang nạp bộ câu hỏi phản xạ Đúng / Sai...</p>
+            </div>
+          ) : tfFinished ? (
+            /* Finished Summary Card */
+            <div className="p-8 md:p-12 rounded-3xl glass-panel border border-amber-500/30 text-center flex flex-col items-center gap-5 animate-in fade-in zoom-in-95">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-500/40">
+                <Award className="w-8 h-8" />
+              </div>
+
+              <div>
+                <h3 className="text-2xl md:text-3xl font-extrabold text-white">Thử Thách Hoàn Thành!</h3>
+                <p className="text-sm text-slate-400 mt-1">
+                  Bạn đã hoàn thành chặng thi phản xạ Đúng / Sai trong thời hạn 15 giây.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-2">
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xs text-slate-400">Tổng điểm tích lũy</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">+{tfScore} đ</div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xs text-slate-400">Tổng số câu hỏi</div>
+                  <div className="text-2xl font-black text-blue-400 mt-1">{tfQuestions.length} câu</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={fetchTrueFalse}
+                  className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                >
+                  <RotateCw className="w-4 h-4" /> Chơi Lại Vòng Mới
+                </button>
+                <Link
+                  href="/bible"
+                  className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm flex items-center gap-2 transition-colors border border-slate-700"
+                >
+                  <BookOpen className="w-4 h-4" /> Đọc Lại Kinh Thánh
+                </Link>
+              </div>
+            </div>
+          ) : tfQuestions.length > 0 && tfQuestions[tfIndex] ? (
+            /* Active Question Card */
+            (() => {
+              const currentQ = tfQuestions[tfIndex];
+              const isCorrect = tfSelectedOption === currentQ.correct_option;
+
+              return (
+                <div className="flex flex-col gap-6">
+                  {/* Timer Progress Line */}
+                  <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-1000 ${
+                        tfTimer <= 3 ? "bg-rose-500" : tfTimer <= 7 ? "bg-amber-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${(tfTimer / 15) * 100}%` }}
+                    />
+                  </div>
+
+                  {/* Statement Box */}
+                  <div className="p-8 md:p-10 rounded-3xl glass-panel border border-slate-700/80 flex flex-col items-center gap-4 text-center">
+                    <div className="flex items-center gap-2 text-xs uppercase font-bold tracking-wider text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Khẳng Định Kinh Thánh (§3 Phản Xạ Nhanh)</span>
+                    </div>
+
+                    <p className="font-serif text-lg md:text-2xl text-slate-100 leading-relaxed max-w-2xl py-2">
+                      &ldquo;{currentQ.question_text}&rdquo;
+                    </p>
+
+                    <span className="text-xs text-slate-400">
+                      Hãy quyết định trong vòng 15 giây: Khẳng định trên là <strong className="text-emerald-400">ĐÚNG</strong> hay <strong className="text-rose-400">SAI</strong>?
+                    </span>
+                  </div>
+
+                  {/* Dual Action Buttons: ĐÚNG vs SAI */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* BUTTON ĐÚNG (Index 0) */}
+                    <button
+                      type="button"
+                      disabled={tfIsAnswered}
+                      onClick={() => handleTfAnswer(0)}
+                      className={`py-6 px-4 md:px-8 rounded-2xl border-2 flex flex-col md:flex-row items-center justify-center gap-3 font-extrabold text-lg md:text-xl transition-all ${
+                        !tfIsAnswered
+                          ? "bg-emerald-950/20 border-emerald-600/40 text-emerald-300 hover:bg-emerald-600 hover:text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-950/40"
+                          : currentQ.correct_option === 0
+                          ? "bg-emerald-600 text-white border-emerald-400 ring-4 ring-emerald-500/30 scale-[1.02]"
+                          : tfSelectedOption === 0
+                          ? "bg-rose-600 text-white border-rose-400 ring-4 ring-rose-500/30"
+                          : "bg-slate-900/40 border-slate-800 text-slate-500 opacity-50"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-7 h-7 flex-shrink-0" />
+                      <span>ĐÚNG (TRUE)</span>
+                    </button>
+
+                    {/* BUTTON SAI (Index 1) */}
+                    <button
+                      type="button"
+                      disabled={tfIsAnswered}
+                      onClick={() => handleTfAnswer(1)}
+                      className={`py-6 px-4 md:px-8 rounded-2xl border-2 flex flex-col md:flex-row items-center justify-center gap-3 font-extrabold text-lg md:text-xl transition-all ${
+                        !tfIsAnswered
+                          ? "bg-rose-950/20 border-rose-600/40 text-rose-300 hover:bg-rose-600 hover:text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-rose-950/40"
+                          : currentQ.correct_option === 1
+                          ? "bg-emerald-600 text-white border-emerald-400 ring-4 ring-emerald-500/30 scale-[1.02]"
+                          : tfSelectedOption === 1
+                          ? "bg-rose-600 text-white border-rose-400 ring-4 ring-rose-500/30"
+                          : "bg-slate-900/40 border-slate-800 text-slate-500 opacity-50"
+                      }`}
+                    >
+                      <XCircle className="w-7 h-7 flex-shrink-0" />
+                      <span>SAI (FALSE)</span>
+                    </button>
+                  </div>
+
+                  {/* Real-time Feedback & Scripture Reference Card */}
+                  {tfIsAnswered && (
+                    <div className="p-6 rounded-2xl glass-panel border border-slate-700 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs uppercase font-extrabold px-3 py-1 rounded-lg ${
+                              isCorrect
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                : tfSelectedOption === -1
+                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                            }`}
+                          >
+                            {isCorrect
+                              ? `Chính Xác! +${100 + Math.max(0, tfTimer * 5)} Điểm (Tốc độ: +${tfTimer * 5}đ)`
+                              : tfSelectedOption === -1
+                              ? "Hết Giờ (0 Điểm)"
+                              : `Chưa Đúng (Đáp án đúng là: ${currentQ.correct_option === 0 ? "ĐÚNG" : "SAI"})`}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleNextTfQuestion}
+                          className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-lg shadow-amber-500/20 flex-shrink-0"
+                        >
+                          <span>{tfIndex + 1 < tfQuestions.length ? "Câu Tiếp Theo" : "Xem Tổng Kết"}</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="text-sm text-slate-200 leading-relaxed font-sans pt-2 border-t border-slate-800">
+                        <strong className="text-amber-300">Giải nghĩa thần học: </strong>
+                        {currentQ.explanation}
+                      </div>
+
+                      {currentQ.scripture_reference && (
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(currentQ.scripture_reference)}`}
+                            className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Kinh Thánh tham chiếu: {currentQ.scripture_reference} →</span>
+                          </Link>
+
+                          <span className="text-slate-500 text-[11px]">Bản dịch Truyền Thống 1925</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            <div className="p-12 text-center text-slate-500">
+              Không tìm thấy câu hỏi Đúng / Sai nào. Vui lòng thử lại.
+            </div>
           )}
         </div>
       )}
