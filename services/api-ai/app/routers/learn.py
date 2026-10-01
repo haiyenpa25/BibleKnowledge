@@ -2475,5 +2475,56 @@ def record_memorize_practice(
     )
 
 
+# ==============================================================================
+# BIBLE READING PLANS ENDPOINTS (ROADMAP §3 & §46)
+# ==============================================================================
+
+@router.get("/reading-plans")
+def list_reading_plans_learn(
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    from app.routers.bible import list_reading_plans
+    return list_reading_plans(user_identifier=user_identifier, db=db)
+
+
+@router.get("/reading-plans/today")
+def get_today_reading_plan_learn(
+    plan_id: str = Query("plan_1_year", description="Active plan ID"),
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    from app.routers.bible import get_today_reading_plan
+    return get_today_reading_plan(plan_id=plan_id, user_identifier=user_identifier, db=db)
+
+
+@router.get("/reading-plans/{plan_id}")
+def get_reading_plan_detail_learn(
+    plan_id: str,
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    from app.routers.bible import get_reading_plan_detail
+    return get_reading_plan_detail(plan_id=plan_id, user_identifier=user_identifier, db=db)
+
+
+@router.post("/reading-plans/{plan_id}/toggle-day")
+def toggle_reading_plan_day_learn(
+    plan_id: str,
+    day_number: Optional[int] = Query(None, ge=1),
+    completed: Optional[bool] = Query(None),
+    user_identifier: Optional[str] = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    from app.routers.bible import toggle_reading_plan_day, ToggleDayRequest
+    req = ToggleDayRequest(
+        day=day_number or 1,
+        completed=completed,
+        user_identifier=user_identifier
+    )
+    return toggle_reading_plan_day(plan_id=plan_id, req=req, db=db)
+
+
+
 
 
