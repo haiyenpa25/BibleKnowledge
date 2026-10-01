@@ -217,6 +217,14 @@ def list_catalog(
     }
 
 
+def extract_section_text(sec: dict) -> str:
+    if "content" in sec and sec["content"]:
+        return str(sec["content"])
+    if "paragraphs" in sec and isinstance(sec["paragraphs"], list):
+        return "\n\n".join(str(p) for p in sec["paragraphs"] if p)
+    return ""
+
+
 @router.get("/books/{book_index}")
 def get_book_details(book_index: int):
     """Retrieve detailed outline and chapter structure for a specific theological book."""
@@ -239,20 +247,31 @@ def get_book_details(book_index: int):
                 content = json.load(f)
 
             raw_chapters = content.get("chapters", [])
-            for ch in raw_chapters:
-                sections_count = len(ch.get("sections", []))
+            for idx, ch in enumerate(raw_chapters):
+                raw_secs = ch.get("sections", [])
+                sections_count = len(raw_secs)
                 first_section_txt = ""
-                if sections_count > 0:
-                    first_section_txt = ch["sections"][0].get("content", "")[:250]
+                for s in raw_secs:
+                    txt = extract_section_text(s).strip()
+                    if txt:
+                        first_section_txt = txt[:280]
+                        break
 
                 chapters_summary.append({
-                    "title": ch.get("title", "Chương"),
+                    "chapter_index": ch.get("index", idx),
+                    "title": ch.get("title", f"Chương {idx + 1}"),
                     "sections_count": sections_count,
                     "preview": first_section_txt
                 })
 
-            if raw_chapters and raw_chapters[0].get("sections"):
-                sample_excerpt = raw_chapters[0]["sections"][0].get("content", "")[:600]
+            for ch in raw_chapters:
+                for s in ch.get("sections", []):
+                    txt = extract_section_text(s).strip()
+                    if txt:
+                        sample_excerpt = txt[:600]
+                        break
+                if sample_excerpt:
+                    break
 
         except Exception as e:
             print(f"Error reading source file {filename}: {e}")
@@ -269,6 +288,101 @@ def get_book_details(book_index: int):
         "chapters_outline": chapters_summary,
         "sample_excerpt": sample_excerpt
     }
+
+
+class ChapterSectionItem(BaseModel):
+    heading: str
+    content: str
+    paragraphs: List[str] = []
+    scripture_ref: Optional[str] = None
+
+
+class ChapterDetailResponse(BaseModel):
+    book_index: int
+    book_title: str
+    book_author: str
+    series: Optional[str]
+    chapter_index: int
+    chapter_title: str
+    chapter_number: Optional[str]
+    total_sections: int
+    sections: List[ChapterSectionItem]
+    has_previous: bool
+    has_next: bool
+    previous_chapter_index: Optional[int]
+    next_chapter_index: Optional[int]
+
+
+@router.get("/books/{book_index}/chapters/{chapter_index}", response_model=ChapterDetailResponse)
+def get_chapter_content(book_index: int, chapter_index: int):
+    """Retrieve full text and sections of a specific chapter from a theological book."""
+    catalog = load_catalog()
+    sources = catalog.get("sources", [])
+
+    matched = next((s for s in sources if s.get("index") == book_index), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail=f"Book index {book_index} not found in catalog")
+
+    filename = matched.get("filename", "")
+    full_path = os.path.join(SOURCES_DIR, filename)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail=f"Source content file {filename} not found")
+
+    try:
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read book file: {str(e)}")
+
+    raw_chapters = content.get("chapters", [])
+    if not raw_chapters:
+        raise HTTPException(status_code=404, detail="No chapters available in this book")
+
+    target_ch = None
+    target_pos = -1
+    for pos, ch in enumerate(raw_chapters):
+        if ch.get("index") == chapter_index or pos == chapter_index:
+            target_ch = ch
+            target_pos = pos
+            break
+
+    if target_ch is None:
+        raise HTTPException(status_code=404, detail=f"Chapter {chapter_index} not found in book {book_index}")
+
+    sections_data = []
+    for sec in target_ch.get("sections", []):
+        heading = sec.get("heading", "")
+        raw_paras = sec.get("paragraphs", [])
+        if not raw_paras and "content" in sec and sec["content"]:
+            raw_paras = [sec["content"]]
+        text_content = extract_section_text(sec)
+        sections_data.append(ChapterSectionItem(
+            heading=heading,
+            content=text_content,
+            paragraphs=[str(p) for p in raw_paras if p],
+            scripture_ref=sec.get("scripture", "") or sec.get("scripture_ref", "") or None
+        ))
+
+    has_prev = target_pos > 0
+    has_next = target_pos < len(raw_chapters) - 1
+    prev_idx = raw_chapters[target_pos - 1].get("index", target_pos - 1) if has_prev else None
+    next_idx = raw_chapters[target_pos + 1].get("index", target_pos + 1) if has_next else None
+
+    return ChapterDetailResponse(
+        book_index=matched.get("index"),
+        book_title=matched.get("title", ""),
+        book_author=matched.get("author", ""),
+        series=matched.get("series", ""),
+        chapter_index=target_ch.get("index", chapter_index),
+        chapter_title=target_ch.get("title", f"Chương {chapter_index}"),
+        chapter_number=target_ch.get("chapter_number", ""),
+        total_sections=len(sections_data),
+        sections=sections_data,
+        has_previous=has_prev,
+        has_next=has_next,
+        previous_chapter_index=prev_idx,
+        next_chapter_index=next_idx
+    )
 
 
 # --- Personal Study Notes API ---

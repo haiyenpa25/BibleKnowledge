@@ -23,7 +23,13 @@ import {
   Bot,
   Filter,
   Check,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  Volume2,
+  VolumeX,
+  Copy,
+  ArrowLeft,
+  X
 } from "lucide-react";
 
 interface LibraryStats {
@@ -56,9 +62,33 @@ interface BookItem {
 }
 
 interface ChapterSummary {
+  chapter_index: number;
   title: string;
   sections_count: number;
   preview: string;
+}
+
+interface ChapterSectionItem {
+  heading: string;
+  content: string;
+  paragraphs: string[];
+  scripture_ref?: string;
+}
+
+interface ChapterDetail {
+  book_index: number;
+  book_title: string;
+  book_author: string;
+  series?: string;
+  chapter_index: number;
+  chapter_title: string;
+  chapter_number?: string;
+  total_sections: number;
+  sections: ChapterSectionItem[];
+  has_previous: boolean;
+  has_next: boolean;
+  previous_chapter_index?: number;
+  next_chapter_index?: number;
 }
 
 interface BookDetail {
@@ -105,6 +135,13 @@ export default function LibraryPage() {
   const [selectedBookIndex, setSelectedBookIndex] = useState<number | null>(null);
   const [bookDetail, setBookDetail] = useState<BookDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Chapter Reader State
+  const [selectedChapterIndex, setSelectedChapterIndex] = useState<number | null>(null);
+  const [chapterDetail, setChapterDetail] = useState<ChapterDetail | null>(null);
+  const [loadingChapter, setLoadingChapter] = useState(false);
+  const [copiedSectionIndex, setCopiedSectionIndex] = useState<number | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   // Notes States
   const [notes, setNotes] = useState<StudyNote[]>([]);
@@ -176,6 +213,70 @@ export default function LibraryPage() {
       setLoadingDetail(false);
     }
   }
+
+  // Chapter Reader Handlers
+  async function handleOpenChapter(bookIdx: number, chapterIdx: number) {
+    setSelectedChapterIndex(chapterIdx);
+    setLoadingChapter(true);
+    setChapterDetail(null);
+    setIsPlayingAudio(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    try {
+      const res = await fetch(`${apiUrl}/api/library/books/${bookIdx}/chapters/${chapterIdx}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChapterDetail(data);
+      }
+    } catch (err) {
+      console.error("Failed to load chapter content:", err);
+    } finally {
+      setLoadingChapter(false);
+    }
+  }
+
+  function handleToggleAudio() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    if (!chapterDetail || chapterDetail.sections.length === 0) return;
+
+    const fullNarrative = chapterDetail.sections
+      .map(s => (s.heading ? s.heading + ". " : "") + s.content)
+      .join("\n\n");
+
+    const utterance = new SpeechSynthesisUtterance(fullNarrative.slice(0, 3000));
+    utterance.lang = "vi-VN";
+    utterance.rate = 0.95;
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+
+    window.speechSynthesis.speak(utterance);
+    setIsPlayingAudio(true);
+  }
+
+  function handleCopyCitation(section: ChapterSectionItem, idx: number) {
+    if (!chapterDetail) return;
+    const citation = `"${section.content.slice(0, 400)}..."\n— Trích từ: ${chapterDetail.book_title}, ${chapterDetail.chapter_title} (Tác giả: ${chapterDetail.book_author})`;
+    navigator.clipboard.writeText(citation);
+    setCopiedSectionIndex(idx);
+    setTimeout(() => setCopiedSectionIndex(null), 2500);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Fetch Notes
   async function fetchNotes(q?: string) {
@@ -621,21 +722,225 @@ export default function LibraryPage() {
                       {/* Chapters Outline */}
                       <div className="flex flex-col gap-3">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-amber-400" /> Cấu Trúc Các Chương &amp; Đề Mục (Outline)
+                          <Layers className="w-4 h-4 text-amber-400" /> Cấu Trúc Các Chương &amp; Đề Mục (Nhấp để đọc toàn văn)
                         </h4>
                         <div className="flex flex-col gap-2">
                           {bookDetail.chapters_outline.map((ch, idx) => (
-                            <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex flex-col gap-1">
+                            <div 
+                              key={idx} 
+                              onClick={() => handleOpenChapter(bookDetail.index, ch.chapter_index)}
+                              className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/50 flex flex-col gap-1.5 cursor-pointer transition-all group shadow-sm"
+                            >
                               <div className="flex items-center justify-between">
-                                <span className="font-bold text-xs text-amber-300">{ch.title}</span>
-                                <span className="text-[10px] text-slate-400">{ch.sections_count} phân đoạn</span>
+                                <span className="font-bold text-xs text-amber-300 group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
+                                  <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>{ch.title}</span>
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-400">{ch.sections_count} phân đoạn</span>
+                                  <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
+                                    Đọc chương này →
+                                  </span>
+                                </div>
                               </div>
                               {ch.preview && (
-                                <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{ch.preview}...</p>
+                                <p className="text-[11px] text-slate-400 group-hover:text-slate-300 line-clamp-2 mt-0.5 transition-colors pl-5">
+                                  {ch.preview}...
+                                </p>
                               )}
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Chapter Reader Full Modal */}
+          {selectedChapterIndex !== null && (
+            <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 animate-in fade-in">
+              <div className="bg-[#080d19] border border-amber-500/50 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="p-4 md:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/80 backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedChapterIndex(null);
+                        setChapterDetail(null);
+                        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                          window.speechSynthesis.cancel();
+                        }
+                        setIsPlayingAudio(false);
+                      }}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      title="Quay lại mục lục sách"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {chapterDetail?.series && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {chapterDetail.series}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400 font-medium line-clamp-1">
+                          {chapterDetail?.book_title}
+                        </span>
+                      </div>
+                      <h3 className="text-base md:text-xl font-bold text-white mt-0.5">
+                        {chapterDetail?.chapter_title || "Đang tải chương..."}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Read Aloud Button */}
+                    <button
+                      type="button"
+                      onClick={handleToggleAudio}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                        isPlayingAudio
+                          ? "bg-amber-600 text-white animate-pulse shadow-md shadow-amber-600/40"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                      title="Nghe đọc âm thanh toàn chương"
+                    >
+                      {isPlayingAudio ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5" />
+                          <span>Dừng đọc</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Nghe đọc</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedChapterIndex(null);
+                        setChapterDetail(null);
+                        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                          window.speechSynthesis.cancel();
+                        }
+                        setIsPlayingAudio(false);
+                      }}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="p-6 md:p-8 overflow-y-auto flex flex-col gap-6">
+                  {loadingChapter ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+                      <p className="text-xs">Đang tải phân đoạn và nội dung chương...</p>
+                    </div>
+                  ) : chapterDetail ? (
+                    <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
+                      {/* Chapter Sections */}
+                      {chapterDetail.sections.map((sec, sIdx) => (
+                        <article
+                          key={sIdx}
+                          className="p-6 rounded-3xl bg-slate-900/50 border border-slate-800/80 flex flex-col gap-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/60">
+                            <div>
+                              {sec.heading && (
+                                <h4 className="text-base md:text-lg font-bold text-amber-300">
+                                  {sec.heading}
+                                </h4>
+                              )}
+                              {sec.scripture_ref && (
+                                <Link
+                                  href={`/bible?ref=${encodeURIComponent(sec.scripture_ref)}`}
+                                  className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 mt-1"
+                                >
+                                  <BookOpen className="w-3.5 h-3.5" />
+                                  <span>Kinh Thánh: {sec.scripture_ref} →</span>
+                                </Link>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyCitation(sec, sIdx)}
+                              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0"
+                              title="Sao chép đoạn trích kèm nguồn tài liệu"
+                            >
+                              {copiedSectionIndex === sIdx ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span className="text-emerald-400">Đã chép!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Trích dẫn</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Section Paragraphs */}
+                          <div className="flex flex-col gap-3 text-slate-200 font-serif leading-relaxed text-sm md:text-base">
+                            {sec.paragraphs && sec.paragraphs.length > 0 ? (
+                              sec.paragraphs.map((p, pIdx) => (
+                                <p key={pIdx} className="leading-relaxed">
+                                  {p}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="leading-relaxed whitespace-pre-line">{sec.content}</p>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+
+                      {/* Chapter Navigation Footer */}
+                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4 text-xs mt-4">
+                        <button
+                          type="button"
+                          disabled={!chapterDetail.has_previous || chapterDetail.previous_chapter_index === null}
+                          onClick={() => {
+                            if (chapterDetail.previous_chapter_index !== null && chapterDetail.previous_chapter_index !== undefined) {
+                              handleOpenChapter(chapterDetail.book_index, chapterDetail.previous_chapter_index);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Chương trước</span>
+                        </button>
+
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          Chương #{chapterDetail.chapter_index} &bull; {chapterDetail.total_sections} phân đoạn
+                        </span>
+
+                        <button
+                          type="button"
+                          disabled={!chapterDetail.has_next || chapterDetail.next_chapter_index === null}
+                          onClick={() => {
+                            if (chapterDetail.next_chapter_index !== null && chapterDetail.next_chapter_index !== undefined) {
+                              handleOpenChapter(chapterDetail.book_index, chapterDetail.next_chapter_index);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>Chương sau</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ) : null}
