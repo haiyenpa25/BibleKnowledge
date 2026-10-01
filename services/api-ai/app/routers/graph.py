@@ -165,6 +165,47 @@ def get_biblical_timeline(db: Session = Depends(get_db)):
     return timeline
 
 
+@router.get("/entities")
+def get_all_entities(
+    entity_type: Optional[str] = Query(None, description="person, place, event, or all"),
+    search: Optional[str] = Query(None, description="Search keyword in label"),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    List all indexed theological entities (People, Places, Events, Covenants).
+    """
+    query = "SELECT id, node_type, node_key, label, metadata FROM knowledge_nodes"
+    conditions = []
+    params: dict = {"limit": limit, "offset": offset}
+
+    if entity_type and entity_type != "all":
+        conditions.append("node_type = :entity_type")
+        params["entity_type"] = entity_type
+
+    if search:
+        conditions.append("label ILIKE :search")
+        params["search"] = f"%{search}%"
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY label ASC LIMIT :limit OFFSET :offset"
+
+    rows = db.execute(text(query), params).fetchall()
+    results = []
+    for r in rows:
+        results.append({
+            "id": str(r.id),
+            "node_type": r.node_type,
+            "node_key": r.node_key,
+            "label": r.label,
+            "metadata": r.metadata if isinstance(r.metadata, dict) else {}
+        })
+    return results
+
+
 @router.get("/entities/{entity_type}/{slug}")
 def get_entity_detail(entity_type: str, slug: str, db: Session = Depends(get_db)):
     """
