@@ -1681,5 +1681,429 @@ def get_thematic_map(
         "homiletical_outline": t.get("homiletical_outline", {})
     }
 
+# ==============================================================================
+# §6, §8, §9, §44 — Biblical Chronological Event Atlas & Geo-Temporal Synthesis
+# ==============================================================================
 
+EVENT_GEO_ATLAS_METADATA = {
+    "su-sang-tao": {
+        "site_name": "Vườn Ê-đen / Vùng Lưỡng Hà",
+        "ancient_site": "Garden of Eden / Mesopotamia",
+        "modern_name": "Hạ lưu sông Tigris & Euphrates, Iraq",
+        "lat": 31.0200,
+        "lng": 47.4100,
+        "era_key": "primeval_patriarch",
+        "archaeological_context": "Vùng 'Lưỡi Liềm Màu Mỡ' (Fertile Crescent), cái nôi văn minh nhân loại nơi bốn nhánh sông (Ti-gơ-rơ, Ơ-phơ-rát, Phi-sôn, Ghi-hôn) hội tụ theo mô tả Sáng-thế Ký 2.",
+        "strategic_geography": "Điểm khởi đầu địa lý của toàn bộ câu chuyện cứu rỗi; từ đó loài người tản lạc ra khắp mặt đất sau sự kiện tháp Ba-bên."
+    },
+    "giao-uoc-ap-ra-ham": {
+        "site_name": "Si-chem, Bê-tên & Hếp-rôn",
+        "ancient_site": "Shechem, Bethel & Hebron",
+        "modern_name": "Nablus, Beitin & Hebron, Bờ Tây",
+        "lat": 32.2138,
+        "lng": 35.2858,
+        "era_key": "primeval_patriarch",
+        "archaeological_context": "Si-chem nằm ở thung lũng giữa Núi Ê-banh và Núi Ga-ri-xim, là trạm dừng chân đầu tiên khi Áp-ra-ham đặt chân vào Ca-na-an. Nơi đây khảo cổ phát hiện đền thờ Canaanite cổ và giếng Gia-cốp.",
+        "strategic_geography": "Giao lộ của 'Con Đường Các Tổ Phụ' (Way of the Patriarchs) chạy dọc theo sống núi trung tâm xứ Ca-na-an, kết nối các bàn thờ thờ phượng Đức Giê-hô-va."
+    },
+    "xuat-ai-cap-vuot-bien-do": {
+        "site_name": "Ram-se & Núi Si-na-i (Hô-rếp)",
+        "ancient_site": "Ramses & Mount Sinai (Horeb)",
+        "modern_name": "Qantir & Jabal Musa, Bán đảo Sinai, Ai Cập",
+        "lat": 28.5394,
+        "lng": 33.9753,
+        "era_key": "exodus_judges",
+        "archaeological_context": "Núi Si-na-i (Jabal Musa) cao 2.285m bằng đá granite đỏ sừng sững giữa sa mạc bán đảo Sinai. Tu viện Saint Catherine dưới chân núi bảo tồn các bản thảo cổ nhất thế giới.",
+        "strategic_geography": "Bán đảo Sinai là vùng đệm khắc nghiệt ngăn cách văn minh sông Nile với xứ Canaan. Nơi Chúa biến đổi một đám đông nô lệ thành một dân tộc giao ước và vương quốc thầy tế lễ."
+    },
+    "chinh-phuc-ca-na-an-va-gie-ri-co": {
+        "site_name": "Thành Giê-ri-cô & Sông Giô-đanh",
+        "ancient_site": "Jericho & Jordan River Crossing",
+        "modern_name": "Tell es-Sultan, Jericho, Bờ Tây",
+        "lat": 31.8700,
+        "lng": 35.4442,
+        "era_key": "exodus_judges",
+        "archaeological_context": "Tell es-Sultan được xác nhận là một trong những thành phố có tường thành cổ xưa nhất thế giới, nằm dưới mực nước biển 258m gần các suối nước ngọt Elisha.",
+        "strategic_geography": "Chìa khóa chiến lược khống chế hẻm núi đi lên cao nguyên trung tâm và Giê-ru-sa-lem. Sự sụp đổ kỳ diệu của tường thành Giê-ri-cô mở toang cánh cửa chinh phục Đất Hứa."
+    },
+    "thoi-ky-cac-quan-xet-va-ru-to": {
+        "site_name": "Si-lô & Bết-lê-hem",
+        "ancient_site": "Shiloh & Bethlehem",
+        "modern_name": "Khirbet Seilun & Bethlehem, Bờ Tây",
+        "lat": 32.0556,
+        "lng": 35.2897,
+        "era_key": "exodus_judges",
+        "archaeological_context": "Si-lô là trung tâm tôn giáo và nơi đặt Đền Tạm hơn 300 năm trong thời Quan Xét cho đến khi Hòm Giao Ước bị người Phi-li-tin chiếm đoạt (1 Sa-mu-ên 4).",
+        "strategic_geography": "Nằm ở trung tâm bộ tộc Ép-ra-im, điểm quy tụ thờ phượng của 12 chi phái; trong khi cánh đồng Bết-lê-hem là nơi diễn ra câu chuyện tình yêu cứu chuộc của Bô-ô và Ru-tơ."
+    },
+    "vua-da-vit-thong-nhat-va-lap-thu-do": {
+        "site_name": "Thành Đa-vít & Giê-ru-sa-lem",
+        "ancient_site": "City of David & Mount Zion",
+        "modern_name": "Wadi Hilweh, Cổ thành Jerusalem",
+        "lat": 31.7730,
+        "lng": 35.2350,
+        "era_key": "united_kingdom",
+        "archaeological_context": "Thành Giê-bu-sê cổ được Đa-vít chiếm qua đường hầm dẫn nước từ suối Ghi-hôn (Warren's Shaft). Khảo cổ đã tìm thấy cấu trúc đá bậc thang đồ sộ thời Đa-vít.",
+        "strategic_geography": "Nằm giữa ranh giới Giu-đa và Bên-gia-min, không thuộc quyền sở hữu riêng của chi phái nào, tạo sự đoàn kết quốc gia và trở thành trung tâm chính trị lẫn tâm linh vĩnh cửu."
+    },
+    "xay-den-tho-sa-lo-mon": {
+        "site_name": "Núi Mô-ri-a (Đền Thờ Giê-ru-sa-lem)",
+        "ancient_site": "Mount Moriah (Temple Mount)",
+        "modern_name": "Haram al-Sharif, Jerusalem",
+        "lat": 31.7780,
+        "lng": 35.2354,
+        "era_key": "united_kingdom",
+        "archaeological_context": "Đỉnh núi Mô-ri-a nơi Áp-ra-ham dâng Y-sác và sân đập lúa của A-rau-na. Nơi Sa-lô-môn xây Đền Thờ thứ nhất nguy nga với gỗ bá hương Li-ban và vàng ròng Ô-phia.",
+        "strategic_geography": "Trọng tâm hiện diện thánh của Đức Chúa Trời giữa vòng dân tộc; nơi khói hương của sự chuộc tội bay lên ngai ân điển."
+    },
+    "vuong-quoc-phan-chia-va-tien-tri-e-li": {
+        "site_name": "Núi Cạt-mên & Si-chem",
+        "ancient_site": "Mount Carmel & Shechem",
+        "modern_name": "Muhraqa, Mount Carmel, Israel",
+        "lat": 32.6710,
+        "lng": 35.0880,
+        "era_key": "divided_kingdom",
+        "archaeological_context": "Đỉnh Muhraqa nhìn xuống thung lũng Kích-sôn và đồng bằng Gít-rê-ên. Tu viện Cát-minh ghi dấu bàn thờ Chúa bị phá dỡ được Ê-li đắp lại bằng 12 hòn đá.",
+        "strategic_geography": "Dãy Cạt-mên nhô ra Địa Trung Hải là ranh giới tự nhiên giữa Israel và xứ Phê-ni-xi; nơi diễn ra cuộc đọ sức sinh tử giữa Giê-hô-va Đức Chúa Trời chân thần và thần Ba-anh giả trá."
+    },
+    "sa-ma-ri-sup-do-a-si-ri-xam-luoc": {
+        "site_name": "Thủ đô Sa-ma-ri (Vương quốc phía Bắc)",
+        "ancient_site": "Samaria (Sebaste)",
+        "modern_name": "Sebastia, Nablus, Bờ Tây",
+        "lat": 32.2770,
+        "lng": 35.1910,
+        "era_key": "divided_kingdom",
+        "archaeological_context": "Cung điện ngà voi tráng lệ của vua A-háp và vương triều Ôm-ri khai quật tại Sebaste minh chứng cho sự giàu có vật chất song suy đồi tâm linh trầm trọng.",
+        "strategic_geography": "Ngọn đồi biệt lập dễ thủ nhưng bị quân đội hùng mạnh của San-ma-na-se V và Sạt-gôn II của A-si-ri vây hãm 3 năm, dẫn đến sự lưu đày của 10 chi phái phương bắc năm 722 TCN."
+    },
+    "gie-ru-sa-lem-sup-do-ba-by-lon-luu-day": {
+        "site_name": "Giê-ru-sa-lem & Đô thành Ba-by-lôn",
+        "ancient_site": "Jerusalem & Babylon",
+        "modern_name": "Hillah, Tỉnh Babil, Iraq",
+        "lat": 32.5364,
+        "lng": 44.4208,
+        "era_key": "exile",
+        "archaeological_context": "Thành phố tráng lệ Ba-by-lôn với Cổng Ishtar và Đường Diễu Hành bằng gạch men xanh rực rỡ, nơi vua Nê-bu-cát-nết-xa giam giữ tuyển dân Giu-đa bị lưu đày.",
+        "strategic_geography": "Khoảng cách địa lý hơn 1.400 km dọc theo sông Ơ-phơ-rát là cuộc thanh tẩy tâm linh sâu sắc, khiến tuyển dân dứt bỏ hoàn toàn nạn thờ hình tượng để quay về độc thần giáo."
+    },
+    "chieu-chi-si-ru-va-hoi-huong-tai-thiet": {
+        "site_name": "Ba-tư (Su-sơ) & Giê-ru-sa-lem",
+        "ancient_site": "Susa & Jerusalem",
+        "modern_name": "Shush, Khuzestan, Iran & Jerusalem",
+        "lat": 32.1906,
+        "lng": 48.2464,
+        "era_key": "restoration_intertestamental",
+        "archaeological_context": "Trụ đá hình trụ của Vua Si-ru (Cyrus Cylinder) tại Bảo tàng Anh Quốc xác nhận chính sách tôn giáo nhân từ cho phép các dân tộc bị lưu đày hồi hương phục hồi đền thờ.",
+        "strategic_geography": "Đoàn hồi hương dưới sự dẫn dắt của Xô-rô-ba-bên và Giê-su-a vượt sa mạc trở về tái lập bàn thờ trên nền Đền Thờ cũ hoang tàn."
+    },
+    "ne-he-mi-tai-thiet-tuong-thanh": {
+        "site_name": "Tường thành Giê-ru-sa-lem",
+        "ancient_site": "Walls of Jerusalem",
+        "modern_name": "Thành Cổ Jerusalem",
+        "lat": 31.7767,
+        "lng": 35.2345,
+        "era_key": "restoration_intertestamental",
+        "archaeological_context": "Các đoạn tường thành thời Ba Tư được TS. Eilat Mazar phát hiện tại đồi Óp-phen và sườn phía đông Đồi Đa-vít, hoàn thành kỳ diệu trong đúng 52 ngày.",
+        "strategic_geography": "Khôi phục vị thế phòng thủ, an ninh dân sự và sự tôn nghiêm tôn giáo cho cộng đồng tuyển dân trước sự thù địch của các lân bang San-ba-lát và Tô-bi-gia."
+    },
+    "bon-tram-nam-im-lang-giua-hai-uoc": {
+        "site_name": "Giê-ru-sa-lem, A-léc-xăng-đơ-ri & Rô-ma",
+        "ancient_site": "Alexandria & Jerusalem",
+        "modern_name": "Alexandria, Ai Cập & Jerusalem",
+        "lat": 31.2001,
+        "lng": 29.9187,
+        "era_key": "restoration_intertestamental",
+        "archaeological_context": "Sự xuất hiện của bản dịch Kinh Thánh Hy Lạp Bảy Mươi (Septuagint - LXX) tại Alexandria và phong trào Khởi nghĩa Mác-ca-bê tại Mô-đin bảo tồn đức tin Do Thái giáo.",
+        "strategic_geography": "Thời kỳ đế quốc Hy Lạp (văn hóa/ngôn ngữ Koine) và La Mã (hệ thống đường sá Pax Romana) dọn đường toàn hảo cho sự truyền bá Phúc Âm khi kỳ hạn đã được trọn."
+    },
+    "su-giang-sinh-chua-gie-xu": {
+        "site_name": "Bết-lê-hem & Na-xa-rét",
+        "ancient_site": "Bethlehem of Judea & Nazareth",
+        "modern_name": "Bethlehem, Bờ Tây & Nazareth, Israel",
+        "lat": 31.7054,
+        "lng": 35.2024,
+        "era_key": "life_of_christ",
+        "archaeological_context": "Nhà thờ Giáng Sinh (Church of the Nativity) tại Bết-lê-hem xây trên hang đá máng cỏ cổ xưa, ứng nghiệm lời tiên tri Mi-chê 5:1 về Đấng Cai Trị xuất thân từ đời xưa.",
+        "strategic_geography": "Thị trấn nhỏ bé khiêm nhường cách Giê-ru-sa-lem 8 km về phía nam, quê hương tổ phụ Đa-vít, nơi Ngôi Lời hóa thân thành nhục thể ở giữa nhân loại."
+    },
+    "phep-la-ca-na": {
+        "site_name": "Ca-na xứ Ga-li-lê",
+        "ancient_site": "Cana of Galilee",
+        "modern_name": "Kafr Kanna hoặc Khirbet Qana, Israel",
+        "lat": 32.7480,
+        "lng": 35.3380,
+        "era_key": "life_of_christ",
+        "archaeological_context": "Các vò đá cổ lớn đựng nước tẩy lễ theo phong tục Do Thái tìm thấy tại di chỉ Kafr Kanna và Khirbet Qana miền hạ Ga-li-lê.",
+        "strategic_geography": "Khởi đầu các dấu kỳ phép lạ của Chúa Cứu Thế Giê-xu nhằm bày tỏ vinh hiển thiên thượng và khai mở kỷ nguyên tiệc cưới cứu chuộc của Chiên Con."
+    },
+    "di-bo-tren-mat-bien": {
+        "site_name": "Biển Ga-li-lê (Hồ Ti-bê-ri-át / Ghê-nê-xa-rết)",
+        "ancient_site": "Sea of Galilee (Lake Kinneret)",
+        "modern_name": "Hồ Kinneret, Miền Bắc Israel",
+        "lat": 32.8250,
+        "lng": 35.5850,
+        "era_key": "life_of_christ",
+        "archaeological_context": "Hồ nước ngọt trũng sâu 214m dưới mực nước biển, nơi phát hiện chiếc 'Thuyền Chúa Giê-xu' bằng gỗ sồi thế kỷ 1 tại Ginosar trong mùa hạn hán năm 1986.",
+        "strategic_geography": "Vùng hồ gió xoáy bất chợt từ khe núi Golan đổ xuống; nơi Chúa Giê-xu khẳng định thần tính 'Ta Đây, Đừng Sợ' và quyền tể trị trên các thế lực hỗn loạn tự nhiên."
+    },
+    "su-dong-dinh-thap-tu-gia": {
+        "site_name": "Đồi Gô-gô-tha (Núi Sọ / Đồi Can-vê)",
+        "ancient_site": "Golgotha / Calvary",
+        "modern_name": "Cổ thành Jerusalem (Nhà thờ Mộ Thánh / Garden Tomb)",
+        "lat": 31.7785,
+        "lng": 35.2297,
+        "era_key": "life_of_christ",
+        "archaeological_context": "Địa điểm bên ngoài tường thành Giê-ru-sa-lem thế kỷ 1, mỏ đá vôi cổ với khu vườn và các ngôi mộ đục trong vách đá phù hợp mô tả các sách Tin Lành.",
+        "strategic_geography": "Tâm điểm vũ trụ của lịch sử nhân loại; nơi Đấng Vô Tội gánh lấy toàn bộ án phạt tội lỗi, xé toang bức màn Đền Thờ nối kết con người với Đức Chúa Trời."
+    },
+    "su-phuc-sinh-vinh-hien": {
+        "site_name": "Ngôi Mộ Trống & Vườn Núi Ô-liu",
+        "ancient_site": "Empty Tomb & Mount of Olives",
+        "modern_name": "Jerusalem",
+        "lat": 31.7792,
+        "lng": 35.2300,
+        "era_key": "life_of_christ",
+        "archaeological_context": "Ngôi mộ lăn đá cổ thế kỷ 1 với phiến đá đặt thi hài trống không; đỉnh núi Ô-liu nơi Chúa Giê-xu thăng thiên và các thiên sứ hứa Ngài sẽ trở lại cùng một thể ấy.",
+        "strategic_geography": "Nền tảng bất diệt của niềm hy vọng Cơ Đốc giáo; chiến thắng sự chết, âm phủ và bảo đảm sự sống đời đời cho tất cả mọi kẻ tin."
+    },
+    "bien-co-le-ngu-tuan": {
+        "site_name": "Phòng Cao Giê-ru-sa-lem (Núi Si-ôn)",
+        "ancient_site": "Upper Room (Cenacle)",
+        "modern_name": "Mount Zion, Jerusalem",
+        "lat": 31.7722,
+        "lng": 35.2293,
+        "era_key": "apostolic_church",
+        "archaeological_context": "Di tích Cenacle trên Núi Si-ôn, gần mộ vua Đa-vít, nơi 120 môn đồ đồng tâm cầu nguyện nhận lãnh phép báp-tem bằng Đức Thánh Linh và lửa.",
+        "strategic_geography": "Khai sinh Hội Thánh Đấng Christ; Lễ Ngũ Tuần quy tụ người Do Thái từ khắp thế giới La Mã trở thành sứ giả đem Phúc Âm tỏa ra muôn nước."
+    },
+    "su-bien-cai-cua-phao-lo": {
+        "site_name": "Đường Đến Đa-mách (Damascus)",
+        "ancient_site": "Road to Damascus",
+        "modern_name": "Damascus, Syria",
+        "lat": 33.5138,
+        "lng": 36.2765,
+        "era_key": "apostolic_church",
+        "archaeological_context": "Con phố 'Thẳng' (Straight Street - Bab Sharqi) tại Đa-mách nơi Phao-lô ở nhà Giu-đa và được A-na-nia đặt tay chữa lành mắt và làm phép báp-tem.",
+        "strategic_geography": "Đa-mách là đô thị cổ thịnh vượng ngã tư thương mại; nơi tay bắt bớ hung bạo nhất trở thành Sứ đồ vĩ đại truyền giáo cho thế giới Dân Ngoại."
+    },
+    "dai-hoi-dong-gie-ru-sa-lem": {
+        "site_name": "Giê-ru-sa-lem (Hội đồng Sứ đồ & Trưởng lão)",
+        "ancient_site": "Council of Jerusalem",
+        "modern_name": "Jerusalem",
+        "lat": 31.7767,
+        "lng": 35.2345,
+        "era_key": "apostolic_church",
+        "archaeological_context": "Nơi các Sứ đồ và Trưởng lão nhóm lại thảo luận nguyên tắc cứu rỗi thuần khiết bởi đức tin trong ân điển Đấng Christ, không ép Dân Ngoại phải chịu phép cắt bì theo luật Môi-se.",
+        "strategic_geography": "Cột mốc thần học giải phóng Phúc Âm khỏi rào cản quốc gia Do Thái hẹp hòi, mở toang cánh cửa cứu chuộc cho toàn bộ các quốc gia thế giới."
+    },
+    "khai-huyen-tren-dao-bat-mo": {
+        "site_name": "Đảo Bát-mô (Biển Ê-giê)",
+        "ancient_site": "Isle of Patmos",
+        "modern_name": "Patmos, Quần đảo Dodecanese, Hy Lạp",
+        "lat": 37.3167,
+        "lng": 26.5500,
+        "era_key": "apostolic_church",
+        "archaeological_context": "Hòn đảo núi lửa đá cằn cỗi nơi Đế quốc La Mã dùng làm nơi lưu đày tù chính trị; Hang Khải Huyền (Cave of the Apocalypse) lưu giữ nơi Giăng nghe tiếng Chúa như tiếng nước lớn.",
+        "strategic_geography": "Điểm kết thúc khải huyền của 66 sách chính kinh; khải tượng về Đấng An-pha và Ô-mê-ga, sự chiến thắng chung cuộc của Chiên Con và Trời Mới Đất Mới."
+    }
+}
+
+
+def project_geo_coordinates(lat: float, lng: float):
+    """
+    Project Geographic coordinates (lat, lng) to SVG space (900x600).
+    Region bounds: Lat 26..43.5, Lng 11..48 (covers Rome, Greece, Asia Minor, Canaan, Egypt, Mesopotamia).
+    """
+    min_lat, max_lat = 26.0, 43.5
+    min_lng, max_lng = 11.0, 48.0
+    x = ((lng - min_lng) / (max_lng - min_lng)) * 820 + 40
+    y = ((max_lat - lat) / (max_lat - min_lat)) * 520 + 40
+    return round(max(30, min(870, x))), round(max(30, min(570, y)))
+
+
+def _extract_verse_from_db(db: Session, ref: str) -> str:
+    """
+    Helper to fetch verse text from bible_verses table by reference.
+    Robustly handles single verses, ranges, and compound references (e.g. 12:1-3; 15:1).
+    """
+    try:
+        first_ref = ref.split(";")[0].strip()
+        m = re.search(r'^(.*?)\s+(\d+)(?::(\d+))?', first_ref)
+        if not m:
+            return ""
+
+        b_name = m.group(1).strip()
+        ch = int(m.group(2))
+        v = int(m.group(3)) if m.group(3) else 1
+
+        patterns = [b_name]
+        p_roman = re.sub(r'^1\s+', 'I ', b_name)
+        p_roman = re.sub(r'^2\s+', 'II ', p_roman)
+        p_roman = re.sub(r'^3\s+', 'III ', p_roman)
+        patterns.append(p_roman)
+
+        p_hyphen = b_name.replace(" ", "-")
+        patterns.append(p_hyphen)
+
+        if "công vụ" in b_name.lower():
+            patterns.extend(["Công-vụ", "cong", "Acts"])
+
+        clauses = []
+        params = {"ch": ch, "v": v}
+        for idx, pat in enumerate(patterns):
+            key = f"p_{idx}"
+            params[key] = f"%{pat}%"
+            clauses.append(f"b.name_vi ILIKE :{key} OR b.name_en ILIKE :{key} OR b.code ILIKE :{key}")
+
+        where_clause = " OR ".join(clauses)
+        sql = text(f"""
+            SELECT v.text
+            FROM bible_verses v
+            JOIN bible_books b ON v.book_id = b.id
+            WHERE ({where_clause})
+              AND v.chapter = :ch AND v.verse = :v
+            LIMIT 1
+        """)
+        row = db.execute(sql, params).fetchone()
+        if row and row[0]:
+            return row[0].strip()
+    except Exception as e:
+        logger.warning(f"Error fetching verse for ref '{ref}': {e}")
+    return ""
+
+
+@router.get("/event-atlas")
+def get_biblical_event_atlas(
+    era: str = Query(None, description="Era filter (e.g. primeval_patriarch, exodus_judges, all)"),
+    search: str = Query(None, description="Search keyword in event title, location or scripture"),
+    db: Session = Depends(get_db)
+):
+    """
+    §6, §8, §9, §44 — Biblical Chronological Event Atlas & Geo-Temporal Historical Synthesis.
+    Integrates all 22 redemptive events with geographic coordinates, archaeological topography,
+    authentic 1925 Vietnamese scripture verses, and Christological significance.
+    """
+    rows = db.execute(
+        text("""
+        SELECT id, slug, title, approximate_date, date_type, period, description, metadata
+        FROM events
+        ORDER BY (metadata->>'era_order')::int ASC, id ASC
+        """)
+    ).fetchall()
+
+    atlas_events = []
+    for r in rows:
+        meta = r.metadata if isinstance(r.metadata, dict) else {}
+        slug = r.slug
+        geo = EVENT_GEO_ATLAS_METADATA.get(slug, {
+            "site_name": (meta.get("places") or ["Vùng Thánh Địa"])[0],
+            "ancient_site": "Ancient Near East",
+            "modern_name": "Địa lý Cận Đông Cổ Đại",
+            "lat": 31.7683,
+            "lng": 35.2137,
+            "era_key": "all",
+            "archaeological_context": "Vùng đất lịch sử cứu rỗi.",
+            "strategic_geography": "Giao lộ của các nền văn minh cổ đại."
+        })
+
+        era_order = int(meta.get("era_order", 99))
+        era_key = geo.get("era_key", "all")
+
+        # Filter by era if specified
+        if era and era != "all":
+            if era == "primeval_patriarch" and era_key != "primeval_patriarch":
+                continue
+            elif era == "exodus_judges" and era_key != "exodus_judges":
+                continue
+            elif era == "united_kingdom" and era_key != "united_kingdom":
+                continue
+            elif era == "divided_kingdom" and era_key != "divided_kingdom":
+                continue
+            elif era == "exile" and era_key != "exile":
+                continue
+            elif era == "restoration_intertestamental" and era_key != "restoration_intertestamental":
+                continue
+            elif era == "life_of_christ" and era_key != "life_of_christ":
+                continue
+            elif era == "apostolic_church" and era_key != "apostolic_church":
+                continue
+
+        # Filter by search if specified
+        scripture_ref = meta.get("scripture", "")
+        if search:
+            q = search.lower().strip()
+            title_match = q in r.title.lower()
+            desc_match = q in (r.description or "").lower()
+            ref_match = q in scripture_ref.lower()
+            site_match = q in geo["site_name"].lower() or q in geo["modern_name"].lower()
+            people_match = any(q in p.lower() for p in meta.get("people", []))
+            if not (title_match or desc_match or ref_match or site_match or people_match):
+                continue
+
+        # Extract authentic verse text from DB
+        verse_text = ""
+        if scripture_ref:
+            verse_text = _extract_verse_from_db(db, scripture_ref)
+
+        svg_x, svg_y = project_geo_coordinates(geo["lat"], geo["lng"])
+
+        atlas_events.append({
+            "id": str(r.id),
+            "slug": slug,
+            "title": r.title,
+            "approximate_date": r.approximate_date,
+            "date_type": r.date_type,
+            "period": r.period,
+            "description": r.description,
+            "era_order": era_order,
+            "era_key": era_key,
+            "scripture": scripture_ref,
+            "verse_text": verse_text,
+            "people": meta.get("people", []),
+            "places": meta.get("places", []),
+            "theological_significance": meta.get("theological_significance"),
+            "geo": {
+                "site_name": geo["site_name"],
+                "ancient_site": geo["ancient_site"],
+                "modern_name": geo["modern_name"],
+                "latitude": geo["lat"],
+                "longitude": geo["lng"],
+                "svg_x": svg_x,
+                "svg_y": svg_y,
+                "archaeological_context": geo["archaeological_context"],
+                "strategic_geography": geo["strategic_geography"]
+            }
+        })
+
+    return {
+        "total_events": len(atlas_events),
+        "era_filter": era or "all",
+        "events": atlas_events
+    }
+
+
+@router.get("/geo-routes")
+def get_biblical_geo_routes():
+    """
+    §9 — Returns curated Biblical Spatial Journeys with projected SVG coordinates.
+    """
+    journeys_data = list_biblical_journeys()
+    routes = []
+    for j in journeys_data:
+        wps = []
+        for wp in j.get("waypoints", []):
+            sx, sy = project_geo_coordinates(wp["lat"], wp["lng"])
+            wps.append({
+                **wp,
+                "svg_x": sx,
+                "svg_y": sy
+            })
+        routes.append({
+            **j,
+            "waypoints": wps
+        })
+    return {
+        "total_routes": len(routes),
+        "routes": routes
+    }
 

@@ -189,6 +189,31 @@ async function main() {
   const rThemeMap = await testEndpoint('/api/graph/theme-map?theme_id=covenant_redemption', d => (!d.nodes || d.nodes.length === 0 || !d.edges || !d.eras_trajectory || !d.homiletical_outline) && 'Invalid theme map response');
   report('GET /api/graph/theme-map (Thematic network radial graph, OT/NT typology links & 8-era trajectory)', rThemeMap.ok, rThemeMap.error);
 
+  // Biblical Chronological Event Atlas & Geo-Temporal Historical Synthesis (§6, §8, §9, §44)
+  const rEventAtlas = await testEndpoint('/api/graph/event-atlas', d => {
+    if (d.total_events !== 22 || !Array.isArray(d.events) || d.events.length !== 22) {
+      return `Expected 22 events, got ${d?.total_events}`;
+    }
+    const ev0 = d.events[0];
+    if (!ev0.geo || !ev0.geo.latitude || !ev0.verse_text || !ev0.verse_text.includes('Ban đầu')) {
+      return `Event 0 missing valid coordinates or authentic 1925 verse text: ${JSON.stringify(ev0).substring(0, 100)}`;
+    }
+    return false;
+  });
+  report('GET /api/graph/event-atlas (Chronological 22-event atlas with GPS coordinates, authentic 1925 verses & archaeology)', rEventAtlas.ok, rEventAtlas.error);
+
+  const rGeoRoutes = await testEndpoint('/api/graph/geo-routes', d => {
+    if (d.total_routes !== 9 || !Array.isArray(d.routes) || d.routes.length !== 9) {
+      return `Expected 9 routes, got ${d?.total_routes}`;
+    }
+    const r0 = d.routes[0];
+    if (!r0.waypoints || r0.waypoints.length === 0 || !r0.waypoints[0].svg_x) {
+      return 'Route 0 missing projected SVG coordinates on waypoints';
+    }
+    return false;
+  });
+  report('GET /api/graph/geo-routes (Curated 9 spatial journeys with projected SVG vector coordinates)', rGeoRoutes.ok, rGeoRoutes.error);
+
   // Learning & Discipleship Module
   const rQuiz = await testEndpoint('/api/learn/quiz', d => (!Array.isArray(d) || d.length === 0) && 'No quiz questions');
   report('GET /api/learn/quiz (Interactive theological quiz)', rQuiz.ok, rQuiz.error);

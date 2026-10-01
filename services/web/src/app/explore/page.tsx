@@ -216,6 +216,36 @@ interface TimelineEvent {
   theological_significance?: string;
 }
 
+interface EventAtlasGeo {
+  site_name: string;
+  ancient_site: string;
+  modern_name: string;
+  latitude: number;
+  longitude: number;
+  svg_x: number;
+  svg_y: number;
+  archaeological_context: string;
+  strategic_geography: string;
+}
+
+interface EventAtlasItem {
+  id: string;
+  slug: string;
+  title: string;
+  approximate_date: string;
+  date_type: string;
+  period: string;
+  description: string;
+  era_order: number;
+  era_key: string;
+  scripture: string;
+  verse_text: string;
+  people: string[];
+  places: string[];
+  theological_significance: string;
+  geo: EventAtlasGeo;
+}
+
 interface BiblicalPlace {
   id: string;
   slug: string;
@@ -490,6 +520,18 @@ export default function ExplorePage() {
     });
   }, [timeline, selectedTimelineEra, timelineSearch]);
 
+  // Map Sub-Mode: 'atlas' (Chronological Event Atlas §6, §9) vs 'journeys' (9 Spatial Routes)
+  const [mapSubMode, setMapSubMode] = useState<"atlas" | "journeys">("atlas");
+  const [atlasEvents, setAtlasEvents] = useState<EventAtlasItem[]>([]);
+  const [selectedAtlasEventId, setSelectedAtlasEventId] = useState<string>("su-sang-tao");
+  const [atlasEraFilter, setAtlasEraFilter] = useState<string>("all");
+  const [atlasSearch, setAtlasSearch] = useState<string>("");
+  const [loadingAtlas, setLoadingAtlas] = useState<boolean>(true);
+  const [isPlayingAtlasTour, setIsPlayingAtlasTour] = useState<boolean>(false);
+  const [atlasTourSpeed, setAtlasTourSpeed] = useState<number>(1.0);
+  const [speakingAtlasEvent, setSpeakingAtlasEvent] = useState<string | null>(null);
+  const atlasTourTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Map & Journeys State
   const [places, setPlaces] = useState<BiblicalPlace[]>([]);
   const [journeys, setJourneys] = useState<BiblicalJourney[]>([]);
@@ -556,6 +598,133 @@ export default function ExplorePage() {
       console.error("Failed to load timeline:", err);
     } finally {
       setLoadingTimeline(false);
+    }
+  };
+
+  // Computed Atlas Events
+  const currentAtlasEvent = useMemo(() => {
+    return atlasEvents.find(e => e.slug === selectedAtlasEventId) || atlasEvents[0] || null;
+  }, [atlasEvents, selectedAtlasEventId]);
+
+  const filteredAtlasEvents = useMemo(() => {
+    return atlasEvents.filter(e => {
+      if (atlasEraFilter !== "all" && e.era_key !== atlasEraFilter) return false;
+      if (atlasSearch.trim()) {
+        const q = atlasSearch.toLowerCase().trim();
+        const matchTitle = e.title.toLowerCase().includes(q);
+        const matchDesc = (e.description || "").toLowerCase().includes(q);
+        const matchSite = (e.geo.site_name || "").toLowerCase().includes(q) || (e.geo.modern_name || "").toLowerCase().includes(q);
+        const matchRef = (e.scripture || "").toLowerCase().includes(q);
+        const matchPeople = (e.people || []).some(p => p.toLowerCase().includes(q));
+        if (!matchTitle && !matchDesc && !matchSite && !matchRef && !matchPeople) return false;
+      }
+      return true;
+    });
+  }, [atlasEvents, atlasEraFilter, atlasSearch]);
+
+  const getAtlasEraColor = (eraKey: string) => {
+    switch (eraKey) {
+      case "primeval_patriarch": return "#10b981"; // Emerald
+      case "exodus_judges": return "#f97316"; // Orange
+      case "united_kingdom": return "#eab308"; // Amber
+      case "divided_kingdom": return "#f43f5e"; // Rose
+      case "exile": return "#8b5cf6"; // Purple
+      case "restoration_intertestamental": return "#06b6d4"; // Cyan
+      case "life_of_christ": return "#3b82f6"; // Blue
+      case "apostolic_church": return "#a855f7"; // Violet
+      default: return "#64748b";
+    }
+  };
+
+  const getAtlasEraBadgeClass = (eraKey: string) => {
+    switch (eraKey) {
+      case "primeval_patriarch": return "bg-emerald-500/15 border-emerald-500/30 text-emerald-300";
+      case "exodus_judges": return "bg-orange-500/15 border-orange-500/30 text-orange-300";
+      case "united_kingdom": return "bg-amber-500/15 border-amber-500/30 text-amber-300";
+      case "divided_kingdom": return "bg-rose-500/15 border-rose-500/30 text-rose-300";
+      case "exile": return "bg-purple-500/15 border-purple-500/30 text-purple-300";
+      case "restoration_intertestamental": return "bg-cyan-500/15 border-cyan-500/30 text-cyan-300";
+      case "life_of_christ": return "bg-blue-500/15 border-blue-500/30 text-blue-300";
+      case "apostolic_church": return "bg-violet-500/15 border-violet-500/30 text-violet-300";
+      default: return "bg-slate-800 border-slate-700 text-slate-300";
+    }
+  };
+
+  const fetchAtlasEvents = async (era?: string, search?: string) => {
+    setLoadingAtlas(true);
+    try {
+      let url = `${apiUrl}/api/graph/event-atlas?`;
+      if (era && era !== "all") url += `era=${encodeURIComponent(era)}&`;
+      if (search && search.trim()) url += `search=${encodeURIComponent(search.trim())}&`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setAtlasEvents(data.events || []);
+        if (data.events?.length > 0 && !selectedAtlasEventId) {
+          setSelectedAtlasEventId(data.events[0].slug);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load event atlas:", err);
+    } finally {
+      setLoadingAtlas(false);
+    }
+  };
+
+  const handleSelectAtlasEvent = (slug: string) => {
+    setSelectedAtlasEventId(slug);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpeakingAtlasEvent(null);
+    }
+  };
+
+  const toggleAtlasTour = () => {
+    if (isPlayingAtlasTour) {
+      setIsPlayingAtlasTour(false);
+      if (atlasTourTimerRef.current) {
+        clearTimeout(atlasTourTimerRef.current);
+        atlasTourTimerRef.current = null;
+      }
+    } else {
+      setIsPlayingAtlasTour(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!isPlayingAtlasTour || filteredAtlasEvents.length === 0) return;
+    const currentIndex = filteredAtlasEvents.findIndex(e => e.slug === selectedAtlasEventId);
+    const nextIndex = (currentIndex + 1) % filteredAtlasEvents.length;
+
+    atlasTourTimerRef.current = setTimeout(() => {
+      const nextEv = filteredAtlasEvents[nextIndex];
+      if (nextEv) {
+        setSelectedAtlasEventId(nextEv.slug);
+      }
+    }, 4500 / atlasTourSpeed);
+
+    return () => {
+      if (atlasTourTimerRef.current) {
+        clearTimeout(atlasTourTimerRef.current);
+      }
+    };
+  }, [isPlayingAtlasTour, selectedAtlasEventId, filteredAtlasEvents, atlasTourSpeed]);
+
+  const toggleAtlasSpeech = (event: EventAtlasItem) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speakingAtlasEvent === event.slug) {
+      window.speechSynthesis.cancel();
+      setSpeakingAtlasEvent(null);
+    } else {
+      window.speechSynthesis.cancel();
+      const textToSpeak = `${event.title}. Thời kỳ: ${event.period}. Địa danh: ${event.geo.site_name}. Tọa độ: ${event.geo.modern_name}. Kinh Thánh: ${event.scripture}. Lời Kinh Thánh: ${event.verse_text}. Bối cảnh khảo cổ: ${event.geo.archaeological_context}. Ý nghĩa cứu chuộc: ${event.theological_significance}`;
+      const utt = new SpeechSynthesisUtterance(textToSpeak);
+      utt.lang = "vi-VN";
+      utt.rate = 1.0;
+      utt.onend = () => setSpeakingAtlasEvent(null);
+      utt.onerror = () => setSpeakingAtlasEvent(null);
+      window.speechSynthesis.speak(utt);
+      setSpeakingAtlasEvent(event.slug);
     }
   };
 
@@ -828,6 +997,7 @@ export default function ExplorePage() {
     fetchGraph();
     fetchTimeline();
     fetchMapData();
+    fetchAtlasEvents();
     fetchConnections();
     fetchHarmonyEvents();
     fetchThemesCatalog();
@@ -1597,7 +1767,22 @@ export default function ExplorePage() {
                     )}
 
                     <div className="text-[11px] text-blue-400/80 font-medium pt-1 flex items-center justify-between border-t border-slate-800/60 mt-1">
-                      <span>Xem ý nghĩa cứu chuộc &amp; khảo cứu sâu →</span>
+                      <div className="flex items-center gap-2">
+                        <span>Xem ý nghĩa cứu chuộc &amp; khảo cứu sâu →</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAtlasEventId(ev.slug);
+                            setMapSubMode("atlas");
+                            setActiveTab("map");
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[10px] font-medium flex items-center gap-1 transition-colors"
+                          title="Xem vị trí địa lý & khảo cổ trên Atlas (§9)"
+                        >
+                          <MapPin className="w-2.5 h-2.5" />
+                          <span>Bản Đồ (§9)</span>
+                        </button>
+                      </div>
                       <span className="text-[10px] text-slate-500">#{ev.era_order}</span>
                     </div>
                   </div>
@@ -1697,16 +1882,30 @@ export default function ExplorePage() {
                     </div>
                   )}
 
-                  {/* Scripture Link Button */}
-                  {selectedTimelineEvent.scripture && (
-                    <Link
-                      href={`/bible?ref=${encodeURIComponent(selectedTimelineEvent.scripture)}`}
-                      className="mt-2 p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30"
+                  {/* Actions: Scripture Link & View on Map Atlas Button */}
+                  <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                    {selectedTimelineEvent.scripture && (
+                      <Link
+                        href={`/bible?ref=${encodeURIComponent(selectedTimelineEvent.scripture)}`}
+                        className="flex-1 p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        <span>Đọc Phân Đoạn Kinh Thánh ({selectedTimelineEvent.scripture}) →</span>
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedAtlasEventId(selectedTimelineEvent.slug);
+                        setSelectedTimelineEvent(null);
+                        setMapSubMode("atlas");
+                        setActiveTab("map");
+                      }}
+                      className="p-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/30"
                     >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Đọc Phân Đoạn Kinh Thánh ({selectedTimelineEvent.scripture}) →</span>
-                    </Link>
-                  )}
+                      <MapPin className="w-4 h-4" />
+                      <span>Xem Vị Trí Địa Lý & Khảo Cổ (§9) →</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1719,406 +1918,930 @@ export default function ExplorePage() {
       {/* ===================================================================== */}
       {activeTab === "map" && (
         <div className="flex flex-col gap-6">
-          {/* Era Filter & Journeys Selector Bar */}
-          <div className="flex flex-col gap-3">
-            {/* Era Category Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              <span className="text-slate-400 whitespace-nowrap font-medium">Thời kỳ lịch sử:</span>
-              {[
-                { id: "all", label: "Tất Cả (9 hành trình)" },
-                { id: "ot_patriarch", label: "Tổ Phụ & Xuất Hành" },
-                { id: "ot_monarchy", label: "Vương Triều & Tiên Tri" },
-                { id: "nt_apostolic", label: "Chúa Giê-xu & Sứ Đồ" }
-              ].map((era) => (
-                <button
-                  key={era.id}
-                  onClick={() => setJourneyEraFilter(era.id)}
-                  className={`px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap ${
-                    journeyEraFilter === era.id
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold"
-                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                  }`}
-                >
-                  {era.label}
-                </button>
-              ))}
+          {/* Sub-Mode Switcher: Atlas vs Journeys */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800 self-start sm:self-auto">
+              <button
+                onClick={() => setMapSubMode("atlas")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                  mapSubMode === "atlas"
+                    ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Bản Đồ Sự Kiện Lịch Sử Cứu Chuộc (22 Mốc Biến Cố Atlas • §6, §9)</span>
+              </button>
+              <button
+                onClick={() => setMapSubMode("journeys")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                  mapSubMode === "journeys"
+                    ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md shadow-rose-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                <span>9 Tuyến Hành Trình Điển Hình (Spatial Journeys)</span>
+              </button>
             </div>
 
-            {/* Journeys List & Tour Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-                {journeys
-                  .filter((j) => {
-                    if (journeyEraFilter === "all") return true;
-                    if (journeyEraFilter === "ot_patriarch") return j.id === "journey-abraham" || j.id === "journey-exodus";
-                    if (journeyEraFilter === "ot_monarchy") return j.id === "journey-david-fugitive" || j.id === "journey-elijah";
-                    if (journeyEraFilter === "nt_apostolic") return j.id.startsWith("journey-jesus") || j.id.startsWith("journey-paul");
-                    return true;
-                  })
-                  .map((j) => (
-                    <button
-                      key={j.id}
-                      onClick={() => handleSelectJourney(j.id)}
-                      className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                        selectedJourneyId === j.id
-                          ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
-                          : "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/40"
-                      }`}
-                    >
-                      <Navigation className="w-3.5 h-3.5" />
-                      <span>{j.title}</span>
-                    </button>
-                  ))}
-              </div>
-
-              {/* Guided Tour Play/Pause & Speed Controller */}
-              {currentJourney && (
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Speed Controller */}
-                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
-                    {[1.0, 1.5, 2.0].map((spd) => (
-                      <button
-                        key={spd}
-                        onClick={() => setTourSpeed(spd)}
-                        className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
-                          tourSpeed === spd
-                            ? "bg-rose-600 text-white"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                      >
-                        {spd}x
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={toggleTour}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-                      isPlayingTour
-                        ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
-                        : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/20"
-                    }`}
-                  >
-                    {isPlayingTour ? (
-                      <>
-                        <Pause className="w-3.5 h-3.5" />
-                        <span>Tạm Dừng Mô Phỏng</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                        <span>Mô Phỏng Tự Động (Guided Tour)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+            <div className="text-[11px] text-slate-400 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Hệ tọa độ không gian Thánh địa tích hợp dữ liệu Kinh Thánh 1925</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Interactive Vector Map Canvas */}
-            <div className="lg:col-span-2 rounded-3xl glass-panel border border-slate-700/60 p-4 h-[620px] relative overflow-hidden flex flex-col justify-between bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-              {loadingMap ? (
-                <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
-                  <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-                  <p className="text-xs">Đang tải bản đồ không gian Thánh địa...</p>
-                </div>
-              ) : (
-                <svg className="w-full h-full select-none" viewBox="0 0 900 600">
-                  <defs>
-                    <linearGradient id="seaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#0f172a" stopOpacity="0.8" />
-                      <stop offset="100%" stopColor="#1e293b" stopOpacity="0.8" />
-                    </linearGradient>
-                    <filter id="mapGlow">
-                      <feGaussianBlur stdDeviation="3" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                  </defs>
-
-                  {/* Water bodies & regions hints */}
-                  <rect width="900" height="600" fill="#090d16" />
-
-                  {/* Decorative Ancient Geography Lines & Names */}
-                  <text x="70" y="110" fill="rgba(168, 85, 247, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
-                    Ý & LA-MÃ (ITALY / ROME)
-                  </text>
-                  <text x="270" y="140" fill="rgba(59, 130, 246, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
-                    HY LẠP & MA-XÊ-ĐOAN
-                  </text>
-                  <text x="250" y="270" fill="rgba(59, 130, 246, 0.2)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="4">
-                    ĐỊA TRUNG HẢI (MEDITERRANEAN SEA)
-                  </text>
-                  <text x="540" y="370" fill="rgba(16, 185, 129, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif">
-                    CA-NA-AN (ĐẤT HỨA)
-                  </text>
-                  <text x="480" y="520" fill="rgba(239, 68, 68, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
-                    BIỂN ĐỎ (RED SEA)
-                  </text>
-                  <text x="700" y="340" fill="rgba(245, 158, 11, 0.15)" fontSize="15" fontWeight="bold" fontFamily="serif" letterSpacing="3">
-                    LƯỠNG HÀ (MESOPOTAMIA)
-                  </text>
-
-                  {/* Grid latitude lines */}
-                  {[100, 200, 300, 400, 500].map((y) => (
-                    <line key={y} x1="0" y1={y} x2="900" y2={y} stroke="rgba(148, 163, 184, 0.05)" strokeDasharray="3,3" />
-                  ))}
-
-                  {/* Journey Route Polyline */}
-                  {currentJourney && currentJourney.waypoints.length > 1 && (
-                    <g>
-                      {currentJourney.waypoints.slice(0, -1).map((wp, idx) => {
-                        const nextWp = currentJourney.waypoints[idx + 1];
-                        const p1 = projectCoordinates(wp.lat, wp.lng);
-                        const p2 = projectCoordinates(nextWp.lat, nextWp.lng);
-                        return (
-                          <line
-                            key={idx}
-                            x1={p1.x}
-                            y1={p1.y}
-                            x2={p2.x}
-                            y2={p2.y}
-                            stroke={currentJourney.color}
-                            strokeWidth="2.5"
-                            strokeDasharray="6,4"
-                            className="animate-pulse"
-                            opacity="0.8"
-                          />
-                        );
-                      })}
-                    </g>
-                  )}
-
-                  {/* All Places Pins */}
-                  {places.map((pl) => {
-                    if (!pl.latitude || !pl.longitude) return null;
-                    const pt = projectCoordinates(pl.latitude, pl.longitude);
-                    const isWaypoint = currentJourney?.waypoints.some((w) => w.name.includes(pl.name_vi));
-
-                    return (
-                      <g key={pl.id} transform={`translate(${pt.x}, ${pt.y})`} className="cursor-pointer group">
-                        <circle
-                          r={isWaypoint ? 6 : 4}
-                          fill={isWaypoint ? "#ffffff" : "#10b981"}
-                          opacity={isWaypoint ? 0.9 : 0.5}
-                          stroke="#0f172a"
-                          strokeWidth="1.5"
-                        />
-                        <text
-                          y="-8"
-                          fill={isWaypoint ? "#ffffff" : "rgba(148, 163, 184, 0.6)"}
-                          fontSize={isWaypoint ? "10" : "8"}
-                          fontWeight={isWaypoint ? "bold" : "normal"}
-                          textAnchor="middle"
-                          className="pointer-events-none drop-shadow"
-                        >
-                          {pl.name_vi}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Journey Waypoints Pins */}
-                  {currentJourney?.waypoints.map((wp) => {
-                    const pt = projectCoordinates(wp.lat, wp.lng);
-                    const isActive = activeWaypoint?.order === wp.order;
-
-                    return (
-                      <g
-                        key={wp.order}
-                        transform={`translate(${pt.x}, ${pt.y})`}
-                        onClick={() => setActiveWaypoint(wp)}
-                        className="cursor-pointer group"
+          {/* =================================================================== */}
+          {/* SUB-MODE 1: CHRONOLOGICAL EVENT ATLAS (22 EVENTS)                   */}
+          {/* =================================================================== */}
+          {mapSubMode === "atlas" && (
+            <div className="flex flex-col gap-6 animate-in fade-in">
+              {/* Era Filter & Search & Tour Bar */}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-80">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={atlasSearch}
+                      onChange={(e) => setAtlasSearch(e.target.value)}
+                      placeholder="Tìm biến cố, địa danh cổ, tọa độ, nhân vật..."
+                      className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                    />
+                    {atlasSearch && (
+                      <button
+                        onClick={() => setAtlasSearch("")}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
                       >
-                        {isActive && (
-                          <circle
-                            r="16"
-                            fill={currentJourney.color}
-                            opacity="0.3"
-                            filter="url(#mapGlow)"
-                            className="animate-ping"
-                          />
-                        )}
-                        <circle
-                          r={isActive ? 12 : 9}
-                          fill={currentJourney.color}
-                          stroke="#ffffff"
-                          strokeWidth="2"
-                          className="transition-transform group-hover:scale-125"
-                        />
-                        <text
-                          y="3"
-                          fill="#ffffff"
-                          fontSize="9"
-                          fontWeight="bold"
-                          textAnchor="middle"
-                          className="pointer-events-none select-none"
-                        >
-                          {wp.order}
-                        </text>
-                        <text
-                          y="22"
-                          fill={isActive ? "#ffffff" : "#cbd5e1"}
-                          fontSize="10"
-                          fontWeight={isActive ? "bold" : "medium"}
-                          textAnchor="middle"
-                          className="pointer-events-none drop-shadow"
-                        >
-                          {wp.name}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </svg>
-              )}
-
-              {/* Map Footer Note */}
-              <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800">
-                <span className="flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Khu vực Cận Đông Cổ Đại & Địa Trung Hải • Nhấp vào trạm dừng (1, 2, 3...) để xem chi tiết</span>
-                </span>
-                <span className="font-mono text-[11px] text-slate-500">Tọa độ WGS84</span>
-              </div>
-            </div>
-
-            {/* Journey Stepper & Waypoint Inspector Panel */}
-            <div className="rounded-3xl glass-panel border border-slate-700/60 p-6 flex flex-col justify-between gap-4 overflow-y-auto max-h-[620px]">
-              {currentJourney && (
-                <div className="flex flex-col gap-4">
-                  <div className="pb-3 border-b border-slate-800">
-                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                      {currentJourney.period}
-                    </span>
-                    <h3 className="text-xl font-extrabold text-white mt-1.5">
-                      {currentJourney.title}
-                    </h3>
-                    <p className="text-xs text-slate-300 leading-relaxed font-serif mt-1">
-                      {currentJourney.description}
-                    </p>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Waypoint Detail Highlight */}
-                  {activeWaypoint && (
-                    <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 flex flex-col gap-3">
-                      <div className="flex justify-between items-center">
+                  {/* Guided Tour Controls */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
+                      {[1.0, 1.5, 2.0].map((spd) => (
+                        <button
+                          key={spd}
+                          onClick={() => setAtlasTourSpeed(spd)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                            atlasTourSpeed === spd
+                              ? "bg-cyan-600 text-white"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          {spd}x
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={toggleAtlasTour}
+                      className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                        isPlayingAtlasTour
+                          ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
+                          : "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-md shadow-blue-600/20"
+                      }`}
+                    >
+                      {isPlayingAtlasTour ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5" />
+                          <span>Tạm Dừng Mô Phỏng</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Mô Phỏng Trình Tự Niên Biểu (Guided Tour)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Era Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                  {[
+                    { id: "all", label: `Tất Cả (${atlasEvents.length})`, date: "Toàn bộ" },
+                    { id: "primeval_patriarch", label: "Sáng Tạo & Tổ Phụ", date: "~4000-1800 TCN" },
+                    { id: "exodus_judges", label: "Xuất Hành & Quan Xét", date: "~1446-1050 TCN" },
+                    { id: "united_kingdom", label: "Vương Quốc Thống Nhất", date: "1050-931 TCN" },
+                    { id: "divided_kingdom", label: "Vương Quốc Phân Chia", date: "931-586 TCN" },
+                    { id: "exile", label: "Lưu Đày Ba-by-lôn", date: "586-538 TCN" },
+                    { id: "restoration_intertestamental", label: "Hồi Hương & Giữa Hai Ước", date: "538-4 TCN" },
+                    { id: "life_of_christ", label: "Cuộc Đời Chúa Giê-xu", date: "4 TCN-33 SCN" },
+                    { id: "apostolic_church", label: "Hội Thánh & Khải Huyền", date: "30-100 SCN" }
+                  ].map((era) => (
+                    <button
+                      key={era.id}
+                      onClick={() => setAtlasEraFilter(era.id)}
+                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs flex items-center gap-1.5 ${
+                        atlasEraFilter === era.id
+                          ? "bg-cyan-600 text-white font-semibold shadow-md shadow-cyan-600/30"
+                          : "bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/40"
+                      }`}
+                    >
+                      <span>{era.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        atlasEraFilter === era.id ? "bg-cyan-700 text-cyan-100 font-mono" : "bg-slate-900 text-slate-500 font-mono"
+                      }`}>
+                        {era.date}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Main Content: Vector Map + Event Inspector */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Vector Map Canvas */}
+                <div className="lg:col-span-2 rounded-3xl glass-panel border border-slate-700/60 p-4 h-[650px] relative overflow-hidden flex flex-col justify-between bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+                  {loadingAtlas ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                      <p className="text-xs">Đang tải bản đồ địa lý 22 mốc sự kiện cứu chuộc...</p>
+                    </div>
+                  ) : (
+                    <svg className="w-full h-full select-none" viewBox="0 0 900 600">
+                      <defs>
+                        <linearGradient id="atlasFlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="35%" stopColor="#38bdf8" />
+                          <stop offset="70%" stopColor="#eab308" />
+                          <stop offset="100%" stopColor="#a855f7" />
+                        </linearGradient>
+                        <filter id="atlasGlow">
+                          <feGaussianBlur stdDeviation="3" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                      </defs>
+
+                      {/* Map Background */}
+                      <rect width="900" height="600" fill="#090d16" />
+
+                      {/* Ancient Geography Hints */}
+                      <text x="65" y="110" fill="rgba(168, 85, 247, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        Ý & LA-MÃ (ITALY / ROME)
+                      </text>
+                      <text x="260" y="135" fill="rgba(59, 130, 246, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        HY LẠP & MA-XÊ-ĐOAN
+                      </text>
+                      <text x="240" y="270" fill="rgba(59, 130, 246, 0.2)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="4">
+                        ĐỊA TRUNG HẢI (MEDITERRANEAN SEA)
+                      </text>
+                      <text x="530" y="370" fill="rgba(16, 185, 129, 0.3)" fontSize="14" fontWeight="bold" fontFamily="serif">
+                        CA-NA-AN (ĐẤT HỨA)
+                      </text>
+                      <text x="470" y="525" fill="rgba(239, 68, 68, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        BIỂN ĐỎ (RED SEA)
+                      </text>
+                      <text x="700" y="340" fill="rgba(245, 158, 11, 0.2)" fontSize="15" fontWeight="bold" fontFamily="serif" letterSpacing="3">
+                        LƯỠNG HÀ (MESOPOTAMIA)
+                      </text>
+                      <text x="730" y="420" fill="rgba(217, 70, 239, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif">
+                        BA-BY-LÔN & BA-TƯ
+                      </text>
+
+                      {/* Grid latitude lines */}
+                      {[100, 200, 300, 400, 500].map((y) => (
+                        <line key={y} x1="0" y1={y} x2="900" y2={y} stroke="rgba(148, 163, 184, 0.05)" strokeDasharray="3,3" />
+                      ))}
+
+                      {/* Chronological Flow Spline across consecutive events */}
+                      {filteredAtlasEvents.length > 1 && (
+                        <g>
+                          {filteredAtlasEvents.slice(0, -1).map((ev, idx) => {
+                            const nextEv = filteredAtlasEvents[idx + 1];
+                            return (
+                              <line
+                                key={idx}
+                                x1={ev.geo.svg_x}
+                                y1={ev.geo.svg_y}
+                                x2={nextEv.geo.svg_x}
+                                y2={nextEv.geo.svg_y}
+                                stroke="url(#atlasFlowGrad)"
+                                strokeWidth="2.5"
+                                strokeDasharray="5,4"
+                                opacity="0.6"
+                                className="animate-pulse"
+                              />
+                            );
+                          })}
+                        </g>
+                      )}
+
+                      {/* 22 Chronological Event Pins */}
+                      {filteredAtlasEvents.map((ev) => {
+                        const isSelected = selectedAtlasEventId === ev.slug;
+                        const eraColor = getAtlasEraColor(ev.era_key);
+
+                        return (
+                          <g
+                            key={ev.slug}
+                            transform={`translate(${ev.geo.svg_x}, ${ev.geo.svg_y})`}
+                            className="cursor-pointer group"
+                            onClick={() => handleSelectAtlasEvent(ev.slug)}
+                          >
+                            {/* Pulsing Outer Ping Ring when selected */}
+                            {isSelected && (
+                              <circle
+                                r="18"
+                                fill="none"
+                                stroke="#38bdf8"
+                                strokeWidth="2"
+                                opacity="0.8"
+                                className="animate-ping"
+                              />
+                            )}
+
+                            {/* Pin Body */}
+                            <circle
+                              r={isSelected ? 12 : 9}
+                              fill={isSelected ? "#38bdf8" : eraColor}
+                              stroke="#0f172a"
+                              strokeWidth="2"
+                              filter={isSelected ? "url(#atlasGlow)" : undefined}
+                              className="transition-all duration-300 group-hover:scale-125"
+                            />
+
+                            {/* Chronological Sequence Order # */}
+                            <text
+                              y="3"
+                              fill="#ffffff"
+                              fontSize={isSelected ? "9.5" : "8"}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              className="pointer-events-none select-none font-mono"
+                            >
+                              {ev.era_order}
+                            </text>
+
+                            {/* Label */}
+                            <text
+                              y={isSelected ? "-16" : "-12"}
+                              fill={isSelected ? "#ffffff" : "rgba(226, 232, 240, 0.8)"}
+                              fontSize={isSelected ? "11" : "8.5"}
+                              fontWeight={isSelected ? "bold" : "normal"}
+                              textAnchor="middle"
+                              className="pointer-events-none drop-shadow select-none"
+                            >
+                              {ev.title.length > 22 ? ev.title.substring(0, 20) + "..." : ev.title}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
+
+                  {/* Map Footer Bar */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                        <span className="text-[10px]">Tổ Phụ</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                        <span className="text-[10px]">Xuất Hành</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                        <span className="text-[10px]">Vương Triều</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        <span className="text-[10px]">Đấng Christ</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                        <span className="text-[10px]">Hội Thánh</span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-cyan-400">
+                      Hiển thị {filteredAtlasEvents.length} / {atlasEvents.length} biến cố
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Column: Event Atlas Inspector Card */}
+                <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-[650px] pr-1">
+                  {currentAtlasEvent ? (
+                    <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col gap-4">
+                      {/* Header & Badges */}
+                      <div className="flex justify-between items-start pb-3 border-b border-slate-800">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getAtlasEraBadgeClass(currentAtlasEvent.era_key)}`}>
+                              #{currentAtlasEvent.era_order} • {currentAtlasEvent.period}
+                            </span>
+                            <span className="text-xs font-mono font-semibold text-amber-400">
+                              {currentAtlasEvent.approximate_date}
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-bold text-white leading-snug">
+                            {currentAtlasEvent.title}
+                          </h3>
+                        </div>
+
+                        {/* Speech Narration Button */}
+                        <button
+                          onClick={() => toggleAtlasSpeech(currentAtlasEvent)}
+                          title="Đọc thuyết minh âm thanh biến cố này"
+                          className={`p-2 rounded-xl border transition-all ${
+                            speakingAtlasEvent === currentAtlasEvent.slug
+                              ? "bg-cyan-600 text-white border-cyan-500 animate-pulse shadow-md shadow-cyan-600/30"
+                              : "bg-slate-800/80 text-slate-300 hover:text-white border-slate-700/60"
+                          }`}
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Strategic Geography & Coordinates */}
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
+                          <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Địa Danh &amp; Định Vị Địa Lý:</span>
+                        </div>
+                        <div className="text-xs text-white font-medium">
+                          {currentAtlasEvent.geo.site_name}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          <span className="text-slate-500">Tên cổ:</span> {currentAtlasEvent.geo.ancient_site} • <span className="text-slate-500">Hiện đại:</span> {currentAtlasEvent.geo.modern_name}
+                        </div>
+                        <div className="text-[10px] font-mono text-cyan-400/80 pt-0.5">
+                          Tọa độ GPS: {currentAtlasEvent.geo.latitude}° N, {currentAtlasEvent.geo.longitude}° E
+                        </div>
+                      </div>
+
+                      {/* Authentic 1925 Vietnamese Scripture Verse Text */}
+                      {currentAtlasEvent.verse_text && (
+                        <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-800/50 flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                              Lời Chúa (Kinh Thánh 1925):
+                            </span>
+                            <Link
+                              href={`/bible?ref=${encodeURIComponent(currentAtlasEvent.scripture)}`}
+                              className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                            >
+                              <span>{currentAtlasEvent.scripture}</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          </div>
+                          <blockquote className="text-xs text-amber-100/90 leading-relaxed font-serif italic border-l-2 border-amber-500/60 pl-2.5">
+                            "{currentAtlasEvent.verse_text}"
+                          </blockquote>
+                        </div>
+                      )}
+
+                      {/* Archaeological & Historical Topography */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                          Khảo Cổ Học &amp; Bối Cảnh Lịch Sử:
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-serif bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                          {currentAtlasEvent.geo.archaeological_context}
+                        </p>
+                      </div>
+
+                      {/* Strategic Geography Importance */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                          Ý Nghĩa Vị Thế Địa Lý Chiến Lược:
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-serif bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                          {currentAtlasEvent.geo.strategic_geography}
+                        </p>
+                      </div>
+
+                      {/* Redemptive & Christological Theology */}
+                      {currentAtlasEvent.theological_significance && (
+                        <div className="p-3.5 rounded-2xl bg-blue-950/30 border border-blue-800/50 flex flex-col gap-1.5">
+                          <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                            Ý Nghĩa Cứu Chuộc &amp; Hình Bóng Đấng Christ:
+                          </span>
+                          <p className="text-xs text-blue-100/90 leading-relaxed font-serif">
+                            {currentAtlasEvent.theological_significance}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Key Characters with Dossier Link */}
+                      {currentAtlasEvent.people && currentAtlasEvent.people.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                            <Users className="w-3 h-3" /> Nhân vật trọng tâm:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {currentAtlasEvent.people.map((p, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => openCharacterDossier(p)}
+                                className="px-2.5 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 text-xs font-medium flex items-center gap-1 transition-colors"
+                              >
+                                <span>{p}</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-purple-400" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Navigation & Convergence Actions */}
+                      <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow">
-                            {activeWaypoint.order}
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(currentAtlasEvent.scripture)}`}
+                            className="flex-1 p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-600/30"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Đọc Toàn Bộ Kinh Thánh</span>
+                          </Link>
+                          <button
+                            onClick={() => {
+                              const tlMatch = timeline.find(t => t.slug === currentAtlasEvent.slug);
+                              if (tlMatch) {
+                                setSelectedTimelineEvent(tlMatch);
+                              }
+                              setActiveTab("timeline");
+                            }}
+                            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+                            title="Xem vị trí trong Dòng Thời Gian (§6)"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Xem Dòng Thời Gian</span>
+                          </button>
+                        </div>
+
+                        {/* Stepper Controls */}
+                        <div className="flex items-center justify-between pt-1 text-xs">
+                          <button
+                            disabled={currentAtlasEvent.era_order <= 1}
+                            onClick={() => {
+                              const prev = atlasEvents.find(e => e.era_order === currentAtlasEvent.era_order - 1);
+                              if (prev) handleSelectAtlasEvent(prev.slug);
+                            }}
+                            className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          >
+                            ← Biến cố trước
+                          </button>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Mốc #{currentAtlasEvent.era_order} / {atlasEvents.length}
                           </span>
                           <button
-                            onClick={() => speakWaypoint(activeWaypoint)}
-                            title="Nghe thuyết minh âm thanh trạm này"
-                            className="px-2 py-0.5 rounded-lg bg-rose-900/50 hover:bg-rose-800 border border-rose-700/60 text-rose-200 text-[11px] flex items-center gap-1 transition-colors"
+                            disabled={currentAtlasEvent.era_order >= atlasEvents.length}
+                            onClick={() => {
+                              const next = atlasEvents.find(e => e.era_order === currentAtlasEvent.era_order + 1);
+                              if (next) handleSelectAtlasEvent(next.slug);
+                            }}
+                            className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                           >
-                            <Volume2 className="w-3 h-3 text-rose-300" />
-                            <span>Đọc Thuyết Minh</span>
+                            Biến cố sau →
                           </button>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => openWaypointScripture(activeWaypoint.scripture)}
-                            className="px-2 py-0.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 text-[11px] flex items-center gap-1 transition-colors"
-                            title="Đọc trực tiếp phân đoạn Kinh Thánh trạm dừng này"
-                          >
-                            <BookOpen className="w-3 h-3 text-amber-400" />
-                            <span>Đọc Phân Đoạn</span>
-                          </button>
-                          <Link
-                            href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
-                            className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
-                            title="Mở trong Bible Reader đầy đủ"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>{activeWaypoint.scripture}</span>
-                          </Link>
-                        </div>
                       </div>
-
-                      <div>
-                        <h4 className="text-base font-bold text-white">
-                          {activeWaypoint.name}
-                        </h4>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-emerald-400" />
-                          <span>Vị trí hiện đại: {activeWaypoint.modern}</span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-200 leading-relaxed font-serif pt-1">
-                        {activeWaypoint.notes}
-                      </p>
-
-                      {/* Previous / Next Stepper Controls */}
-                      <div className="flex items-center justify-between pt-2 border-t border-rose-900/40 text-xs">
-                        <button
-                          disabled={activeWaypoint.order <= 1}
-                          onClick={() => {
-                            const prev = currentJourney.waypoints.find(w => w.order === activeWaypoint.order - 1);
-                            if (prev) {
-                              setActiveWaypoint(prev);
-                              if (isPlayingTour) speakWaypoint(prev);
-                            }
-                          }}
-                          className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                        >
-                          ← Chặng trước
-                        </button>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {activeWaypoint.order} / {currentJourney.waypoints.length}
-                        </span>
-                        <button
-                          disabled={activeWaypoint.order >= currentJourney.waypoints.length}
-                          onClick={() => {
-                            const next = currentJourney.waypoints.find(w => w.order === activeWaypoint.order + 1);
-                            if (next) {
-                              setActiveWaypoint(next);
-                              if (isPlayingTour) speakWaypoint(next);
-                            }
-                          }}
-                          className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                        >
-                          Chặng sau →
-                        </button>
-                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-500 text-xs">
+                      Chọn một biến cố trên bản đồ để xem chi tiết
                     </div>
                   )}
 
-                  {/* All Steps in Journey */}
-                  <div className="flex flex-col gap-2">
+                  {/* All 22 Chronological Events Quick Picker */}
+                  <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col gap-2">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Milestone className="w-3.5 h-3.5 text-rose-400" />
-                      Các Chặng Dừng Chân ({currentJourney.waypoints.length})
+                      <Milestone className="w-3.5 h-3.5 text-cyan-400" />
+                      Danh Sách 22 Mốc Biến Cố Niên Biểu
                     </h4>
                     <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
-                      {currentJourney.waypoints.map((wp) => (
+                      {atlasEvents.map((ev) => (
                         <button
-                          key={wp.order}
-                          onClick={() => setActiveWaypoint(wp)}
-                          className={`p-2.5 rounded-xl border text-left text-xs transition-colors flex items-center justify-between ${
-                            activeWaypoint?.order === wp.order
-                              ? "bg-rose-950/40 border-rose-600 text-white font-semibold"
-                              : "bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800"
+                          key={ev.slug}
+                          onClick={() => handleSelectAtlasEvent(ev.slug)}
+                          className={`p-2 rounded-xl border text-left text-xs transition-colors flex items-center justify-between ${
+                            selectedAtlasEventId === ev.slug
+                              ? "bg-cyan-950/50 border-cyan-500 text-white font-semibold"
+                              : "bg-slate-950/60 border-slate-800/80 text-slate-300 hover:bg-slate-800"
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold">
-                              {wp.order}
+                            <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-mono font-bold text-cyan-400">
+                              {ev.era_order}
                             </span>
-                            <span>{wp.name}</span>
+                            <span className="truncate max-w-[150px]">{ev.title}</span>
                           </div>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {wp.scripture}
+                          <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                            {ev.approximate_date}
                           </span>
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* =================================================================== */}
+          {/* SUB-MODE 2: 9 MAJOR SPATIAL JOURNEYS                                */}
+          {/* =================================================================== */}
+          {mapSubMode === "journeys" && (
+            <div className="flex flex-col gap-6 animate-in fade-in">
+              {/* Era Filter & Journeys Selector Bar */}
+              <div className="flex flex-col gap-3">
+                {/* Era Category Filter Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                  <span className="text-slate-400 whitespace-nowrap font-medium">Thời kỳ lịch sử:</span>
+                  {[
+                    { id: "all", label: "Tất Cả (9 hành trình)" },
+                    { id: "ot_patriarch", label: "Tổ Phụ & Xuất Hành" },
+                    { id: "ot_monarchy", label: "Vương Triều & Tiên Tri" },
+                    { id: "nt_apostolic", label: "Chúa Giê-xu & Sứ Đồ" }
+                  ].map((era) => (
+                    <button
+                      key={era.id}
+                      onClick={() => setJourneyEraFilter(era.id)}
+                      className={`px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap ${
+                        journeyEraFilter === era.id
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold"
+                          : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                      }`}
+                    >
+                      {era.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Journeys List & Tour Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                    {journeys
+                      .filter((j) => {
+                        if (journeyEraFilter === "all") return true;
+                        if (journeyEraFilter === "ot_patriarch") return j.id === "journey-abraham" || j.id === "journey-exodus";
+                        if (journeyEraFilter === "ot_monarchy") return j.id === "journey-david-fugitive" || j.id === "journey-elijah";
+                        if (journeyEraFilter === "nt_apostolic") return j.id.startsWith("journey-jesus") || j.id.startsWith("journey-paul");
+                        return true;
+                      })
+                      .map((j) => (
+                        <button
+                          key={j.id}
+                          onClick={() => handleSelectJourney(j.id)}
+                          className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                            selectedJourneyId === j.id
+                              ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
+                              : "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/40"
+                          }`}
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>{j.title}</span>
+                        </button>
+                      ))}
+                  </div>
+
+                  {/* Guided Tour Play/Pause & Speed Controller */}
+                  {currentJourney && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
+                        {[1.0, 1.5, 2.0].map((spd) => (
+                          <button
+                            key={spd}
+                            onClick={() => setTourSpeed(spd)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                              tourSpeed === spd
+                                ? "bg-rose-600 text-white"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            {spd}x
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={toggleTour}
+                        className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                          isPlayingTour
+                            ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
+                            : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/20"
+                        }`}
+                      >
+                        {isPlayingTour ? (
+                          <>
+                            <Pause className="w-3.5 h-3.5" />
+                            <span>Tạm Dừng Mô Phỏng</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Mô Phỏng Tự Động (Guided Tour)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Interactive Vector Map Canvas */}
+                <div className="lg:col-span-2 rounded-3xl glass-panel border border-slate-700/60 p-4 h-[620px] relative overflow-hidden flex flex-col justify-between bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+                  {loadingMap ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+                      <p className="text-xs">Đang tải bản đồ không gian Thánh địa...</p>
+                    </div>
+                  ) : (
+                    <svg className="w-full h-full select-none" viewBox="0 0 900 600">
+                      <defs>
+                        <linearGradient id="seaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#0f172a" stopOpacity="0.8" />
+                          <stop offset="100%" stopColor="#1e293b" stopOpacity="0.8" />
+                        </linearGradient>
+                        <filter id="mapGlow">
+                          <feGaussianBlur stdDeviation="3" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                      </defs>
+
+                      <rect width="900" height="600" fill="#090d16" />
+
+                      <text x="70" y="110" fill="rgba(168, 85, 247, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        Ý & LA-MÃ (ITALY / ROME)
+                      </text>
+                      <text x="270" y="140" fill="rgba(59, 130, 246, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        HY LẠP & MA-XÊ-ĐOAN
+                      </text>
+                      <text x="250" y="270" fill="rgba(59, 130, 246, 0.2)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="4">
+                        ĐỊA TRUNG HẢI (MEDITERRANEAN SEA)
+                      </text>
+                      <text x="540" y="370" fill="rgba(16, 185, 129, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif">
+                        CA-NA-AN (ĐẤT HỨA)
+                      </text>
+                      <text x="480" y="520" fill="rgba(239, 68, 68, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                        BIỂN ĐỎ (RED SEA)
+                      </text>
+                      <text x="700" y="340" fill="rgba(245, 158, 11, 0.15)" fontSize="15" fontWeight="bold" fontFamily="serif" letterSpacing="3">
+                        LƯỠNG HÀ (MESOPOTAMIA)
+                      </text>
+
+                      {[100, 200, 300, 400, 500].map((y) => (
+                        <line key={y} x1="0" y1={y} x2="900" y2={y} stroke="rgba(148, 163, 184, 0.05)" strokeDasharray="3,3" />
+                      ))}
+
+                      {currentJourney && currentJourney.waypoints.length > 1 && (
+                        <g>
+                          {currentJourney.waypoints.slice(0, -1).map((wp, idx) => {
+                            const nextWp = currentJourney.waypoints[idx + 1];
+                            const p1 = projectCoordinates(wp.lat, wp.lng);
+                            const p2 = projectCoordinates(nextWp.lat, nextWp.lng);
+                            return (
+                              <line
+                                key={idx}
+                                x1={p1.x}
+                                y1={p1.y}
+                                x2={p2.x}
+                                y2={p2.y}
+                                stroke={currentJourney.color}
+                                strokeWidth="2.5"
+                                strokeDasharray="6,4"
+                                className="animate-pulse"
+                                opacity="0.8"
+                              />
+                            );
+                          })}
+                        </g>
+                      )}
+
+                      {places.map((pl) => {
+                        if (!pl.latitude || !pl.longitude) return null;
+                        const pt = projectCoordinates(pl.latitude, pl.longitude);
+                        const isWaypoint = currentJourney?.waypoints.some((w) => w.name.includes(pl.name_vi));
+
+                        return (
+                          <g key={pl.id} transform={`translate(${pt.x}, ${pt.y})`} className="cursor-pointer group">
+                            <circle
+                              r={isWaypoint ? 6 : 4}
+                              fill={isWaypoint ? "#ffffff" : "#10b981"}
+                              opacity={isWaypoint ? 0.9 : 0.5}
+                              stroke="#0f172a"
+                              strokeWidth="1.5"
+                            />
+                            <text
+                              y="-8"
+                              fill={isWaypoint ? "#ffffff" : "rgba(148, 163, 184, 0.6)"}
+                              fontSize={isWaypoint ? "10" : "8"}
+                              fontWeight={isWaypoint ? "bold" : "normal"}
+                              textAnchor="middle"
+                              className="pointer-events-none drop-shadow"
+                            >
+                              {pl.name_vi}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {currentJourney?.waypoints.map((wp) => {
+                        const pt = projectCoordinates(wp.lat, wp.lng);
+                        const isActive = activeWaypoint?.order === wp.order;
+
+                        return (
+                          <g
+                            key={wp.order}
+                            transform={`translate(${pt.x}, ${pt.y})`}
+                            className="cursor-pointer group"
+                            onClick={() => setActiveWaypoint(wp)}
+                          >
+                            {isActive && (
+                              <circle
+                                r="16"
+                                fill="none"
+                                stroke={currentJourney.color}
+                                strokeWidth="2"
+                                opacity="0.8"
+                                className="animate-ping"
+                              />
+                            )}
+                            <circle
+                              r={isActive ? 10 : 7}
+                              fill={currentJourney.color}
+                              stroke="#0f172a"
+                              strokeWidth="2"
+                              filter={isActive ? "url(#mapGlow)" : undefined}
+                              className="transition-all duration-300 group-hover:scale-125"
+                            />
+                            <text
+                              y="3"
+                              fill="#ffffff"
+                              fontSize={isActive ? "9" : "7"}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              className="pointer-events-none select-none"
+                            >
+                              {wp.order}
+                            </text>
+                            <text
+                              y="-12"
+                              fill={isActive ? "#ffffff" : "rgba(226, 232, 240, 0.9)"}
+                              fontSize={isActive ? "11" : "9"}
+                              fontWeight={isActive ? "bold" : "normal"}
+                              textAnchor="middle"
+                              className="pointer-events-none drop-shadow select-none"
+                            >
+                              {wp.name}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                    <span>* Tọa độ không gian được ánh xạ tự động theo phép chiếu Mercator điều chỉnh cho Cận Đông</span>
+                    <span className="font-mono text-rose-400">
+                      {currentJourney ? `${currentJourney.waypoints.length} trạm dừng chân` : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Column: Journey & Waypoint Detail Inspector */}
+                <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-[620px] pr-1">
+                  {currentJourney && (
+                    <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col gap-4">
+                      <div className="flex justify-between items-start pb-2 border-b border-slate-800">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-rose-400">
+                            {currentJourney.period}
+                          </span>
+                          <h3 className="text-lg font-bold text-white mt-0.5">
+                            {currentJourney.title}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed font-serif">
+                        {currentJourney.description}
+                      </p>
+
+                      {activeWaypoint && (
+                        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 flex flex-col gap-3">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow">
+                                {activeWaypoint.order}
+                              </span>
+                              <button
+                                onClick={() => speakWaypoint(activeWaypoint)}
+                                title="Nghe thuyết minh âm thanh trạm này"
+                                className="px-2 py-0.5 rounded-lg bg-rose-900/50 hover:bg-rose-800 border border-rose-700/60 text-rose-200 text-[11px] flex items-center gap-1 transition-colors"
+                              >
+                                <Volume2 className="w-3 h-3 text-rose-300" />
+                                <span>Đọc Thuyết Minh</span>
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => openWaypointScripture(activeWaypoint.scripture)}
+                                className="px-2 py-0.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 text-[11px] flex items-center gap-1 transition-colors"
+                                title="Đọc trực tiếp phân đoạn Kinh Thánh trạm dừng này"
+                              >
+                                <BookOpen className="w-3 h-3 text-amber-400" />
+                                <span>Đọc Phân Đoạn</span>
+                              </button>
+                              <Link
+                                href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
+                                className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                                title="Mở trong Bible Reader đầy đủ"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>{activeWaypoint.scripture}</span>
+                              </Link>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="text-base font-bold text-white">
+                              {activeWaypoint.name}
+                            </h4>
+                            <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-emerald-400" />
+                              <span>Vị trí hiện đại: {activeWaypoint.modern}</span>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-200 leading-relaxed font-serif pt-1">
+                            {activeWaypoint.notes}
+                          </p>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-rose-900/40 text-xs">
+                            <button
+                              disabled={activeWaypoint.order <= 1}
+                              onClick={() => {
+                                const prev = currentJourney.waypoints.find(w => w.order === activeWaypoint.order - 1);
+                                if (prev) setActiveWaypoint(prev);
+                              }}
+                              className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            >
+                              ← Chặng trước
+                            </button>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              Trạm {activeWaypoint.order} / {currentJourney.waypoints.length}
+                            </span>
+                            <button
+                              disabled={activeWaypoint.order >= currentJourney.waypoints.length}
+                              onClick={() => {
+                                const next = currentJourney.waypoints.find(w => w.order === activeWaypoint.order + 1);
+                                if (next) setActiveWaypoint(next);
+                              }}
+                              className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            >
+                              Chặng sau →
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-2">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Milestone className="w-3.5 h-3.5 text-rose-400" />
+                          Các Chặng Dừng Chân ({currentJourney.waypoints.length})
+                        </h4>
+                        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                          {currentJourney.waypoints.map((wp) => (
+                            <button
+                              key={wp.order}
+                              onClick={() => setActiveWaypoint(wp)}
+                              className={`p-2.5 rounded-xl border text-left text-xs transition-colors flex items-center justify-between ${
+                                activeWaypoint?.order === wp.order
+                                  ? "bg-rose-950/40 border-rose-600 text-white font-semibold"
+                                  : "bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold">
+                                  {wp.order}
+                                </span>
+                                <span>{wp.name}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {wp.scripture}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

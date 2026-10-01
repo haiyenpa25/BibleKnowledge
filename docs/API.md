@@ -312,6 +312,78 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Parameters**: `theme_id` (e.g. `covenant_redemption`, `grace_faith`, `kingdom_god`, `paschal_atonement`, `holy_spirit`, `resurrection_hope`, `prayer_communion`).
 - **Description**: Computes interactive SVG/Cytoscape radial coordinates (Center Hub, Inner Orbit Doctrines r=150, Middle Orbit Scripture Anchors r=265 with OT/NT typological fulfillment links, Outer Orbit Historical Characters & Events r=370). Dynamically retrieves authentic 1925 Vietnamese Bible verses from PostgreSQL `bible_verses`, an 8-era progressive revelation trajectory track, scholarly citations from 275 commentary volumes, and a 3-point homiletical preaching outline with pastoral life applications.
 
+### 4.6 Biblical Chronological Event Atlas & Geo-Temporal Historical Synthesis (§6, §8, §9, §44)
+- **Endpoint**: `GET /api/graph/event-atlas?era={era}&search={search}`
+- **Parameters**:
+  - `era` (optional): Filter events by redemptive era (`primeval_patriarch`, `exodus_judges`, `united_kingdom`, `divided_kingdom`, `exile`, `restoration_intertestamental`, `life_of_christ`, `apostolic_church`, `all`).
+  - `search` (optional): Accent-insensitive search query across event titles, ancient locations, modern sites, and key figures.
+- **Description**: Unifies all 22 redemptive history milestones with precise GPS coordinates, projected SVG cartographic space (900x600 canvas), ancient vs. modern geographic identifications, authentic Protestant 1925 Vietnamese scripture verse texts retrieved from PostgreSQL `bible_verses`, archaeological excavation contexts, strategic topographical positioning, and Christological typology.
+- **Payload Structure**:
+  ```json
+  {
+    "total_events": 22,
+    "era_filter": "all",
+    "events": [
+      {
+        "id": "uuid",
+        "slug": "su-sang-tao",
+        "title": "Sự Sáng Tạo Vũ Trụ & Loài Người",
+        "approximate_date": "~4004 TCN",
+        "period": "Creation & Primeval",
+        "era_order": 1,
+        "era_key": "primeval_patriarch",
+        "scripture": "Sáng-thế Ký 1-2",
+        "verse_text": "Ban đầu Đức Chúa Trời dựng nên trời đất.",
+        "people": ["A-đam", "Ê-va"],
+        "places": ["Vườn Ê-đen"],
+        "theological_significance": "Thiết lập quyền tể trị tuyệt đối...",
+        "geo": {
+          "site_name": "Vườn Ê-đen / Vùng Lưỡng Hà",
+          "ancient_site": "Garden of Eden / Mesopotamia",
+          "modern_name": "Hạ lưu sông Tigris & Euphrates, Iraq",
+          "latitude": 31.02,
+          "longitude": 47.41,
+          "svg_x": 848,
+          "svg_y": 411,
+          "archaeological_context": "Vùng 'Lưỡi Liềm Màu Mỡ'...",
+          "strategic_geography": "Điểm khởi đầu địa lý..."
+        }
+      }
+    ]
+  }
+  ```
+
+### 4.7 Biblical Spatial Journeys & Projected Vector Cartography (§9)
+- **Endpoint**: `GET /api/graph/geo-routes`
+- **Description**: Returns all 9 foundational biblical spatial journeys (Abraham's Pilgrimage, The Exodus & Wilderness, David as Fugitive, Elijah to Horeb, Jesus' Galilean Ministry, Paul's Three Missionary Journeys, Journey to Rome) pre-computed with projected SVG canvas coordinates (`svg_x`, `svg_y`) on each ordered waypoint, narrative exegesis, scripture citations, and contemporary geographical references.
+- **Payload Structure**:
+  ```json
+  {
+    "total_routes": 9,
+    "routes": [
+      {
+        "id": "journey-abraham",
+        "title": "Hành Trình Đức Tin Của Áp-ra-ham",
+        "period": "Patriarchs (khoảng 2091 TCN)",
+        "color": "#f59e0b",
+        "waypoints": [
+          {
+            "order": 1,
+            "name": "U-rơ (Ur)",
+            "modern": "Tell el-Muqayyar, Iraq",
+            "lat": 30.9628,
+            "lng": 46.1031,
+            "svg_x": 818,
+            "svg_y": 413,
+            "scripture": "Sáng-thế Ký 11:31",
+            "notes": "Nơi Áp-ram sinh ra..."
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
 ---
 
 ## 5. Learning & Memorization Engine (`/api/learn`)
