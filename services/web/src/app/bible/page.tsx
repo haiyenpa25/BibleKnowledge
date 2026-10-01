@@ -27,7 +27,8 @@ import {
   Plus,
   Trash2,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Volume2
 } from "lucide-react";
 
 interface BookMeta {
@@ -891,12 +892,28 @@ export default function BibleReaderPage() {
                             <span className="text-xs uppercase font-semibold text-slate-400">
                               {item.language === "greek" ? "Hy Lạp" : "Hê-bơ-rơ"}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                                  window.speechSynthesis.cancel();
+                                  const utt = new SpeechSynthesisUtterance(item.lemma);
+                                  utt.lang = item.language === "greek" ? "el-GR" : "he-IL";
+                                  utt.rate = 0.85;
+                                  window.speechSynthesis.speak(utt);
+                                }
+                              }}
+                              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors"
+                              title="Nghe phát âm chuẩn"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <Link
-                            href={`/study?word=${item.strong_number}`}
-                            className="text-[11px] text-blue-400 hover:underline flex items-center gap-1"
+                            href="/research"
+                            className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
                           >
-                            <span>Xem tra cứu</span>
+                            <span>Concordance</span>
                             <ExternalLink className="w-3 h-3" />
                           </Link>
                         </div>
@@ -906,7 +923,7 @@ export default function BibleReaderPage() {
                             {item.lemma}
                           </span>
                           <span className="text-xs italic text-slate-400">
-                            {item.transliteration} ({item.pronunciation})
+                            {item.transliteration} {item.pronunciation ? `[${item.pronunciation}]` : ""}
                           </span>
                         </div>
 

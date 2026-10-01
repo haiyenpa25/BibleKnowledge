@@ -673,3 +673,208 @@ def get_verse_details(
     }
 
 
+@router.get("/lexicon")
+def list_lexicon(
+    lang: Optional[str] = Query(None, description="Filter by language: 'greek' or 'hebrew'"),
+    q: Optional[str] = Query(None, description="Search term in lemma, transliteration, definition or Strong number"),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """List and search Strong's Greek and Hebrew Lexicon entries."""
+    conditions = []
+    params: Dict[str, Any] = {"lim": limit}
+
+    if lang:
+        conditions.append("LOWER(language) = :lang")
+        params["lang"] = lang.lower().strip()
+
+    if q:
+        cleaned_q = f"%{q.strip().lower()}%"
+        conditions.append("""
+            (LOWER(strong_number) LIKE :q 
+             OR LOWER(lemma) LIKE :q 
+             OR LOWER(transliteration) LIKE :q 
+             OR LOWER(definition) LIKE :q 
+             OR LOWER(theological_significance) LIKE :q)
+        """)
+        params["q"] = cleaned_q
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = text(f"""
+        SELECT strong_number, language, lemma, transliteration, pronunciation,
+               part_of_speech, definition, theological_significance,
+               occurrences_count, key_verses
+        FROM strong_lexicon
+        {where_clause}
+        ORDER BY language DESC, occurrences_count DESC
+        LIMIT :lim
+    """)
+
+    rows = db.execute(sql, params).fetchall()
+    return [
+        {
+            "strong_number": r.strong_number,
+            "language": r.language,
+            "lemma": r.lemma,
+            "transliteration": r.transliteration,
+            "pronunciation": r.pronunciation or "",
+            "part_of_speech": r.part_of_speech or "",
+            "definition": r.definition,
+            "theological_significance": r.theological_significance or "",
+            "occurrences_count": r.occurrences_count,
+            "key_verses": r.key_verses if isinstance(r.key_verses, list) else []
+        }
+        for r in rows
+    ]
+
+
+@router.get("/lexicon/{strong_number}")
+def get_lexicon_detail(
+    strong_number: str,
+    db: Session = Depends(get_db)
+):
+    """Retrieve detailed Strong's Lexicon entry with resolved key verses."""
+    s_clean = strong_number.strip().upper()
+    row = db.execute(
+        text("""
+        SELECT strong_number, language, lemma, transliteration, pronunciation,
+               part_of_speech, definition, theological_significance,
+               occurrences_count, key_verses
+        FROM strong_lexicon
+        WHERE UPPER(strong_number) = :s
+        LIMIT 1
+        """),
+        {"s": s_clean}
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Strong entry '{strong_number}' not found")
+
+    raw_verses = row.key_verses if isinstance(row.key_verses, list) else []
+    resolved_verses = []
+    from app.routers.bible import get_verse_range
+    for ref_str in raw_verses:
+        v_text = ""
+        try:
+            res = get_verse_range(ref=ref_str, db=db)
+            if res.get("verses"):
+                v_text = res["verses"][0]["text"]
+        except Exception:
+            v_text = ""
+        resolved_verses.append({
+            "reference": ref_str,
+            "text": v_text
+        })
+
+    return {
+        "strong_number": row.strong_number,
+        "language": row.language,
+        "lemma": row.lemma,
+        "transliteration": row.transliteration,
+        "pronunciation": row.pronunciation or "",
+        "part_of_speech": row.part_of_speech or "",
+        "definition": row.definition,
+        "theological_significance": row.theological_significance or "",
+        "occurrences_count": row.occurrences_count,
+        "resolved_verses": resolved_verses
+    }
+
+
+@router.get("/concordance")
+def get_concordance(
+    strong_number: Optional[str] = Query(None, description="Strong number (e.g. 'G4102', 'H7965')"),
+    q: Optional[str] = Query(None, description="Theological concept keyword (e.g. 'đức tin', 'bình an', 'giao ước')"),
+    testament: Optional[str] = Query(None, description="OT or NT"),
+    limit: int = Query(25, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Concordance search across the 31,081 Bible verses for key theological terms and Strong roots."""
+    search_term = ""
+    lex_info = None
+
+    if strong_number:
+        s_clean = strong_number.strip().upper()
+        lex_row = db.execute(
+            text("SELECT strong_number, language, lemma, transliteration, definition FROM strong_lexicon WHERE UPPER(strong_number) = :s"),
+            {"s": s_clean}
+        ).fetchone()
+        if lex_row:
+            lex_info = {
+                "strong_number": lex_row.strong_number,
+                "language": lex_row.language,
+                "lemma": lex_row.lemma,
+                "transliteration": lex_row.transliteration,
+                "definition": lex_row.definition
+            }
+            # Extract main keyword for text search from definition
+            search_term = lex_row.definition.split(",")[0].strip()
+
+    if q:
+        search_term = q.strip()
+
+    if not search_term:
+        raise HTTPException(status_code=400, detail="Must provide either strong_number or search keyword q")
+
+    # Clean search keywords
+    clean_kw = search_term.split(";")[0].split("(")[0].strip()
+    # Remove leading articles if any
+    clean_kw = re.sub(r'^(sự|lẽ|đấng|người)\s+', '', clean_kw, flags=re.IGNORECASE).strip()
+    if not clean_kw:
+        clean_kw = search_term.strip()
+
+    params: Dict[str, Any] = {"pat": f"%{clean_kw}%", "lim": limit}
+    test_filter = ""
+    if testament:
+        test_filter = "AND b.testament = :test"
+        params["test"] = testament.upper().strip()
+
+    # Get testament counts
+    count_sql = text("""
+        SELECT b.testament, count(v.id) as cnt
+        FROM bible_verses v
+        JOIN bible_books b ON v.book_id = b.id
+        WHERE v.text ILIKE :pat
+        GROUP BY b.testament
+    """)
+    count_rows = db.execute(count_sql, {"pat": f"%{clean_kw}%"}).fetchall()
+    ot_count = next((r.cnt for r in count_rows if r.testament == "OT"), 0)
+    nt_count = next((r.cnt for r in count_rows if r.testament == "NT"), 0)
+
+    # Get sample verses
+    verses_sql = text(f"""
+        SELECT v.id, v.verse_code, b.name_vi as book_name, b.code as book_code,
+               b.testament, v.chapter, v.verse, v.text
+        FROM bible_verses v
+        JOIN bible_books b ON v.book_id = b.id
+        WHERE v.text ILIKE :pat {test_filter}
+        ORDER BY b.book_order ASC, v.chapter ASC, v.verse ASC
+        LIMIT :lim
+    """)
+    v_rows = db.execute(verses_sql, params).fetchall()
+
+    return {
+        "search_term": search_term,
+        "clean_keyword": clean_kw,
+        "lexicon_info": lex_info,
+        "distribution": {
+            "old_testament": ot_count,
+            "new_testament": nt_count,
+            "total_matches": ot_count + nt_count
+        },
+        "verses": [
+            {
+                "global_id": r.id,
+                "verse_code": r.verse_code,
+                "reference": f"{r.book_name} {r.chapter}:{r.verse}",
+                "book_code": r.book_code,
+                "testament": r.testament,
+                "chapter": r.chapter,
+                "verse": r.verse,
+                "text": r.text
+            }
+            for r in v_rows
+        ]
+    }
+
+
+
