@@ -323,6 +323,7 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `POST /api/study/projects/{project_id}/generate-questions`: AI generates 4-5 deep theological and practical discussion questions.
   - `POST /api/study/projects/{project_id}/generate-summary`: AI generates a comprehensive grounded research synthesis note.
   - `POST /api/study/projects/{project_id}/export-flashcards`: Exports project insights and scriptures directly into SM-2 flashcard deck.
+  - `GET /api/study/projects/{project_id}/export-leader-guide`: Generates a publication-grade Small Group Leader Guide & Study Curriculum (§50) featuring 3H learning objectives (Head, Heart, Hands), icebreaker question, pinned scripture exegesis, historical entity contexts, 3-step lesson outline, discovery discussion questions, citations from 275 commentary volumes, and weekly practical action plan. Returns JSON with formatted Markdown curriculum.
 
 ### 6.9 Homiletical Slide Deck Exporter & Presentation Engine (§50)
 - **Component**: `/study` Homiletical Workspace (`sermon` tab)

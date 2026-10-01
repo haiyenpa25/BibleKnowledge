@@ -1141,6 +1141,12 @@ Yêu cầu trả về định dạng JSON array hợp lệ, KHÔNG thêm bất k
 @router.post("/projects/{project_id}/export-flashcards")
 def export_project_to_flashcards(project_id: str, db: Session = Depends(get_db)):
     """Export project outline and verses into SM-2 spaced repetition flashcards."""
+    try:
+        from uuid import UUID
+        UUID(project_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
     r = db.execute(
         text("SELECT id, title, ai_outline, pinned_verses FROM study_projects WHERE id = :id"),
         {"id": project_id}
@@ -1184,6 +1190,164 @@ def export_project_to_flashcards(project_id: str, db: Session = Depends(get_db))
 
     db.commit()
     return {"message": f"Đã xuất thành công {created_count} thẻ ghi nhớ Flashcard vào hệ thống Học Tập!", "created_count": created_count}
+
+
+@router.get("/projects/{project_id}/export-leader-guide")
+def export_project_leader_guide(project_id: str, db: Session = Depends(get_db)):
+    """
+    Generate and export a comprehensive, publication-grade Small Group Leader Guide & Curriculum
+    from a Study Project (§50).
+    """
+    try:
+        from uuid import UUID
+        UUID(project_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    r = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, pinned_entities, study_questions, ai_outline FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    title = r.title
+    description = r.description or "Tài liệu học Kinh Thánh chuyên sâu."
+    category = r.category or "theology"
+    pinned_verses = parse_json_field(r.pinned_verses)
+    pinned_entities = parse_json_field(r.pinned_entities)
+    study_questions = parse_json_field(r.study_questions)
+    ai_outline = parse_json_field(r.ai_outline)
+
+    # 1. Fetch relevant citations from 275 commentary volumes
+    citations = []
+    for pv in pinned_verses[:3]:
+        ref = pv.get("reference", "")
+        book_match = ref.split()[0] if ref else ""
+        if book_match:
+            cit_rows = db.execute(
+                text("""
+                    SELECT d.title, d.author, c.content
+                    FROM document_chunks c
+                    JOIN documents d ON c.document_id = d.id
+                    WHERE d.title ILIKE :kw OR c.content ILIKE :kw
+                    LIMIT 2
+                """),
+                {"kw": f"%{book_match}%"}
+            ).fetchall()
+            for cr in cit_rows:
+                citations.append({
+                    "source_title": cr[0],
+                    "author": cr[1] or "Học giả Thần học",
+                    "quote": cr[2][:200].strip() + "..."
+                })
+            if len(citations) >= 4:
+                break
+
+    # 2. 3H Learning Objectives
+    objectives = [
+        f"**Tri Thức (Head)**: Nắm vững lẽ thật mạc khải, cấu trúc và văn cảnh phân đoạn liên quan đến '{title}'.",
+        f"**Tấm Lòng (Heart)**: Cảm nhận tình yêu và sự thánh khiết của Đức Chúa Trời, nuôi dưỡng lòng kính sợ Chúa.",
+        f"**Hành Động (Hands)**: Ứng dụng thực tiễn trong nếp sống kỷ luật thuộc linh, nâng đỡ nhau và làm chứng nhân giữa thế gian."
+    ]
+
+    # 3. Icebreaker Hook
+    icebreaker = f"Trong tuần qua, có biến cố hay suy nghĩ nào khiến bạn suy ngẫm sâu sắc về đề tài '{title}'? Khi nghĩ đến chủ đề này, cảm xúc hay câu hỏi đầu tiên xuất hiện trong tâm trí bạn là gì?"
+
+    # 4. Formatted Markdown Lines
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    md = [
+        f"# GIÁO TRÌNH HỌC KINH THÁNH & HƯỚNG DẪN ĐIỀU PHỐI NHÓM NHỎ",
+        f"## CHUYÊN ĐỀ: {title.upper()}",
+        f"> **Phân loại**: `{category.upper()}` • **Thời gian xuất bản**: {now_str}  ",
+        f"> **Tài liệu chuẩn mực**: Soạn thảo từ Hệ sinh thái Tri Thức Kinh Thánh BibleKnowledge  ",
+        "",
+        "---",
+        "",
+        "### I. MỤC TIÊU HUẤN LUYỆN MÔN ĐỒ (3H OBJECTIVES)",
+        "",
+        "- 🧠 " + objectives[0],
+        "- ❤️ " + objectives[1],
+        "- 🤝 " + objectives[2],
+        "",
+        "---",
+        "",
+        "### II. KHỞI ĐỘNG & PHÁ BĂNG (ICE-BREAKER — 10 PHÚT)",
+        "",
+        f"*{icebreaker}*",
+        "",
+        "---",
+        "",
+        f"### III. KINH VĂN TRỌNG TÂM ({len(pinned_verses)} Phân Đoạn)",
+        ""
+    ]
+
+    for idx, v in enumerate(pinned_verses, 1):
+        md.append(f"#### {idx}. {v.get('reference', 'Kinh văn')}")
+        md.append(f"> \"{v.get('text', '')}\" — *(Bản Truyền Thống 1925)*")
+        md.append("")
+
+    if pinned_entities:
+        md.append("---")
+        md.append("")
+        md.append(f"### IV. HỒ SƠ THỰC THỂ & BỐI CẢNH LỊCH SỬ ({len(pinned_entities)} Thực Thể)")
+        md.append("")
+        for e in pinned_entities:
+            type_label = {"person": "Nhân vật", "place": "Địa danh", "event": "Biến cố", "topic": "Chủ đề"}.get(e.get("type"), e.get("type"))
+            md.append(f"- **{e.get('name')}** `[{type_label}]`: Thực thể trọng tâm kết nối văn mạch và mạng lưới thần học giao ước.")
+        md.append("")
+
+    if ai_outline:
+        md.append("---")
+        md.append("")
+        md.append("### V. DÀN Ý KHẢO LUẬN 3 BƯỚC (LESSON OUTLINE)")
+        md.append("")
+        for o in ai_outline:
+            md.append(f"#### • {o.get('section', '')}")
+            md.append(f"{o.get('content', '')}")
+            md.append("")
+
+    if study_questions:
+        md.append("---")
+        md.append("")
+        md.append("### VI. HỆ THỐNG CÂU HỎI THẢO LUẬN NHÓM (DISCOVERY QUESTIONS)")
+        md.append("")
+        for idx, q in enumerate(study_questions, 1):
+            md.append(f"**Câu {idx}**: {q}")
+            md.append("")
+
+    if citations:
+        md.append("---")
+        md.append("")
+        md.append("### VII. TRÍCH DẪN CHÚ GIẢI THẦN HỌC (275 TÁC PHẨM KINH ĐIỂN)")
+        md.append("")
+        for c in citations:
+            md.append(f"- **{c.get('source_title')}** ({c.get('author')}):")
+            md.append(f"  > \"{c.get('quote')}\"")
+            md.append("")
+
+    md.extend([
+        "---",
+        "",
+        "### VIII. LỜI CẦU NGUYỆN KẾT THÚC & HÀNH ĐỘNG TUẦN MỚI",
+        "",
+        f"Lạy Chúa, chúng con tạ ơn Ngài vì Lời hằng sống đã soi rọi đề tài '{title}' trong đời sống chúng con. Xin Thánh Linh ban thêm năng quyền để từng thành viên trong nhóm không chỉ là người nghe Lời Chúa mà còn là người làm theo Lời Chúa trọn tuần này. Amen.",
+        "",
+        "**Bài tập thuộc linh tuần này**:",
+        f"1. Dành 15 phút mỗi ngày suy ngẫm phân đoạn Kinh Thánh trọng tâm.",
+        f"2. Thực hành một hành động yêu thương, phục vụ cụ thể đối với người lân cận dựa trên lẽ thật hôm nay.",
+        ""
+    ])
+
+    return {
+        "project_id": project_id,
+        "project_title": title,
+        "markdown_curriculum": "\n".join(md),
+        "learning_objectives": objectives,
+        "icebreaker_hook": icebreaker,
+        "citations": citations
+    }
 
 
 # --- Project Notes Endpoints (§50) ---

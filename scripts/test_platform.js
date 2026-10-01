@@ -195,6 +195,16 @@ async function main() {
     report('GET /api/study/groups/{id}/export (Export collaborative study minutes to Markdown)', rGroupExport.ok, rGroupExport.error);
   }
 
+  // Small Group Leader Guide & Study Curriculum Generator (§50)
+  const rProjects = await testEndpoint('/api/study/projects', d => (!Array.isArray(d) || d.length === 0) && 'No study projects');
+  report(`GET /api/study/projects (${rProjects.data?.length || 0} Theological study projects)`, rProjects.ok, rProjects.error);
+
+  if (rProjects.ok && rProjects.data && rProjects.data.length > 0) {
+    const testProjectId = rProjects.data[0].id;
+    const rLeaderGuide = await testEndpoint(`/api/study/projects/${testProjectId}/export-leader-guide`, d => (!d.markdown_curriculum || !Array.isArray(d.learning_objectives)) && 'Invalid leader guide payload');
+    report('GET /api/study/projects/{id}/export-leader-guide (3H Curriculum & Leader Guide generation)', rLeaderGuide.ok, rLeaderGuide.error);
+  }
+
   // Theological Library Module
   const rLibStats = await testEndpoint('/api/library/stats', d => d.total_books !== 275 && `Expected 275 books, got ${d?.total_books}`);
   report('GET /api/library/stats (275 Theological volumes statistics)', rLibStats.ok, rLibStats.error);
