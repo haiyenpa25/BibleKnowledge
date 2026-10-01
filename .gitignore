@@ -28,3 +28,7 @@ Thumbs.db
 npm-debug.log*
 tmp/
 temp/
+
+# Large local data files
+data/sources/
+

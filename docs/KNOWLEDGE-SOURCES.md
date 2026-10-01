@@ -29,6 +29,22 @@ LEVEL 4 — Community References
 - Report the conflict explicitly and record the verified decision in an Architecture Decision Record (`docs/ADR/`).
 
 ## Project Notebooks & Grounded References
-- **Notebook Name**: `TODO: record linked notebook name`
-- **Notebook URL**: `TODO: record URL`
-- **Scope / Topics**: Scripture resources, theological references, project notes.
+
+### 1. Primary Knowledge Base: NGHIÊN CỨU KINH THÁNH © AICoDoc.com
+- **Notebook Name**: `NGHIÊN CỨU KINH THÁNH © AICoDoc.com`
+- **Notebook ID**: `058481ca-131d-41e5-9d8f-8383604a7ed3`
+- **Notebook URL**: `https://notebooklm.google.com/notebook/058481ca-131d-41e5-9d8f-8383604a7ed3`
+- **Source Count**: 275 sources
+- **Scope / Topics**: Comprehensive Biblical knowledge base including Warren W. Wiersbe's BE Series (50 volumes), Zondervan Encyclopedias, Atlases, Dictionaries, Commentaries, Top 100 Q&A, and study resources.
+
+### 2. Supporting Knowledge Base: Biblical Narratives and Prophecies
+- **Notebook Name**: `Biblical Narratives and Prophecies`
+- **Notebook ID**: `092abfe1-5161-48d5-be43-8c43640e2fb1`
+- **Notebook URL**: `https://notebooklm.google.com/notebook/092abfe1-5161-48d5-be43-8c43640e2fb1`
+- **Source Count**: 3 sources
+- **Scope / Topics**: Specialized scripture narratives and prophetic texts.
+
+### 3. Architecture & Technical References
+- **App_Architecture_Docs**: `25a741ee-20cf-4091-9dca-9981db56ad05`
+- **Apollo Technologies Company Profile**: `b564cc55-1028-4506-84b5-f5ada231cd1f`
+

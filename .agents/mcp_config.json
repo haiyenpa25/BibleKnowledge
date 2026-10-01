@@ -4,8 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "notebooklm-mcp-server",
-        "server"
+        "@roomi-fields/notebooklm-mcp@latest"
       ]
     }
   }
