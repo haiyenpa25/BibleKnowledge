@@ -34,8 +34,39 @@ import {
   SplitSquareVertical,
   Filter,
   BarChart3,
-  BookA
+  BookA,
+  ShieldAlert,
+  Clock
 } from "lucide-react";
+
+// --- Context Study Interfaces (§15) ---
+interface ContextDimension {
+  dimension_key: string;
+  dimension_title: string;
+  dimension_icon: string;
+  summary: string;
+  detailed_analysis: string;
+  key_scriptures: string[];
+  scholarly_citations: string[];
+}
+
+interface ContextStudyData {
+  subject_or_passage: string;
+  scripture_anchor: string;
+  historical_era: string;
+  primary_takeaway: string;
+  dimensions: ContextDimension[];
+  hermeneutical_significance: string;
+  related_theological_books: string[];
+}
+
+interface ContextPresetOption {
+  key: string;
+  title: string;
+  passage_ref: string;
+  era: string;
+  brief: string;
+}
 
 // --- Types ---
 interface BibleEvidence {
@@ -232,13 +263,22 @@ export default function ResearchPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Active Research Mode Tab
-  const [activeTab, setActiveTab] = useState<"agent" | "lexicon" | "qa" | "character" | "theme">("agent");
+  const [activeTab, setActiveTab] = useState<"agent" | "context" | "lexicon" | "qa" | "character" | "theme">("agent");
 
   // --- Tab 1: AI Agent Research States (§51) ---
   const [agentQuery, setAgentQuery] = useState(PRESET_AGENT_QUERIES[0]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentData, setAgentData] = useState<AgentResearchData | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
+
+  // --- Tab: Multi-Dimensional Context Study States (§15) ---
+  const [contextPresets, setContextPresets] = useState<ContextPresetOption[]>([]);
+  const [selectedContextPreset, setSelectedContextPreset] = useState("john-4");
+  const [customContextInput, setCustomContextInput] = useState("");
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextData, setContextData] = useState<ContextStudyData | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const [activeDimensionFilter, setActiveDimensionFilter] = useState<string>("all");
 
   // --- Tab 2: Strong's Lexicon & Concordance States (§37, §49) ---
   const [lexiconList, setLexiconList] = useState<LexiconItem[]>([]);
@@ -270,21 +310,60 @@ export default function ResearchPage() {
   const [themeData, setThemeData] = useState<ThemeStudyData | null>(null);
   const [themeError, setThemeError] = useState<string | null>(null);
 
-  // Load available themes on mount
+  // Load available themes & context presets on mount
   useEffect(() => {
-    async function loadThemes() {
+    async function loadInitialData() {
       try {
-        const res = await fetch(`${apiUrl}/api/rag/themes`);
-        if (res.ok) {
-          const data = await res.json();
-          setAvailableThemes(data);
+        const [themeRes, presetRes] = await Promise.all([
+          fetch(`${apiUrl}/api/rag/themes`),
+          fetch(`${apiUrl}/api/rag/context-preset-options`)
+        ]);
+        if (themeRes.ok) {
+          const tData = await themeRes.json();
+          setAvailableThemes(tData);
+        }
+        if (presetRes.ok) {
+          const pData = await presetRes.json();
+          setContextPresets(pData);
         }
       } catch (e) {
-        console.error("Failed to load themes:", e);
+        console.error("Failed to load initial presets:", e);
       }
     }
-    loadThemes();
+    loadInitialData();
   }, [apiUrl]);
+
+  // Load Context Study when Context tab is selected
+  useEffect(() => {
+    if (activeTab === "context" && !contextData && !contextLoading) {
+      handleContextStudy(selectedContextPreset);
+    }
+  }, [activeTab]);
+
+  const handleContextStudy = async (subjectOrKey: string) => {
+    setContextLoading(true);
+    setContextError(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/rag/context-study`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject_or_passage: subjectOrKey,
+          focus_dimension: "all"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setContextData(data);
+      } else {
+        setContextError("Không thể phân tích bối cảnh phân đoạn Kinh Thánh này.");
+      }
+    } catch (e: any) {
+      setContextError(e.message || "Lỗi kết nối máy chủ phân tích bối cảnh.");
+    } finally {
+      setContextLoading(false);
+    }
+  };
 
   // Load Lexicon items when Lexicon tab is selected
   useEffect(() => {
@@ -518,7 +597,25 @@ export default function ResearchPage() {
           <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-400/20 text-purple-300 uppercase tracking-wider">Mới §51</span>
         </button>
 
-        {/* Mode 2: Strong's Lexicon & Concordance */}
+        {/* Mode 2: Multi-Dimensional Context Study (§15) */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("context");
+            if (!contextData && !contextLoading) handleContextStudy(selectedContextPreset);
+          }}
+          className={`px-4 py-2 rounded-2xl flex items-center gap-2 font-bold transition-all whitespace-nowrap ${
+            activeTab === "context"
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
+              : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <Compass className="w-4 h-4 text-rose-200" />
+          <span>Bối Cảnh Đa Chiều</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-400/20 text-rose-300 uppercase tracking-wider">6 Chiều §15</span>
+        </button>
+
+        {/* Mode 3: Strong's Lexicon & Concordance */}
         <button
           type="button"
           onClick={() => {
@@ -936,6 +1033,291 @@ export default function ResearchPage() {
                       >
                         &rarr; {fq}
                       </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 2: MULTI-DIMENSIONAL CONTEXT STUDY (§15) */}
+      {/* ======================================================== */}
+      {activeTab === "context" && (
+        <div className="flex flex-col gap-6">
+          {/* Header & Preset Selector */}
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-indigo-950/30 border border-rose-800/40 shadow-xl flex flex-col gap-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 tracking-wider">
+                    Context Study Analyzer • §15
+                  </span>
+                  <span className="text-xs text-slate-400">Đa chiều: 6 Trục Ngữ Cảnh</span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-white mt-1.5 flex items-center gap-2">
+                  <Compass className="w-6 h-6 text-rose-400" />
+                  Phân Tích Bối Cảnh Lịch Sử - Văn Hóa Đa Chiều
+                </h2>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed mt-1">
+                  Đánh giá toàn cảnh sự kiện và phân đoạn Kinh Thánh qua 6 lăng kính độc lập: Lịch sử, Văn hóa, Chính trị, Tôn giáo, Địa lý và Văn chương để bảo toàn ý nghĩa nguyên thủy của bản văn.
+                </p>
+              </div>
+            </div>
+
+            {/* Presets Row */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold text-slate-400">Các phân đoạn bối cảnh kinh điển:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {[
+                  { key: "john-4", label: "Giăng 4 — Sa-ma-ri", sub: "Người đàn bà bên giếng Gia-cốp", icon: "🍇" },
+                  { key: "matthew-5-7", label: "Ma-thi-ơ 5-7 — Núi Ga-li-lê", sub: "Bài Giảng Trên Núi & Tám Phước", icon: "🏔️" },
+                  { key: "philippians", label: "Phi-líp 1-4 — Ngục Tù La-mã", sub: "Carmen Christi & Sự Khiêm Nhường", icon: "🏛️" },
+                  { key: "exodus-12", label: "Xuất Ê-díp-tô Ký 12 — Ai Cập", sub: "Đêm Lễ Vượt Qua Đầu Tiên", icon: "🐑" }
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedContextPreset(item.key);
+                      handleContextStudy(item.key);
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-2.5 ${
+                      selectedContextPreset === item.key && !customContextInput
+                        ? "bg-rose-500/20 border-rose-500 text-white shadow-md shadow-rose-500/10"
+                        : "bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
+                    }`}
+                  >
+                    <span className="text-xl">{item.icon}</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-white truncate">{item.label}</span>
+                      <span className="text-[10px] text-slate-400 truncate">{item.sub}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Passage Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customContextInput.trim()) {
+                  handleContextStudy(customContextInput.trim());
+                }
+              }}
+              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-800/80"
+            >
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={customContextInput}
+                  onChange={(e) => setCustomContextInput(e.target.value)}
+                  placeholder="Hoặc nhập phân đoạn/biến cố khác (ví dụ: '1 Sa-mu-ên 17 - Đa-vít và Gô-li-át', 'Sáng 22')..."
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={contextLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-md shadow-rose-600/20 shrink-0"
+              >
+                {contextLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>Phân Tích 6 Chiều</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Loading or Error */}
+          {contextLoading && (
+            <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+              <p className="text-sm font-semibold text-white">Đang phân tích 6 chiều bối cảnh Kinh Thánh...</p>
+              <p className="text-xs text-slate-500">Truy xuất dữ liệu lịch sử, khảo cổ và đối chiếu 275 sách chuyên khảo.</p>
+            </div>
+          )}
+
+          {contextError && (
+            <div className="p-6 rounded-2xl bg-red-950/30 border border-red-800/50 text-red-200 text-xs">
+              {contextError}
+            </div>
+          )}
+
+          {/* Context Study Results */}
+          {!contextLoading && contextData && (
+            <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+              {/* Executive Overview Banner */}
+              <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col gap-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        {contextData.scripture_anchor}
+                      </span>
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        {contextData.historical_era}
+                      </span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                      {contextData.subject_or_passage}
+                    </h2>
+                  </div>
+
+                  <Link
+                    href={`/bible?ref=${encodeURIComponent(contextData.scripture_anchor.split(';')[0])}`}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+                    target="_blank"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-blue-400" /> Đọc Kinh Thánh 1925 <ExternalLink className="w-2.5 h-2.5" />
+                  </Link>
+                </div>
+
+                {/* Primary Takeaway */}
+                <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/30 flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-400" /> Thông Điệp Cốt Lõi (Primary Takeaway)
+                  </span>
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+                    {contextData.primary_takeaway}
+                  </p>
+                </div>
+              </div>
+
+              {/* Dimension Filter Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <span className="text-slate-400 whitespace-nowrap">Lọc góc nhìn:</span>
+                {[
+                  { id: "all", label: "Tất cả 6 Chiều" },
+                  { id: "historical", label: "Lịch Sử (Historical)" },
+                  { id: "cultural", label: "Văn Hóa (Cultural)" },
+                  { id: "political", label: "Chính Trị (Political)" },
+                  { id: "religious", label: "Tôn Giáo (Religious)" },
+                  { id: "geographical", label: "Địa Lý (Geographical)" },
+                  { id: "literary", label: "Văn Chương (Literary)" }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setActiveDimensionFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold ${
+                      activeDimensionFilter === f.id
+                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-sm"
+                        : "bg-slate-800/70 text-slate-400 hover:text-white border border-transparent"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 6 Dimensions Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {contextData.dimensions
+                  .filter((d) => activeDimensionFilter === "all" || d.dimension_key === activeDimensionFilter)
+                  .map((dim) => {
+                    const badgeStyles: Record<string, { bg: string; text: string; border: string }> = {
+                      historical: { bg: "bg-amber-500/10", text: "text-amber-300", border: "border-amber-500/30" },
+                      cultural: { bg: "bg-purple-500/10", text: "text-purple-300", border: "border-purple-500/30" },
+                      political: { bg: "bg-red-500/10", text: "text-red-300", border: "border-red-500/30" },
+                      religious: { bg: "bg-blue-500/10", text: "text-blue-300", border: "border-blue-500/30" },
+                      geographical: { bg: "bg-emerald-500/10", text: "text-emerald-300", border: "border-emerald-500/30" },
+                      literary: { bg: "bg-cyan-500/10", text: "text-cyan-300", border: "border-cyan-500/30" }
+                    };
+                    const style = badgeStyles[dim.dimension_key] || { bg: "bg-slate-800/40", text: "text-slate-300", border: "border-slate-700" };
+
+                    return (
+                      <div
+                        key={dim.dimension_key}
+                        className={`p-5 rounded-3xl border flex flex-col justify-between gap-4 transition-all ${style.bg} ${style.border}`}
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-xl border ${style.bg} ${style.text} ${style.border}`}>
+                              {dim.dimension_title}
+                            </span>
+                            <span className="text-[10px] text-slate-500 uppercase font-mono">
+                              §15.{dim.dimension_key}
+                            </span>
+                          </div>
+
+                          <h4 className="text-xs font-bold text-white leading-snug">
+                            {dim.summary}
+                          </h4>
+
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                            {dim.detailed_analysis}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/60">
+                          {/* Key scriptures */}
+                          {dim.key_scriptures && dim.key_scriptures.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                              <span className="text-slate-400 font-medium">Câu gốc:</span>
+                              {dim.key_scriptures.map((s, idx) => (
+                                <Link
+                                  key={idx}
+                                  href={`/bible?ref=${encodeURIComponent(s.split(';')[0])}`}
+                                  target="_blank"
+                                  className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700/80 text-indigo-300 hover:text-white transition-colors"
+                                >
+                                  {s}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Academic citations */}
+                          {dim.scholarly_citations && dim.scholarly_citations.length > 0 && (
+                            <div className="text-[10px] text-slate-400 flex items-start gap-1">
+                              <BookOpen className="w-3 h-3 text-slate-500 shrink-0 mt-0.5" />
+                              <span className="italic leading-normal">
+                                Đối chiếu: {dim.scholarly_citations.join(" • ")}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Hermeneutical Significance */}
+              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-rose-400" />
+                  Ý Nghĩa Giải Kinh Học Thuật &amp; Ứng Dụng Thuộc Linh
+                </h3>
+                <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                  {contextData.hermeneutical_significance}
+                </p>
+              </div>
+
+              {/* Related Theological Books from Library */}
+              {contextData.related_theological_books && contextData.related_theological_books.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                    <Library className="w-4 h-4 text-emerald-400" />
+                    Tài Liệu Chuyên Khảo Khuyên Đọc (Thư Viện 275 Sách)
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                    {contextData.related_theological_books.map((b, idx) => (
+                      <Link
+                        key={idx}
+                        href={`/library?search=${encodeURIComponent(b.split('(')[0].trim())}`}
+                        className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/40 text-xs text-slate-300 hover:text-white transition-all flex flex-col justify-between gap-2 group"
+                      >
+                        <span className="font-semibold group-hover:text-emerald-300 leading-snug">
+                          {b}
+                        </span>
+                        <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                          Mở sách <ExternalLink className="w-2.5 h-2.5" />
+                        </span>
+                      </Link>
                     ))}
                   </div>
                 </div>
