@@ -741,16 +741,53 @@ class TimelineEventItem(BaseModel):
     correct_order: int
     period: str
     approximate_date: str
-    scripture: Optional[str]
+    scripture: Optional[str] = None
     description: str
+    verse_text: Optional[str] = None
+    theological_significance: Optional[str] = None
 
 
 class TimelineChallenge(BaseModel):
     id: str
     era_title: str
+    category: str
     description: str
     events: List[TimelineEventItem]
     narrative_explanation: str
+    theological_summary: Optional[str] = None
+    xp_reward: int = 50
+
+
+class TimelineVerifyRequest(BaseModel):
+    challenge_id: str
+    submitted_slug_order: List[str]
+    user_identifier: Optional[str] = "local_user"
+
+
+class TimelineSlotFeedback(BaseModel):
+    slug: str
+    title: str
+    submitted_position: int
+    correct_position: int
+    is_correct_position: bool
+    approximate_date: str
+    period: str
+    scripture: Optional[str] = None
+    verse_text: Optional[str] = None
+    theological_significance: Optional[str] = None
+
+
+class TimelineVerifyResponse(BaseModel):
+    challenge_id: str
+    is_all_correct: bool
+    correct_slots_count: int
+    total_slots_count: int
+    accuracy_percentage: float
+    xp_awarded: int
+    streak_bonus: int
+    feedback_slots: List[TimelineSlotFeedback]
+    chronological_narrative: str
+    theological_significance: str
 
 
 @router.get("/fill-in-blank", response_model=List[FillInBlankItem])
@@ -891,54 +928,183 @@ def get_fill_in_blank_challenges():
     return results
 
 
-@router.get("/timeline-challenge", response_model=List[TimelineChallenge])
-def get_timeline_challenges(db: Session = Depends(get_db)):
-    """Retrieve Biblical chronological timeline sorting challenges (§3)."""
-    import random
+TIMELINE_CHALLENGES_CONFIG = [
+    {
+        "id": "tl-1",
+        "era_title": "Toàn Cảnh 6 Kỷ Nguyên Lịch Sử Cứu Chuộc",
+        "category": "All Eras",
+        "description": "Sắp xếp theo thứ tự thời gian các cột mốc định hình lịch sử cứu chuộc từ lúc Sáng Thế đến khi Hội Thánh lan rộng.",
+        "event_slugs": [
+            "su-sang-tao",
+            "giao-uoc-ap-ra-ham",
+            "xuat-ai-cap-vuot-bien-do",
+            "xay-den-tho-sa-lo-mon",
+            "su-giang-sinh-chua-gie-xu",
+            "bien-co-le-ngu-tuan"
+        ],
+        "explanation": "Dòng thời gian bắt đầu từ Sáng Tạo Vũ Trụ (Khởi đầu) -> Giao ước Áp-ra-ham (~2091 TCN) -> Xuất Ai Cập (~1446 TCN) -> Đền thờ Sa-lô-môn (~966 TCN) -> Chúa Giê-xu Giáng sinh (~5 TCN) -> Đức Thánh Linh giáng lâm Lễ Ngũ Tuần (~30 SCN).",
+        "theological_summary": "Khải huyền tiệm tiến của Đức Chúa Trời qua các giao ước từ sáng tạo, tuyển dân Y-sơ-ra-ên đến sự ứng nghiệm trọn vẹn trong Đấng Christ và Hội Thánh.",
+        "xp_reward": 50
+    },
+    {
+        "id": "tl-2",
+        "era_title": "Thời Kỳ Tổ Phụ Đến Chinh Phục Ca-na-an",
+        "category": "Old Testament",
+        "description": "Sắp xếp hành trình từ khi Chúa kêu gọi Áp-ra-ham, giải phóng dân sự khỏi Ai Cập đến khi bước vào Đất Hứa.",
+        "event_slugs": [
+            "giao-uoc-ap-ra-ham",
+            "xuat-ai-cap-vuot-bien-do",
+            "chinh-phuc-ca-na-an-va-gie-ri-co",
+            "thoi-ky-cac-quan-xet-va-ru-to"
+        ],
+        "explanation": "Giao ước Áp-ra-ham (~2091 TCN) -> Xuất Ai Cập & Vượt Biển Đỏ (~1446 TCN) -> Chinh phục Giê-ri-cô dưới quyền Giô-suê (~1406 TCN) -> Thời kỳ Các Quan Xét cai trị (~1375 - 1050 TCN).",
+        "theological_summary": "Sự thành tín của Đức Chúa Trời trong việc thực thi lời thề hứa ban Đất Hứa cho dòng dõi Áp-ra-ham bất chấp sự bất toàn của con người.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-3",
+        "era_title": "Vương Quốc Thống Nhất & Đền Thờ Thứ Nhất",
+        "category": "Kingdom",
+        "description": "Sắp xếp thời hoàng kim của vương triều Y-sơ-ra-ên từ khi Đa-vít lập đô đến khi đền thờ bị chia cắt.",
+        "event_slugs": [
+            "thoi-ky-cac-quan-xet-va-ru-to",
+            "vua-da-vit-thong-nhat-va-lap-thu-do",
+            "xay-den-tho-sa-lo-mon",
+            "vuong-quoc-phan-chia-va-tien-tri-e-li"
+        ],
+        "explanation": "Thời kỳ Các Quan Xét kết thúc (~1050 TCN) -> Vua Đa-vít thống nhất 12 chi phái và chọn Giê-ru-sa-lem làm thủ đô (~1000 TCN) -> Sa-lô-môn xây cất Đền Thờ đầu tiên (~966 TCN) -> Vương quốc bị phân chia Bắc/Nam và chức vụ tiên tri Ê-li (~870 TCN).",
+        "theological_summary": "Đền Thờ là nơi ngự cụ thể của vinh quang Đức Chúa Trời (Shekinah), biểu trưng cho sự hiện diện giao ước giữa tuyển dân.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-4",
+        "era_title": "Vương Quốc Phân Chia & Sự Sụp Đổ Lưu Đày",
+        "category": "Exile",
+        "description": "Sắp xếp những biến cố bi tráng dẫn đến sự phán xét trên hai vương quốc Y-sơ-ra-ên và Giu-đa.",
+        "event_slugs": [
+            "vuong-quoc-phan-chia-va-tien-tri-e-li",
+            "sa-ma-ri-sup-do-a-si-ri-xam-luoc",
+            "gie-ru-sa-lem-sup-do-ba-by-lon-luu-day",
+            "chieu-chi-si-ru-va-hoi-huong-tai-thiet"
+        ],
+        "explanation": "Vương quốc phân chia & Ê-li tại Núi Cạt-mên (~870 TCN) -> Vương quốc phía Bắc (Sa-ma-ri) sụp đổ trước A-si-ri (722 TCN) -> Giê-ru-sa-lem sụp đổ & lưu đày sang Ba-by-lôn (586 TCN) -> Chiếu chỉ Si-ru cho phép hồi hương (538 TCN).",
+        "theological_summary": "Sự công bình nghiêm khắc của Chúa đối với tội lỗi bội nghịch, nhưng ân điển bảo tồn một 'dân sót' trung tín để chuẩn bị cho Đấng Mê-si.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-5",
+        "era_title": "Hồi Hương Tái Thiết Đến 400 Năm Im Lặng",
+        "category": "Old Testament",
+        "description": "Sắp xếp công cuộc tái thiết quê hương của tuyển dân cho đến giai đoạn chuyển giao giữa hai giao ước.",
+        "event_slugs": [
+            "gie-ru-sa-lem-sup-do-ba-by-lon-luu-day",
+            "chieu-chi-si-ru-va-hoi-huong-tai-thiet",
+            "ne-he-mi-tai-thiet-tuong-thanh",
+            "bon-tram-nam-im-lang-giua-hai-uoc"
+        ],
+        "explanation": "Lưu đày Ba-by-lôn (586 TCN) -> Sắc lệnh Si-ru hồi hương xây lại Đền Thờ (538 TCN) -> Nê-hê-mi tái thiết tường thành & E-xơ-ra phục hưng (~445 TCN) -> 400 năm im lặng giữa Cựu Ước và Tân Ước (~430 - 5 TCN).",
+        "theological_summary": "Giai đoạn chuẩn bị bối cảnh lịch sử, ngôn ngữ (Hy Lạp) và đường sá (La Mã) để đón nhận 'khi kỳ hạn đã được trọn'.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-6",
+        "era_title": "Cuộc Đời & Chức Vụ Của Chúa Cứu Thế Giê-xu",
+        "category": "Gospels",
+        "description": "Sắp xếp các cột mốc trong chức vụ nhập thể của Con Đức Chúa Trời trên đất.",
+        "event_slugs": [
+            "su-giang-sinh-chua-gie-xu",
+            "phep-la-ca-na",
+            "di-bo-tren-mat-bien",
+            "su-dong-dinh-thap-tu-gia",
+            "su-phuc-sinh-vinh-hien"
+        ],
+        "explanation": "Chúa Giê-xu Giáng sinh (~5 TCN) -> Khởi đầu dấu lạ tại tiệc cưới Ca-na (27 SCN) -> Đi bộ trên Biển Ga-li-lê (29 SCN) -> Chịu chết trên Thập tự giá (30/33 SCN) -> Phục sinh khải hoàn sau 3 ngày.",
+        "theological_summary": "Tâm điểm của toàn bộ Kinh Thánh: Sự nhập thể, chức vụ quyền năng, sự chết chuộc tội và sự phục sinh đắc thắng sự chết.",
+        "xp_reward": 50
+    },
+    {
+        "id": "tl-7",
+        "era_title": "Cuộc Khổ Nạn, Phục Sinh & Lễ Ngũ Tuần",
+        "category": "Gospels & Acts",
+        "description": "Sắp xếp chuỗi biến cố then chốt từ tuần lễ thương khó đến ngày khai sinh Hội Thánh Đấng Christ.",
+        "event_slugs": [
+            "su-dong-dinh-thap-tu-gia",
+            "su-phuc-sinh-vinh-hien",
+            "bien-co-le-ngu-tuan",
+            "su-bien-cai-cua-phao-lo"
+        ],
+        "explanation": "Chúa chịu đóng đinh vào ngày Lễ Vượt Qua -> Phục sinh vào ngày thứ nhất trong tuần -> 50 ngày sau Đức Thánh Linh giáng lâm vào Lễ Ngũ Tuần -> Sau-lơ biến cải trên đường Đa-mách (~34 SCN).",
+        "theological_summary": "Chúa Phục sinh sai phái Đức Thánh Linh vận hành qua Hội Thánh để làm chứng nhân từ Giê-ru-sa-lem cho đến cùng trái đất.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-8",
+        "era_title": "Kỷ Nguyên Các Sứ Đồ Đến Khải Huyền Hoàn Tất",
+        "category": "Early Church",
+        "description": "Sắp xếp tiến trình Phúc Âm truyền đến Dân Ngoại và sự kết thúc của dòng chính kinh Tân Ước.",
+        "event_slugs": [
+            "bien-co-le-ngu-tuan",
+            "su-bien-cai-cua-phao-lo",
+            "dai-hoi-dong-gie-ru-sa-lem",
+            "khai-huyen-tren-dao-bat-mo"
+        ],
+        "explanation": "Đức Thánh Linh giáng lâm (30 SCN) -> Sau-lơ được biến cải thành Phao-lô (~34 SCN) -> Công đồng Giê-ru-sa-lem xác nhận sự cứu rỗi bởi ân điển (49 SCN) -> Sứ đồ Giăng nhận sự Khải Huyền trên đảo Bát-mô (~95 SCN).",
+        "theological_summary": "Sự hiệp nhất của Hội Thánh trong ân điển không phân biệt Do Thái hay Dân Ngoại và khải tượng vinh quang về sự tái lâm của Vua Muôn Vua.",
+        "xp_reward": 45
+    },
+    {
+        "id": "tl-9",
+        "era_title": "Dòng Niên Biểu Đền Thờ Giê-ru-sa-lem",
+        "category": "Temple History",
+        "description": "Sắp xếp lịch sử nơi thánh từ khi Sa-lô-môn khởi công xây cất đến sự hy sinh của Đền Thờ Đích Thực.",
+        "event_slugs": [
+            "vua-da-vit-thong-nhat-va-lap-thu-do",
+            "xay-den-tho-sa-lo-mon",
+            "gie-ru-sa-lem-sup-do-ba-by-lon-luu-day",
+            "chieu-chi-si-ru-va-hoi-huong-tai-thiet",
+            "su-dong-dinh-thap-tu-gia"
+        ],
+        "explanation": "Đa-vít chuẩn bị vật liệu & lập đô (~1000 TCN) -> Sa-lô-môn xây Đền Thờ I (~966 TCN) -> Ba-by-lôn thiêu rụi Đền Thờ (586 TCN) -> Hồi hương xây Đền Thờ II (516 TCN) -> Chúa Giê-xu chịu chết xé toang bức màn Đền Thờ (30 SCN).",
+        "theological_summary": "Đền thờ vật chất tạm thời dẫn đến Đền Thờ trọn vẹn là chính thân thể Đấng Christ và Hội Thánh là đền thờ của Đức Thánh Linh.",
+        "xp_reward": 50
+    },
+    {
+        "id": "tl-10",
+        "era_title": "Đại Niên Biểu Toàn Thư: Từ Sáng Thế Đến Khải Huyền",
+        "category": "Cosmic Scope",
+        "description": "Thử thách tối hậu: Sắp xếp 6 biến cố vĩ đại nhất bao quát toàn bộ 66 sách chính kinh.",
+        "event_slugs": [
+            "su-sang-tao",
+            "giao-uoc-ap-ra-ham",
+            "xuat-ai-cap-vuot-bien-do",
+            "su-giang-sinh-chua-gie-xu",
+            "su-dong-dinh-thap-tu-gia",
+            "khai-huyen-tren-dao-bat-mo"
+        ],
+        "explanation": "Sáng Tạo Vũ Trụ (Nguyên thủy) -> Giao ước Áp-ra-ham (2091 TCN) -> Xuất Ai Cập (1446 TCN) -> Giê-xu Giáng sinh (5 TCN) -> Thập tự giá (30 SCN) -> Khải Huyền Trời Mới Đất Mới (95 SCN).",
+        "theological_summary": "Bức tranh toàn cảnh về kế hoạch đời đời của Đức Chúa Trời: Sáng Tạo -> Sa Ngã -> Cứu Chuộc -> Hoàn Tất Vinh Hiển.",
+        "xp_reward": 60
+    }
+]
 
-    challenges_config = [
-        {
-            "id": "tl-1",
-            "era_title": "Toàn Cảnh Lịch Sử Cứu Rỗi (Từ Sáng Thế Đến Hội Thánh)",
-            "description": "Sắp xếp theo thứ tự thời gian các biến cố định hình lịch sử đức tin từ lúc ban đầu đến khi Hội Thánh lan rộng.",
-            "event_slugs": [
-                "su-sang-tao",
-                "giao-uoc-ap-ra-ham",
-                "xuat-ai-cap-vuot-bien-do",
-                "xay-den-tho-sa-lo-mon",
-                "su-giang-sinh-chua-gie-xu",
-                "bien-co-le-ngu-tuan"
-            ],
-            "explanation": "Dòng thời gian bắt đầu từ Sáng Tạo Vũ Trụ -> Giao ước Áp-ra-ham (2091 TCN) -> Xuất Ai Cập (1446 TCN) -> Đền thờ Sa-lô-môn (966 TCN) -> Chúa Giê-xu Giáng sinh (5 TCN) -> Đức Thánh Linh giáng lâm (30 SCN)."
-        },
-        {
-            "id": "tl-2",
-            "era_title": "Cuộc Đời & Chức Vụ Của Chúa Cứu Thế Giê-xu",
-            "description": "Sắp xếp các cột mốc then chốt trong chức vụ trên đất của Đức Chúa Giê-xu Christ.",
-            "event_slugs": [
-                "su-giang-sinh-chua-gie-xu",
-                "phep-la-ca-na",
-                "di-bo-tren-mat-bien",
-                "su-dong-dinh-thap-tu-gia",
-                "su-phuc-sinh-vinh-hien"
-            ],
-            "explanation": "Chúa Giê-xu giáng sinh tại Bết-lê-hem -> Phép lạ đầu tiên tại tiệc cưới Ca-na (27 SCN) -> Đi bộ trên Biển Ga-li-lê (29 SCN) -> Chịu đóng đinh đền tội (30 SCN) -> Phục sinh khải hoàn sau 3 ngày."
-        },
-        {
-            "id": "tl-3",
-            "era_title": "Hội Thánh Đầu Tiên & Chức Vụ Sứ Đồ",
-            "description": "Sắp xếp các biến cố từ sự giáng lâm của Đức Thánh Linh đến sự biến cải của Sứ đồ Phao-lô.",
-            "event_slugs": [
-                "su-phuc-sinh-vinh-hien",
-                "bien-co-le-ngu-tuan",
-                "su-bien-cai-cua-phao-lo"
-            ],
-            "explanation": "Sau sự Phục sinh của Chúa Giê-xu, Đức Thánh Linh giáng lâm vào Lễ Ngũ Tuần làm bùng cháy Hội Thánh Giê-ru-sa-lem, sau đó Sau-lơ được biến cải trên đường Đa-mách để trở thành Sứ đồ Phao-lô cho Dân Ngoại."
-        }
-    ]
+
+@router.get("/timeline-challenge", response_model=List[TimelineChallenge])
+def get_timeline_challenges(
+    category: Optional[str] = Query(None, description="Category filter (All Eras, Old Testament, Kingdom, Exile, Gospels, Early Church)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve Biblical chronological timeline sorting challenges (§3, §6, §44, §46).
+    Enriches each historical event with authentic 1925 Vietnamese Bible verses from PostgreSQL.
+    """
+    import random
+    from app.routers.graph import _extract_verse_from_db
 
     results = []
-    for cfg in challenges_config:
+    for cfg in TIMELINE_CHALLENGES_CONFIG:
+        if category and category != "all" and cfg["category"].lower() != category.lower():
+            continue
+
         slug_order_map = {slug: idx + 1 for idx, slug in enumerate(cfg["event_slugs"])}
         slugs_tuple = tuple(cfg["event_slugs"])
 
@@ -951,20 +1117,35 @@ def get_timeline_challenges(db: Session = Depends(get_db)):
             {"slugs": slugs_tuple}
         ).fetchall()
 
+        events_map = {r.slug: r for r in rows}
         events_list = []
-        for r in rows:
+
+        for slug in cfg["event_slugs"]:
+            r = events_map.get(slug)
+            if not r:
+                continue
+
             meta = r.metadata if isinstance(r.metadata, dict) else {}
+            scripture_ref = meta.get("scripture", "") if meta else ""
+            verse_text = ""
+            if scripture_ref:
+                verse_text = _extract_verse_from_db(db, scripture_ref)
+
+            theology_sig = meta.get("theological_significance", "") if meta else ""
+
             events_list.append(TimelineEventItem(
                 slug=r.slug,
                 title=r.title,
                 correct_order=slug_order_map.get(r.slug, 99),
                 period=r.period or "",
                 approximate_date=r.approximate_date or "",
-                scripture=meta.get("scripture", "") if meta else "",
-                description=r.description or ""
+                scripture=scripture_ref,
+                verse_text=verse_text,
+                description=r.description or "",
+                theological_significance=theology_sig
             ))
 
-        # Sort initially by correct_order then scramble order for the challenge
+        # Sort by correct_order first, then produce shuffled order for client challenge
         events_list.sort(key=lambda x: x.correct_order)
         shuffled = list(events_list)
         random.shuffle(shuffled)
@@ -972,12 +1153,114 @@ def get_timeline_challenges(db: Session = Depends(get_db)):
         results.append(TimelineChallenge(
             id=cfg["id"],
             era_title=cfg["era_title"],
+            category=cfg["category"],
             description=cfg["description"],
             events=shuffled,
-            narrative_explanation=cfg["explanation"]
+            narrative_explanation=cfg["explanation"],
+            theological_summary=cfg.get("theological_summary"),
+            xp_reward=cfg.get("xp_reward", 50)
         ))
 
     return results
+
+
+@router.post("/timeline-challenge/verify", response_model=TimelineVerifyResponse)
+def verify_timeline_challenge(
+    req: TimelineVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    §3, §6, §44, §46 — Verify user's chronological order for a Timeline Challenge.
+    Calculates exact slot accuracy, awards XP and streak, and provides exegetical feedback.
+    """
+    from app.routers.graph import _extract_verse_from_db
+
+    challenge = next((c for c in TIMELINE_CHALLENGES_CONFIG if c["id"] == req.challenge_id), None)
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Không tìm thấy thử thách niên đại.")
+
+    correct_slug_order = challenge["event_slugs"]
+    submitted_slugs = req.submitted_slug_order
+
+    slug_order_map = {slug: idx + 1 for idx, slug in enumerate(correct_slug_order)}
+    slugs_tuple = tuple(correct_slug_order)
+
+    rows = db.execute(
+        text("""
+        SELECT slug, title, period, approximate_date, description, metadata
+        FROM events
+        WHERE slug IN :slugs
+        """),
+        {"slugs": slugs_tuple}
+    ).fetchall()
+
+    events_map = {r.slug: r for r in rows}
+
+    correct_slots = 0
+    feedback_slots = []
+
+    for sub_idx, slug in enumerate(submitted_slugs):
+        correct_pos = slug_order_map.get(slug, 99)
+        sub_pos = sub_idx + 1
+        is_pos_correct = (sub_pos == correct_pos)
+        if is_pos_correct:
+            correct_slots += 1
+
+        r = events_map.get(slug)
+        meta = r.metadata if r and isinstance(r.metadata, dict) else {}
+        sc_ref = meta.get("scripture", "") if meta else ""
+        v_text = _extract_verse_from_db(db, sc_ref) if sc_ref else ""
+
+        feedback_slots.append(TimelineSlotFeedback(
+            slug=slug,
+            title=r.title if r else slug,
+            submitted_position=sub_pos,
+            correct_position=correct_pos,
+            is_correct_position=is_pos_correct,
+            approximate_date=r.approximate_date if r else "",
+            period=r.period if r else "",
+            scripture=sc_ref,
+            verse_text=v_text,
+            theological_significance=meta.get("theological_significance", "") if meta else None
+        ))
+
+    total_slots = len(correct_slug_order)
+    is_all_correct = (correct_slots == total_slots and len(submitted_slugs) == total_slots)
+    accuracy = round((correct_slots / max(1, total_slots)) * 100, 1)
+
+    xp_awarded = challenge.get("xp_reward", 50) if is_all_correct else max(5, int(challenge.get("xp_reward", 50) * (correct_slots / max(1, total_slots))))
+    streak_bonus = 1 if is_all_correct else 0
+
+    # Gamification persistence
+    try:
+        prof_row = db.execute(
+            text("SELECT total_score, daily_streak FROM user_learning_profiles WHERE user_identifier = :u LIMIT 1"),
+            {"u": req.user_identifier}
+        ).fetchone()
+
+        if prof_row:
+            new_score = (prof_row[0] or 0) + xp_awarded
+            new_streak = (prof_row[1] or 0) + streak_bonus
+            db.execute(
+                text("UPDATE user_learning_profiles SET total_score = :s, daily_streak = :st, updated_at = CURRENT_TIMESTAMP WHERE user_identifier = :u"),
+                {"s": new_score, "st": new_streak, "u": req.user_identifier}
+            )
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Error updating user profile for timeline challenge: {e}")
+
+    return TimelineVerifyResponse(
+        challenge_id=req.challenge_id,
+        is_all_correct=is_all_correct,
+        correct_slots_count=correct_slots,
+        total_slots_count=total_slots,
+        accuracy_percentage=accuracy,
+        xp_awarded=xp_awarded,
+        streak_bonus=streak_bonus,
+        feedback_slots=feedback_slots,
+        chronological_narrative=challenge["explanation"],
+        theological_significance=challenge.get("theological_summary", "")
+    )
 
 
 # ==============================================================================

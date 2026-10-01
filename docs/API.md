@@ -484,6 +484,61 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
     }
     ```
 
+### 5.7 Interactive Biblical Chronology & Era Order Challenges (§3, §6, §44, §46)
+- **Challenges Endpoint**: `GET /api/learn/timeline-challenge?category={category}`
+  - **Description**: Returns 10 curated canonical redemptive history challenge packs (Creation to Consummation) with chronological sequence milestones. Dynamically enriches every historical event with authentic 1925 Vietnamese scripture verses retrieved directly from PostgreSQL `bible_verses`, date approximations, historical period tags, key people, and geographic settings.
+  - **Challenge Sets**:
+    1. `tl-1`: Toàn Cảnh 6 Kỷ Nguyên Lịch Sử Cứu Chuộc (Creation to Early Church)
+    2. `tl-2`: Thời Kỳ Tổ Phụ Đến Chinh Phục Ca-na-an
+    3. `tl-3`: Vương Quốc Thống Nhất & Đền Thờ Thứ Nhất
+    4. `tl-4`: Vương Quốc Phân Chia & Sự Sụp Đổ Lưu Đày
+    5. `tl-5`: Hồi Hương Tái Thiết Đến 400 Năm Im Lặng
+    6. `tl-6`: Cuộc Đời & Chức Vụ Của Chúa Cứu Thế Giê-xu
+    7. `tl-7`: Cuộc Khổ Nạn, Phục Sinh & Lễ Ngũ Tuần
+    8. `tl-8`: Kỷ Nguyên Các Sứ Đồ Đến Khải Huyền Hoàn Tất
+    9. `tl-9`: Dòng Niên Biểu Đền Thờ Giê-ru-sa-lem
+    10. `tl-10`: Đại Niên Biểu Toàn Thư: Từ Sáng Thế Đến Khải Huyền
+- **Verification & Gamification Endpoint**: `POST /api/learn/timeline-challenge/verify`
+  - **Request Body**:
+    ```json
+    {
+      "challenge_id": "tl-1",
+      "submitted_slug_order": [
+        "su-sang-tao",
+        "giao-uoc-ap-ra-ham",
+        "xuat-ai-cap-vuot-bien-do",
+        "xay-den-tho-sa-lo-mon",
+        "su-giang-sinh-chua-gie-xu",
+        "bien-co-le-ngu-tuan"
+      ],
+      "user_identifier": "local_user"
+    }
+    ```
+  - **Response Structure**:
+    ```json
+    {
+      "challenge_id": "tl-1",
+      "is_perfect": true,
+      "accuracy_percentage": 100.0,
+      "correct_slots": 6,
+      "total_slots": 6,
+      "score_awarded": 150,
+      "user_xp": 150,
+      "streak_days": 1,
+      "narrative_explanation": "Kế hoạch cứu chuộc của Đức Chúa Trời khởi đi từ sự sáng tạo hoàn hảo qua lịch sử cứu chuộc đến khi Tin Lành bùng nổ sang muôn dân.",
+      "feedback_slots": [
+        {
+          "slot_index": 0,
+          "event_slug": "su-sang-tao",
+          "event_title": "Sự Sáng Tạo Vũ Trụ & Loài Người",
+          "submitted_order": 1,
+          "correct_order": 1,
+          "is_correct": true
+        }
+      ]
+    }
+    ```
+
 ---
 
 ## 6. Scholarly Exegesis & Synthesis Engine (`/api/study`)

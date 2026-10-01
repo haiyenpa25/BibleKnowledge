@@ -265,6 +265,37 @@ async function main() {
   });
   report('POST /api/learn/geo-challenges/verify (Spatial coordinates verification, gamification XP & archaeological insights)', rGeoVerify.ok, rGeoVerify.error);
 
+  const rTimelineChallenge = await testEndpoint('/api/learn/timeline-challenge', d => {
+    if (!Array.isArray(d) || d.length !== 10) return `Expected 10 timeline challenges, got ${d?.length}`;
+    if (!d[0].events || d[0].events.length === 0) return 'Challenge 0 has no events';
+    if (!d[0].events[0].verse_text) return 'Events missing authentic 1925 verse text';
+    return false;
+  });
+  report('GET /api/learn/timeline-challenge (10 Canonical Biblical Chronology Challenges with 1925 Verses §3, §6, §44)', rTimelineChallenge.ok, rTimelineChallenge.error);
+
+  const rTimelineVerify = await testEndpoint('/api/learn/timeline-challenge/verify', d => {
+    if (!d || typeof d.accuracy_percentage !== 'number' || !Array.isArray(d.feedback_slots)) {
+      return 'Invalid timeline verify response structure';
+    }
+    return false;
+  }, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      challenge_id: 'tl-1',
+      submitted_slug_order: [
+        'su-sang-tao',
+        'giao-uoc-ap-ra-ham',
+        'xuat-ai-cap-vuot-bien-do',
+        'xay-den-tho-sa-lo-mon',
+        'su-giang-sinh-chua-gie-xu',
+        'bien-co-le-ngu-tuan'
+      ],
+      user_identifier: 'local_user'
+    })
+  });
+  report('POST /api/learn/timeline-challenge/verify (Chronology slot verification, gamified XP & redemptive narrative §46)', rTimelineVerify.ok, rTimelineVerify.error);
+
   // Exegetical Workspace Module
   const rHarmony = await testEndpoint('/api/study/harmony', d => (d.total_events !== 16 && d.events?.length !== 16) && `Expected 16 harmony events, got ${d?.total_events}`);
   report('GET /api/study/harmony (Parallel Gospels & Historical synopsis)', rHarmony.ok, rHarmony.error);

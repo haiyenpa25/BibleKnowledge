@@ -280,14 +280,45 @@ interface TimelineEventItem {
   approximate_date: string;
   scripture?: string;
   description: string;
+  verse_text?: string;
+  theological_significance?: string;
 }
 
 interface TimelineChallenge {
   id: string;
   era_title: string;
+  category: string;
   description: string;
   events: TimelineEventItem[];
   narrative_explanation: string;
+  theological_summary?: string;
+  xp_reward?: number;
+}
+
+interface TimelineSlotFeedback {
+  slug: string;
+  title: string;
+  submitted_position: number;
+  correct_position: number;
+  is_correct_position: boolean;
+  approximate_date: string;
+  period: string;
+  scripture?: string;
+  verse_text?: string;
+  theological_significance?: string;
+}
+
+interface TimelineVerifyResult {
+  challenge_id: string;
+  is_all_correct: boolean;
+  correct_slots_count: number;
+  total_slots_count: number;
+  accuracy_percentage: number;
+  xp_awarded: number;
+  streak_bonus: number;
+  feedback_slots: TimelineSlotFeedback[];
+  chronological_narrative: string;
+  theological_significance: string;
 }
 
 
@@ -458,13 +489,17 @@ export default function LearnPage() {
   const [fibChecked, setFibChecked] = useState(false);
   const [fibIsCorrect, setFibIsCorrect] = useState(false);
 
-  // Timeline Order State (§3)
+  // Timeline Order State (§3, §6, §44, §46)
   const [timelineChallenges, setTimelineChallenges] = useState<TimelineChallenge[]>([]);
   const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0);
   const [userEventOrder, setUserEventOrder] = useState<TimelineEventItem[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineChecked, setTimelineChecked] = useState(false);
   const [timelineIsCorrect, setTimelineIsCorrect] = useState(false);
+  const [timelineCategoryFilter, setTimelineCategoryFilter] = useState<string>("all");
+  const [timelineVerifyResult, setTimelineVerifyResult] = useState<TimelineVerifyResult | null>(null);
+  const [timelineVerifying, setTimelineVerifying] = useState<boolean>(false);
+  const [expandedVerseSlug, setExpandedVerseSlug] = useState<string | null>(null);
 
   // AI Generator State
   const [genTarget, setGenTarget] = useState("Giăng 3:1-16");
@@ -966,16 +1001,23 @@ export default function LearnPage() {
     }
   };
 
-  // Fetch Timeline challenges
-  const fetchTimelineChallenges = async () => {
+  // Fetch Timeline challenges with Era Filter (§3, §6, §44)
+  const fetchTimelineChallenges = async (cat?: string) => {
     setTimelineLoading(true);
     setCurrentTimelineIndex(0);
     setTimelineChecked(false);
     setTimelineIsCorrect(false);
+    setTimelineVerifyResult(null);
+    setExpandedVerseSlug(null);
     try {
-      const res = await fetch(`${apiUrl}/api/learn/timeline-challenge`);
+      const c = cat !== undefined ? cat : timelineCategoryFilter;
+      let url = `${apiUrl}/api/learn/timeline-challenge`;
+      if (c && c !== "all") {
+        url += `?category=${encodeURIComponent(c)}`;
+      }
+      const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
+        const data: TimelineChallenge[] = await res.json();
         setTimelineChallenges(data);
         if (data.length > 0) {
           setUserEventOrder(data[0].events);
@@ -1392,33 +1434,36 @@ export default function LearnPage() {
   };
 
   const handleCheckTimeline = async () => {
-    let inOrder = true;
-    for (let i = 0; i < userEventOrder.length - 1; i++) {
-      if (userEventOrder[i].correct_order > userEventOrder[i + 1].correct_order) {
-        inOrder = false;
-        break;
+    if (!currentTimeline || timelineVerifying) return;
+    setTimelineVerifying(true);
+    try {
+      const submittedSlugs = userEventOrder.map((e) => e.slug);
+      const res = await fetch(`${apiUrl}/api/learn/timeline-challenge/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge_id: currentTimeline.id,
+          submitted_slug_order: submittedSlugs,
+          user_identifier: "local_user"
+        })
+      });
+      if (res.ok) {
+        const data: TimelineVerifyResult = await res.json();
+        setTimelineVerifyResult(data);
+        setTimelineChecked(true);
+        setTimelineIsCorrect(data.is_all_correct);
+        if (data.xp_awarded > 0) {
+          setScore((prev) => prev + data.xp_awarded);
+          if (data.is_all_correct) {
+            setStreak((prev) => prev + 1);
+          }
+          fetchProfile();
+        }
       }
-    }
-    setTimelineIsCorrect(inOrder);
-    setTimelineChecked(true);
-
-    if (inOrder) {
-      setScore((prev) => prev + 50);
-      setStreak((prev) => prev + 1);
-      try {
-        await fetch(`${apiUrl}/api/learn/quiz/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            correct_count: 1,
-            total_questions: 1,
-            topic: "History"
-          })
-        });
-        fetchProfile();
-      } catch (err) {
-        console.error("Failed to submit score:", err);
-      }
+    } catch (err) {
+      console.error("Failed to verify timeline challenge:", err);
+    } finally {
+      setTimelineVerifying(false);
     }
   };
 
@@ -1429,8 +1474,10 @@ export default function LearnPage() {
       setUserEventOrder(timelineChallenges[nextIdx].events);
       setTimelineChecked(false);
       setTimelineIsCorrect(false);
+      setTimelineVerifyResult(null);
+      setExpandedVerseSlug(null);
     } else {
-      fetchTimelineChallenges();
+      fetchTimelineChallenges(timelineCategoryFilter);
     }
   };
 
@@ -3325,107 +3372,240 @@ export default function LearnPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* 4. TIMELINE ORDER MODE (Sắp Xếp Niên Đại - §3)                        */}
+      {/* 4. TIMELINE ORDER MODE (Interactive Biblical Chronology §3, §6, §44, §46) */}
       {/* ===================================================================== */}
       {activeTab === "timeline" && (
         <div className="flex flex-col gap-6">
-          <div className="p-6 rounded-3xl bg-slate-900/80 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
-            <div>
+          {/* Header Banner */}
+          <div className="p-6 rounded-3xl bg-slate-900/90 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
-                <Clock className="w-4 h-4" /> Chronological Timeline &bull; Sắp Xếp Niên Đại (§3)
+                <Clock className="w-4 h-4 text-purple-400 animate-spin-slow" /> Chronological Timeline &bull; Thử Thách Sắp Xếp Niên Đại (§3, §6, §44)
               </div>
-              <h2 className="text-xl font-bold text-white mt-1">
-                Thử Thách Sắp Xếp Trật Tự Thời Gian Biến Cố
+              <h2 className="text-xl font-bold text-white">
+                Niên Biểu Lịch Sử Cứu Chuộc &amp; Trật Tự Biến Cố
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Dùng các phím mũi tên Lên / Xuống để sắp xếp các biến cố từ xa xưa nhất đến gần nhất
+              <p className="text-xs text-slate-300">
+                Sử dụng các phím mũi tên Lên (↑) / Xuống (↓) để tái lập trình tự thời gian chính xác từ lúc ban đầu đến khi hoàn tất.
               </p>
             </div>
-            {currentTimeline && (
-              <span className="text-xs font-bold px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Màn {currentTimelineIndex + 1} / {timelineChallenges.length}
-              </span>
-            )}
+
+            <div className="flex items-center gap-2.5">
+              {currentTimeline && (
+                <span className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono shadow-sm">
+                  Thử Thách {currentTimelineIndex + 1} / {timelineChallenges.length}
+                </span>
+              )}
+              <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold font-mono">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>+{currentTimeline?.xp_reward || 50} XP</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Era Category Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span className="text-slate-400 whitespace-nowrap font-medium text-[11px]">Kỷ nguyên:</span>
+            {[
+              { id: "all", label: "Tất Cả (10 Màn)", icon: "✨" },
+              { id: "All Eras", label: "Toàn Cảnh Cứu Rỗi", icon: "🌐" },
+              { id: "Old Testament", label: "Cựu Ước & Tổ Phụ", icon: "📜" },
+              { id: "Kingdom", label: "Vương Quốc Thống Nhất", icon: "👑" },
+              { id: "Exile", label: "Lưu Đày & Hồi Hương", icon: "🏛️" },
+              { id: "Gospels", label: "Cuộc Đời Chúa Giê-xu", icon: "✝️" },
+              { id: "Early Church", label: "Hội Thánh & Khải Huyền", icon: "🕊️" }
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setTimelineCategoryFilter(f.id);
+                  fetchTimelineChallenges(f.id);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  timelineCategoryFilter === f.id
+                    ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                    : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/80 border border-slate-700/50"
+                }`}
+              >
+                <span>{f.icon}</span>
+                <span>{f.label}</span>
+              </button>
+            ))}
           </div>
 
           {timelineLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center gap-3">
+            <div className="py-24 rounded-3xl glass-panel flex flex-col items-center justify-center gap-3">
               <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-              <p className="text-xs text-slate-400">Đang nạp dữ liệu biến cố lịch sử...</p>
+              <p className="text-xs text-slate-400">Đang nạp dữ liệu biến cố &amp; trích xuất Lời Chúa 1925...</p>
             </div>
           ) : currentTimeline ? (
             <div className="flex flex-col gap-6">
-              {/* Challenge Title */}
-              <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-1">
-                <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Chủ đề thời đại</span>
-                <h3 className="text-lg font-bold text-white">{currentTimeline.era_title}</h3>
-                <p className="text-xs text-slate-300">{currentTimeline.description}</p>
+              {/* Challenge Overview Card */}
+              <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      {currentTimeline.category}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {userEventOrder.length} Biến cố cần sắp xếp
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white">
+                    {currentTimeline.era_title}
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                    {currentTimeline.description}
+                  </p>
+                </div>
+
+                {currentTimeline.theological_summary && (
+                  <div className="shrink-0 p-3 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-xs max-w-xs hidden xl:flex flex-col gap-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-400 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Trọng Tâm Cứu Chuộc:
+                    </span>
+                    <p className="text-[11px] leading-relaxed line-clamp-3">
+                      {currentTimeline.theological_summary}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Reorderable Events List */}
               <div className="flex flex-col gap-3">
                 {userEventOrder.map((ev, idx) => {
+                  const slotFeedback = timelineVerifyResult?.feedback_slots.find(f => f.slug === ev.slug);
+                  const isPosCorrect = slotFeedback ? slotFeedback.is_correct_position : false;
+                  const isVerseOpen = expandedVerseSlug === ev.slug;
+
                   return (
                     <div
                       key={ev.slug}
-                      className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 shadow-md ${
+                      className={`p-5 rounded-3xl border transition-all flex flex-col gap-3 shadow-md ${
                         timelineChecked
-                          ? timelineIsCorrect
-                            ? "bg-emerald-950/40 border-emerald-500"
-                            : "bg-slate-900/80 border-slate-700"
-                          : "bg-slate-900/80 border-slate-700 hover:border-slate-600"
+                          ? isPosCorrect
+                            ? "bg-emerald-950/30 border-emerald-500/60 shadow-emerald-950/20"
+                            : "bg-rose-950/20 border-rose-500/50 shadow-rose-950/20"
+                          : "bg-slate-900/90 border-slate-700/80 hover:border-slate-600 hover:bg-slate-850"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 font-bold text-xs flex-shrink-0">
-                          {idx + 1}
-                        </div>
-                        <div className="flex flex-col">
-                          <h4 className="text-sm font-bold text-white">{ev.title}</h4>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                            <span className="text-amber-400 font-medium">{ev.period}</span>
-                            {ev.scripture && (
-                              <>
-                                <span>&bull;</span>
-                                <span className="text-blue-300 font-medium">📖 {ev.scripture}</span>
-                              </>
-                            )}
-                            {timelineChecked && (
-                              <>
-                                <span>&bull;</span>
-                                <span className="font-mono text-cyan-300 font-bold">
-                                  Niên đại: {ev.approximate_date}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3.5">
+                          {/* Slot Position Badge */}
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold font-mono text-sm shrink-0 border ${
+                            timelineChecked
+                              ? isPosCorrect
+                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                                : "bg-rose-500/20 border-rose-500/50 text-rose-300"
+                              : "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                          }`}>
+                            #{idx + 1}
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm sm:text-base font-bold text-white">
+                                {ev.title}
+                              </h4>
+                              {timelineChecked && (
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                  isPosCorrect
+                                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                    : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                                }`}>
+                                  {isPosCorrect ? "✓ Vị trí chuẩn" : `Sai vị trí (Đúng: #${slotFeedback?.correct_position})`}
                                 </span>
-                              </>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300 font-medium text-[11px]">
+                                {ev.period}
+                              </span>
+                              {ev.scripture && (
+                                <Link
+                                  href={`/bible?passage=${encodeURIComponent(ev.scripture)}`}
+                                  className="text-blue-400 hover:text-blue-300 font-mono text-[11px] flex items-center gap-1 hover:underline"
+                                  title="Đọc câu Kinh Thánh này trong Bible Reader"
+                                >
+                                  <span>📖 {ev.scripture}</span>
+                                </Link>
+                              )}
+                              {timelineChecked && ev.approximate_date && (
+                                <span className="font-mono text-cyan-300 font-bold text-[11px] bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+                                  ⏳ {ev.approximate_date}
+                                </span>
+                              )}
+                            </div>
+
+                            {ev.description && (
+                              <p className="text-xs text-slate-300 leading-relaxed mt-1 font-sans">
+                                {ev.description}
+                              </p>
                             )}
                           </div>
-                          {ev.description && (
-                            <p className="text-[11px] text-slate-300 mt-1 line-clamp-1">{ev.description}</p>
+                        </div>
+
+                        {/* Reorder Buttons & Actions */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {ev.verse_text && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedVerseSlug(isVerseOpen ? null : ev.slug)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors border ${
+                                isVerseOpen
+                                  ? "bg-amber-600/30 border-amber-500 text-amber-200"
+                                  : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                              }`}
+                              title="Xem trích đoạn Lời Chúa nguyên văn bản dịch 1925"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="hidden sm:inline">{isVerseOpen ? "Ẩn Câu Gốc" : "Lời Chúa"}</span>
+                            </button>
+                          )}
+
+                          <Link
+                            href="/explore?tab=map"
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 transition-colors border border-slate-700/60 hidden sm:flex items-center gap-1 text-xs"
+                            title="Xem vị trí biến cố này trên Bản Đồ Atlas Địa Lý (§9)"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Atlas</span>
+                          </Link>
+
+                          {!timelineChecked && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveEvent(idx, "up")}
+                                disabled={idx === 0}
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-colors border border-slate-700/60"
+                                title="Di chuyển lên trước trong niên biểu"
+                              >
+                                <ArrowUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveEvent(idx, "down")}
+                                disabled={idx === userEventOrder.length - 1}
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-colors border border-slate-700/60"
+                                title="Di chuyển xuống sau trong niên biểu"
+                              >
+                                <ArrowDown className="w-4 h-4" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Up/Down buttons */}
-                      {!timelineChecked && (
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleMoveEvent(idx, "up")}
-                            disabled={idx === 0}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 hover:text-white transition-colors"
-                            title="Di chuyển lên trước"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveEvent(idx, "down")}
-                            disabled={idx === userEventOrder.length - 1}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 hover:text-white transition-colors"
-                            title="Di chuyển xuống sau"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </button>
+                      {/* Expandable Authentic 1925 Verse Snippet */}
+                      {isVerseOpen && ev.verse_text && (
+                        <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs font-serif italic leading-relaxed animate-in fade-in">
+                          <span className="font-sans font-bold text-amber-400 not-italic text-[10px] block mb-1">
+                            📖 Bản Dịch Truyền Thống 1925 ({ev.scripture}):
+                          </span>
+                          "{ev.verse_text}"
                         </div>
                       )}
                     </div>
@@ -3433,26 +3613,32 @@ export default function LearnPage() {
                 })}
               </div>
 
-              {/* Action Controls & Narrative Explanation */}
-              <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
+              {/* Action Controls & Narrative Exegesis Section */}
+              <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {timelineChecked ? (
-                    <div className="flex items-center gap-2">
-                      {timelineIsCorrect ? (
-                        <span className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                          Chính xác hoàn hảo theo lịch sử Kinh Thánh! (+50 XP)
+                  {timelineChecked && timelineVerifyResult ? (
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg border ${
+                        timelineIsCorrect
+                          ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                          : "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                      }`}>
+                        {timelineVerifyResult.accuracy_percentage}%
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={`text-sm font-bold ${timelineIsCorrect ? "text-emerald-400" : "text-amber-400"}`}>
+                          {timelineIsCorrect
+                            ? "Xuất sắc! Đúng hoàn toàn trình tự lịch sử cứu chuộc!"
+                            : `Đúng ${timelineVerifyResult.correct_slots_count} / ${timelineVerifyResult.total_slots_count} vị trí biến cố`}
                         </span>
-                      ) : (
-                        <span className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-                          <AlertCircle className="w-5 h-5 text-amber-400" />
-                          Thứ tự chưa hoàn toàn chuẩn xác, hãy quan sát niên đại và điều chỉnh lại!
+                        <span className="text-xs text-slate-400">
+                          +{timelineVerifyResult.xp_awarded} XP được cộng vào tài khoản học tập
                         </span>
-                      )}
+                      </div>
                     </div>
                   ) : (
                     <span className="text-xs text-slate-400">
-                      Sắp xếp hoàn tất rồi bấm kiểm tra niên đại
+                      Sắp xếp hoàn tất theo trật tự lịch sử rồi bấm kiểm tra để nhận điểm kinh nghiệm XP.
                     </span>
                   )}
 
@@ -3461,38 +3647,63 @@ export default function LearnPage() {
                       <button
                         type="button"
                         onClick={handleCheckTimeline}
-                        className="px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs md:text-sm shadow-lg shadow-purple-600/30 transition-all"
+                        disabled={timelineVerifying}
+                        className="px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
                       >
-                        Kiểm Tra Niên Đại
+                        {timelineVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                        <span>Kiểm Tra Niên Đại (§3)</span>
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={handleNextTimeline}
-                        className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs md:text-sm flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition-all"
+                        className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all"
                       >
-                        <span>{currentTimelineIndex + 1 < timelineChallenges.length ? "Màn Tiếp Theo" : "Chơi Lại Từ Đầu"}</span>
+                        <span>{currentTimelineIndex + 1 < timelineChallenges.length ? "Thử Thách Tiếp Theo" : "Chơi Lại Từ Đầu"}</span>
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Narrative Explanation */}
+                {/* Exegetical Narrative Flow & Audio Synthesis */}
                 {timelineChecked && (
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col gap-1.5 mt-2 animate-in fade-in">
-                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1">
-                      📜 Dòng Chảy Lịch Sử Cứu Rỗi:
-                    </span>
-                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  <div className="p-5 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col gap-3 mt-2 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Sparkles className="w-4 h-4 text-purple-400" /> Luận Đề Dòng Chảy Lịch Sử Cứu Chuộc:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSpeechSpeak(
+                          `${currentTimeline.era_title}. ${currentTimeline.narrative_explanation}`,
+                          currentTimeline.id
+                        )}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs transition-colors border border-slate-800"
+                        title="Nghe thuyết minh dòng thời gian"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>{speakingVerseId === currentTimeline.id ? "Đang đọc..." : "Nghe Thuyết Minh"}</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
                       {currentTimeline.narrative_explanation}
                     </p>
+
+                    {currentTimeline.theological_summary && (
+                      <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-xs text-purple-200 font-sans">
+                        <strong className="text-purple-300">Ý nghĩa thần học giao ước:</strong> {currentTimeline.theological_summary}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="p-12 text-center text-slate-500">Chưa có dữ liệu niên đại.</div>
+            <div className="p-16 rounded-3xl glass-panel text-center text-slate-500">
+              Chưa có dữ liệu niên đại theo kỷ nguyên này.
+            </div>
           )}
         </div>
       )}
