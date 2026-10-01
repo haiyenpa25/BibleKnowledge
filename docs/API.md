@@ -681,6 +681,19 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `DELETE /api/study/notes/{note_id}`: Deletes a study note.
   - `POST /api/study/notes/sync`: Bidirectional offline-first sync engine reconciling local client notes array (`localStorage`) with PostgreSQL `user_study_notes` using timestamp-based Last-Write-Wins conflict resolution. Returns authoritative merged list and counts.
 
+### 6.13 Advanced Sermon Audio Synthesis & Expository Podcast Exporter (§50)
+- **Endpoints**:
+  - `GET /api/study/sermons/community/{id}/podcast-package`: Automatically parses any peer-reviewed community sermon manuscript or outline into an episodic podcast package with:
+    - Chronological chapter markers with exact time offsets (`00:00`, `01:45`, etc.), section type badges (`intro`, `point`, `application`, `prayer`), and spoken narration scripts.
+    - Standard RSS 2.0 `<item>` enclosure with iTunes extensions (`<itunes:title>`, `<itunes:author>`, `<itunes:duration>`, `<itunes:explicit>`, `<itunes:summary>`).
+    - WebVTT chapter markers (`WEBVTT`, timestamps in `00:00.000 --> 00:00.000` format) for native video/audio players.
+    - Publication-ready Markdown Show Notes with scripture citations and outlines.
+  - `POST /api/study/sermons/podcast-package`: On-demand podcast synthesizer accepting custom sermon manuscripts (`title`, `passage_ref`, `author_name`, `markdown_manuscript`, `big_idea`), generating structured audio chapters, teleprompter scripts, and sacred ambient pad parameters.
+- **Frontend Studio (`/study` Sermon tab)**:
+  - Interactive Web Audio API Sacred Ambient Pad synthesizer (C-G-D harmonic drone with gentle chorus modulation and real-time volume fader).
+  - Web Speech API voice synthesis with play/pause, seek, chapter skipping, teleprompter text highlight, and variable speed playback (0.8x, 1.0x, 1.2x, 1.5x).
+  - Multi-tab podcast exporter supporting one-click copy and download for Markdown Show Notes, RSS 2.0 XML, WebVTT markers, and JSON bundles.
+
 ---
 
 ## 7. Theological Library & Document Engine (`/api/library`)
@@ -717,6 +730,6 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 ## 8. Performance & Resource Constraints
 
 - **Maximum Allowed Non-Ollama Application Container RAM**: 2048 MiB (2.0 GB).
-- **Current Audited Usage**: ~961.6 MiB / 2048 MiB (46.9% headroom).
+- **Current Audited Usage**: ~962.3 MiB / 2048 MiB (47.0% headroom).
 - **Ollama LLM GPU Reservation**: Up to 8 GB VRAM on NVIDIA RTX 5050 Laptop GPU.
 

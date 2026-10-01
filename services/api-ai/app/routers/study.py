@@ -306,6 +306,64 @@ class CommunitySermonDetail(BaseModel):
     reviews: List[PeerReviewItem]
 
 
+class PodcastChapter(BaseModel):
+    index: int
+    title: str
+    time_formatted: str
+    seconds: int
+    duration_seconds: int
+    type: str  # "intro", "point", "application", "prayer"
+    scripture_ref: Optional[str] = None
+    summary: str
+    narration_text: str
+
+
+class PodcastNarrationSegment(BaseModel):
+    segment_id: str
+    chapter_index: int
+    speaker: str
+    heading: str
+    text: str
+    estimated_duration_sec: int
+
+
+class PodcastPackageRequest(BaseModel):
+    sermon_id: Optional[str] = None
+    title: Optional[str] = None
+    passage_ref: Optional[str] = None
+    author_name: Optional[str] = "Mục sư Giảng luận"
+    theme: Optional[str] = ""
+    big_idea: Optional[str] = ""
+    key_verse: Optional[str] = None
+    key_verse_text: Optional[str] = None
+    historical_context: Optional[str] = None
+    introduction_and_hook: Optional[str] = None
+    points: Optional[List[Dict[str, Any]]] = []
+    practical_applications: Optional[List[str]] = []
+    conclusion_and_call: Optional[str] = None
+    theological_citations: Optional[List[Dict[str, Any]]] = []
+    markdown_manuscript: Optional[str] = None
+
+
+class PodcastPackageResponse(BaseModel):
+    podcast_id: str
+    episode_title: str
+    series_name: str
+    author_name: str
+    passage_ref: str
+    publication_date: str
+    total_words: int
+    total_duration_seconds: int
+    total_duration_formatted: str
+    ambient_pad_chord: str
+    ambient_pad_frequencies: List[float]
+    chapters: List[PodcastChapter]
+    narration_segments: List[PodcastNarrationSegment]
+    rss_item_xml: str
+    show_notes_markdown: str
+    vtt_chapters: str
+
+
 class StudyGroupCreate(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = ""
@@ -3203,6 +3261,467 @@ def export_study_group_bundle(
         "group_name": g[0],
         "markdown_bundle": "\n".join(lines)
     }
+
+
+# ==============================================================================
+# 7. ADVANCED SERMON AUDIO SYNTHESIS & EXPOSITORY PODCAST EXPORTER (§50)
+# ==============================================================================
+
+def build_podcast_package(
+    sermon_id: str,
+    title: str,
+    passage_ref: str,
+    author_name: str,
+    theme: str,
+    big_idea: str,
+    key_verse: Optional[str],
+    key_verse_text: Optional[str],
+    historical_context: Optional[str],
+    introduction_and_hook: Optional[str],
+    points: List[Dict[str, Any]],
+    practical_applications: List[str],
+    conclusion_and_call: Optional[str],
+    theological_citations: List[Dict[str, Any]],
+    markdown_manuscript: Optional[str] = None
+) -> PodcastPackageResponse:
+    title = title or "Bài Giảng Giải Kinh Thánh"
+    passage_ref = passage_ref or "Kinh Thánh"
+    author_name = author_name or "Mục sư Giảng luận"
+    big_idea = big_idea or f"Sứ điệp chân lý và ân điển từ phân đoạn {passage_ref}."
+
+    chapters: List[PodcastChapter] = []
+    segments: List[PodcastNarrationSegment] = []
+
+    # 1. Chapter 0: Introduction & Historical Context
+    intro_parts = [
+        f"Kính chào quý con cái Chúa và quý thính giả đang lắng nghe chương trình Giảng Luận Giải Kinh của BibleKnowledge.",
+        f"Bài giảng hôm nay có tựa đề: '{title}', dựa trên phân đoạn Kinh Thánh trọng tâm tại {passage_ref}."
+    ]
+    if key_verse_text:
+        kv_ref_str = f" ({key_verse})" if key_verse else ""
+        intro_parts.append(f"Lời Chúa trong câu gốc nền tảng chép rằng: \"{key_verse_text}\"{kv_ref_str}.")
+    if big_idea:
+        intro_parts.append(f"Ý tưởng cốt lõi của sứ điệp: {big_idea}.")
+    if historical_context:
+        intro_parts.append(f"Bối cảnh lịch sử và tác giả: {historical_context}")
+    if introduction_and_hook:
+        intro_parts.append(introduction_and_hook)
+
+    intro_text = " ".join(intro_parts)
+    intro_words = len(intro_text.split())
+    intro_sec = max(30, int(intro_words / 130 * 60))
+
+    chapters.append(PodcastChapter(
+        index=0,
+        title="Dẫn Nhập & Bối Cảnh Lịch Sử",
+        time_formatted="00:00",
+        seconds=0,
+        duration_seconds=intro_sec,
+        type="intro",
+        scripture_ref=passage_ref,
+        summary=f"Mở đầu sứ điệp '{title}' và bối cảnh lịch sử của phân đoạn {passage_ref}.",
+        narration_text=intro_text
+    ))
+    segments.append(PodcastNarrationSegment(
+        segment_id="seg-0-intro",
+        chapter_index=0,
+        speaker="Người Dẫn Giảng",
+        heading="Dẫn Nhập & Bối Cảnh Lịch Sử",
+        text=intro_text,
+        estimated_duration_sec=intro_sec
+    ))
+
+    # 2. Expository Points
+    for idx, pt in enumerate(points, 1):
+        pt_title = pt.get("title", f"Luận điểm {idx}")
+        pt_ref = pt.get("scripture_ref", "")
+        pt_vtext = pt.get("verse_text", "")
+        pt_orig = pt.get("original_language_key", "")
+        pt_expo = pt.get("exposition", "")
+        pt_illus = pt.get("illustration", "")
+
+        pt_parts = [f"Luận điểm thứ {idx}: {pt_title}."]
+        if pt_ref and pt_vtext:
+            pt_parts.append(f"Kinh văn nền tảng tại {pt_ref}: \"{pt_vtext}\".")
+        elif pt_ref:
+            pt_parts.append(f"Kinh văn nền tảng: {pt_ref}.")
+
+        if pt_orig:
+            pt_parts.append(f"Trong nguyên ngữ Kinh Thánh, từ ngữ then chốt là: {pt_orig}.")
+
+        if pt_expo:
+            pt_parts.append(f"Giải nghĩa phân đoạn: {pt_expo}")
+
+        if pt_illus:
+            pt_parts.append(f"Minh họa mục vụ: {pt_illus}")
+
+        pt_text = " ".join(pt_parts)
+        pt_words = len(pt_text.split())
+        pt_sec = max(35, int(pt_words / 130 * 60))
+
+        chapters.append(PodcastChapter(
+            index=len(chapters),
+            title=f"Luận Điểm {idx}: {pt_title}",
+            time_formatted="00:00",
+            seconds=0,
+            duration_seconds=pt_sec,
+            type="point",
+            scripture_ref=pt_ref or passage_ref,
+            summary=f"Giải kinh luận điểm {idx}: {pt_title}",
+            narration_text=pt_text
+        ))
+        segments.append(PodcastNarrationSegment(
+            segment_id=f"seg-{idx}-point",
+            chapter_index=len(chapters) - 1,
+            speaker="Giảng Sư Mục Vụ",
+            heading=f"Luận Điểm {idx}: {pt_title}",
+            text=pt_text,
+            estimated_duration_sec=pt_sec
+        ))
+
+    # 3. Practical Applications
+    if practical_applications:
+        app_parts = [
+            "Thưa Hội Thánh và quý thính giả, Lời Đức Chúa Trời là ngọn đèn soi cho chân chúng ta và ánh sáng cho đường lối chúng ta.",
+            "Từ sứ điệp hôm nay, chúng ta có những áp dụng thực tiễn để bước đi theo Chúa mỗi ngày:"
+        ]
+        for aidx, app in enumerate(practical_applications, 1):
+            app_parts.append(f"Thứ {aidx}: {app}")
+        app_text = " ".join(app_parts)
+    else:
+        app_text = f"Lời Chúa tại {passage_ref} thúc giục mỗi chúng ta tra xét lại đời sống đức tin, hạ mình trước Chúa và hết lòng vâng phục thánh ý Ngài trong mọi hoàn cảnh."
+
+    app_words = len(app_text.split())
+    app_sec = max(30, int(app_words / 130 * 60))
+    app_ch_idx = len(chapters)
+    chapters.append(PodcastChapter(
+        index=app_ch_idx,
+        title="Ứng Dụng Thực Tiễn Mục Vụ",
+        time_formatted="00:00",
+        seconds=0,
+        duration_seconds=app_sec,
+        type="application",
+        scripture_ref=passage_ref,
+        summary="Các bước hành động thực tiễn để sống theo Lời Chúa trong tuần mới.",
+        narration_text=app_text
+    ))
+    segments.append(PodcastNarrationSegment(
+        segment_id=f"seg-{app_ch_idx}-application",
+        chapter_index=app_ch_idx,
+        speaker="Người Dẫn Giảng",
+        heading="Ứng Dụng Thực Tiễn Mục Vụ",
+        text=app_text,
+        estimated_duration_sec=app_sec
+    ))
+
+    # 4. Conclusion & Benediction Prayer
+    concl_parts = []
+    if conclusion_and_call:
+        concl_parts.append(f"Kết luận và kêu gọi: {conclusion_and_call}")
+    else:
+        concl_parts.append(f"Nguyện Lời Chúa tại {passage_ref} tiếp tục soi rọi và biến đổi mỗi tấm lòng chúng ta.")
+
+    concl_parts.append(
+        f"Giờ đây, kính mời quý thính giả cùng hiệp ý trong lời cầu nguyện: "
+        f"Lạy Đức Chúa Trời Ba Ngôi chí thánh là Cha nhân từ, Đấng đã mạc khải chân lý đời đời qua Lời Hằng Sống. "
+        f"Chúng con cảm tạ Chúa vì sứ điệp phân đoạn {passage_ref}. "
+        f"Xin Đức Thánh Linh ngự trị, nhắc nhở và ban năng quyền thiên thượng để chúng con không chỉ là người nghe Lời Chúa mà còn là người làm theo cách trọn vẹn. "
+        f"Nguyện ân điển của Đức Chúa Jêsus-Christ, sự yêu thương của Đức Chúa Trời Cha, và sự thông công của Đức Thánh Linh ở cùng hết thảy chúng con từ nay cho đến ngày Chúa Giê-xu hồi lai. A-men."
+    )
+    concl_text = " ".join(concl_parts)
+    concl_words = len(concl_text.split())
+    concl_sec = max(30, int(concl_words / 130 * 60))
+    concl_ch_idx = len(chapters)
+    chapters.append(PodcastChapter(
+        index=concl_ch_idx,
+        title="Kết Luận & Lời Cầu Nguyện Chúc Phước",
+        time_formatted="00:00",
+        seconds=0,
+        duration_seconds=concl_sec,
+        type="prayer",
+        scripture_ref=passage_ref,
+        summary="Lời đúc kết sứ điệp và lời cầu nguyện chúc phước bế mạc.",
+        narration_text=concl_text
+    ))
+    segments.append(PodcastNarrationSegment(
+        segment_id=f"seg-{concl_ch_idx}-prayer",
+        chapter_index=concl_ch_idx,
+        speaker="Mục Sư Chủ Lễ",
+        heading="Kết Luận & Lời Cầu Nguyện Chúc Phước",
+        text=concl_text,
+        estimated_duration_sec=concl_sec
+    ))
+
+    # Calculate sequential start timestamps
+    cur_sec = 0
+    total_words = 0
+    for ch in chapters:
+        ch.seconds = cur_sec
+        m, s = divmod(cur_sec, 60)
+        ch.time_formatted = f"{m:02d}:{s:02d}"
+        cur_sec += ch.duration_seconds
+        total_words += len(ch.narration_text.split())
+
+    tot_m, tot_s = divmod(cur_sec, 60)
+    total_dur_fmt = f"{tot_m:02d}:{tot_s:02d}"
+
+    # WebVTT chapter track
+    vtt_lines = ["WEBVTT", ""]
+    for ch in chapters:
+        m1, s1 = divmod(ch.seconds, 60)
+        end_s = ch.seconds + ch.duration_seconds
+        m2, s2 = divmod(end_s, 60)
+        vtt_lines.append(f"{m1:02d}:{s1:02d}.000 --> {m2:02d}:{s2:02d}.000")
+        vtt_lines.append(ch.title)
+        vtt_lines.append("")
+    vtt_chapters = "\n".join(vtt_lines)
+
+    # RSS 2.0 XML Enclosure
+    pub_date_rfc = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    clean_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    rss_item_xml = f"""<item>
+  <title><![CDATA[Tập Đặc Biệt: {clean_title} ({passage_ref})]]></title>
+  <description><![CDATA[{big_idea} Giảng giải bởi {author_name}.]]></description>
+  <link>https://bibleknowledge.io/study?sermon={sermon_id}</link>
+  <guid isPermaLink="false">bibleknowledge-podcast-{sermon_id}</guid>
+  <pubDate>{pub_date_rfc}</pubDate>
+  <author>{author_name}</author>
+  <itunes:author>{author_name}</itunes:author>
+  <itunes:title><![CDATA[{clean_title}]]></itunes:title>
+  <itunes:subtitle><![CDATA[{big_idea}]]></itunes:subtitle>
+  <itunes:summary><![CDATA[Chương trình Giảng Luận Giải Kinh Thần Học: {clean_title} - {passage_ref}. {big_idea}]]></itunes:summary>
+  <itunes:duration>{cur_sec}</itunes:duration>
+  <itunes:explicit>no</itunes:explicit>
+  <itunes:episodeType>full</itunes:episodeType>
+  <itunes:category text="Religion &amp; Spirituality">
+    <itunes:category text="Christianity"/>
+  </itunes:category>
+  <enclosure url="https://bibleknowledge.io/audio/podcasts/{sermon_id}.mp3" length="{cur_sec * 16000}" type="audio/mpeg"/>
+</item>"""
+
+    # Markdown Show Notes
+    md_lines = [
+        f"# 🎙️ BIBLEKNOWLEDGE PODCAST: {title.upper()}",
+        f"> **Chuyên mục**: Giảng Luận & Khảo Luận Giải Kinh Thần Học  ",
+        f"> **Giảng sư / Tác giả**: {author_name}  ",
+        f"> **Kinh văn nền tảng**: {passage_ref}  ",
+        f"> **Thời lượng dự kiến**: {total_dur_fmt} ({total_words} từ)  ",
+        f"> **Ý tưởng trung tâm**: *\"{big_idea}\"*  ",
+        "",
+        "---",
+        "",
+        "## ⏱️ MỤC LỤC & TIMESTAMPS TẬP PODCAST",
+        ""
+    ]
+    for ch in chapters:
+        md_lines.append(f"- `[{ch.time_formatted}]` **{ch.title}** ({ch.scripture_ref or passage_ref})")
+    md_lines.append("")
+
+    if key_verse_text:
+        md_lines.extend([
+            "## 📖 CÂU GỐC TRỌNG TÂM (1925 BTT)",
+            f"> \"{key_verse_text}\" — **{key_verse or passage_ref}**",
+            ""
+        ])
+
+    md_lines.extend([
+        "## 📝 ĐỀ CƯƠNG GIẢI KINH CHI TIẾT (EXPOSITORY OUTLINE)",
+        ""
+    ])
+    for idx, pt in enumerate(points, 1):
+        md_lines.append(f"### {idx}. {pt.get('title', f'Luận điểm {idx}')}")
+        if pt.get("scripture_ref"):
+            md_lines.append(f"**Kinh văn**: `{pt.get('scripture_ref')}`  ")
+        if pt.get("verse_text"):
+            md_lines.append(f"> *\"{pt.get('verse_text')}\"*  ")
+        if pt.get("original_language_key"):
+            md_lines.append(f"**Từ nguyên Hy Lạp / Hê-bơ-rơ**: `{pt.get('original_language_key')}`  ")
+        if pt.get("exposition"):
+            md_lines.append(f"{pt.get('exposition')}  ")
+        if pt.get("illustration"):
+            md_lines.append(f"💡 *Minh họa mục vụ*: {pt.get('illustration')}  ")
+        md_lines.append("")
+
+    if practical_applications:
+        md_lines.extend([
+            "## 💡 BÀI HỌC ÁP DỤNG MỤC VỤ (PRACTICAL APPLICATIONS)",
+            ""
+        ])
+        for a in practical_applications:
+            md_lines.append(f"- {a}")
+        md_lines.append("")
+
+    if theological_citations:
+        md_lines.extend([
+            "## 📚 TRÍCH DẪN & TÀI LIỆU THAM KHẢO THẦN HỌC",
+            ""
+        ])
+        for c in theological_citations:
+            auth = f" ({c.get('author')})" if c.get('author') else ""
+            md_lines.append(f"- **{c.get('source_title', '')}**{auth}: *\"{c.get('quote', '')}\"*")
+        md_lines.append("")
+
+    md_lines.extend([
+        "---",
+        "*(Bản quyền nội dung thuộc hệ sinh thái BibleKnowledge - Hệ thống Tra Cứu & Nghiên Cứu Thần Học Đa Kênh)*"
+    ])
+    show_notes_markdown = "\n".join(md_lines)
+
+    return PodcastPackageResponse(
+        podcast_id=sermon_id,
+        episode_title=title,
+        series_name="BibleKnowledge Tiếng Nói Giảng Luận & Giải Kinh",
+        author_name=author_name,
+        passage_ref=passage_ref,
+        publication_date=datetime.utcnow().strftime("%Y-%m-%d"),
+        total_words=total_words,
+        total_duration_seconds=cur_sec,
+        total_duration_formatted=total_dur_fmt,
+        ambient_pad_chord="D Major Sacred Worship Drone (D3-A3-D4-F#4)",
+        ambient_pad_frequencies=[146.83, 220.00, 293.66, 369.99],
+        chapters=chapters,
+        narration_segments=segments,
+        rss_item_xml=rss_item_xml,
+        show_notes_markdown=show_notes_markdown,
+        vtt_chapters=vtt_chapters
+    )
+
+
+@router.get("/sermons/community/{sermon_id}/podcast-package", response_model=PodcastPackageResponse)
+@router.get("/sermons/{sermon_id}/podcast-package", response_model=PodcastPackageResponse)
+def get_sermon_podcast_package(sermon_id: str, db: Session = Depends(get_db)):
+    """
+    Generate complete audible podcast package and RSS/Show Notes exporter for a community sermon (§50).
+    """
+    from app.routers.bible import get_verse_range
+
+    s = db.execute(
+        text("""
+            SELECT id, title, passage_ref, theme, author_name, homiletical_style,
+                   big_idea, points, practical_applications, theological_citations,
+                   markdown_manuscript
+            FROM community_sermons
+            WHERE id = :id
+        """),
+        {"id": sermon_id}
+    ).fetchone()
+
+    if not s:
+        # Check if it matches a preset
+        matched_preset = next((p for p in SERMON_PRESETS if p.id == sermon_id), None)
+        if matched_preset:
+            p_ref = matched_preset.passage_ref
+            v_data = get_verse_range(ref=p_ref, db=db)
+            verses = v_data.get("verses", [])
+            key_v = verses[0] if verses else {}
+            key_v_text = key_v.get("text", "")
+            key_v_ref = f"{key_v.get('book', '')} {key_v.get('chapter', '')}:{key_v.get('verse', '')}" if key_v else p_ref
+
+            pts = [
+                {
+                    "point_number": 1,
+                    "title": "Chân Lý Mạc Khải & Trọng Tâm Đức Tin",
+                    "scripture_ref": p_ref,
+                    "verse_text": key_v_text,
+                    "exposition": matched_preset.summary
+                }
+            ]
+            return build_podcast_package(
+                sermon_id=matched_preset.id,
+                title=matched_preset.title,
+                passage_ref=matched_preset.passage_ref,
+                author_name="Ban Biên Tập BibleKnowledge",
+                theme=matched_preset.theme,
+                big_idea=matched_preset.summary,
+                key_verse=key_v_ref,
+                key_verse_text=key_v_text,
+                historical_context=f"Bối cảnh Kinh Thánh phân đoạn {p_ref} trong đại mạch thần học giao ước.",
+                introduction_and_hook=f"Sứ điệp dành cho {matched_preset.audience}: khám phá ý muốn Chúa cho cuộc đời.",
+                points=pts,
+                practical_applications=[
+                    f"Dành thì giờ suy ngẫm sâu phân đoạn {p_ref}.",
+                    "Áp dụng nguyên tắc đức tin vào quyết định thực tế mỗi ngày."
+                ],
+                conclusion_and_call="Hãy trao trọn niềm tin cậy nơi Lời Hằng Sống của Đấng Tự Hữu Hằng Hữu.",
+                theological_citations=[]
+            )
+
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài giảng cộng đồng này.")
+
+    pts = parse_json_field(s[7])
+    apps = parse_json_field(s[8])
+    cits = parse_json_field(s[9])
+
+    p_ref = s[2] or ""
+    key_verse_ref = None
+    key_verse_text = None
+    if pts and pts[0].get("verse_text"):
+        key_verse_text = pts[0].get("verse_text")
+        key_verse_ref = pts[0].get("scripture_ref")
+    elif p_ref:
+        v_data = get_verse_range(ref=p_ref, db=db)
+        verses = v_data.get("verses", [])
+        if verses:
+            key_verse_text = verses[0].get("text")
+            key_verse_ref = f"{verses[0].get('book')} {verses[0].get('chapter')}:{verses[0].get('verse')}"
+
+    return build_podcast_package(
+        sermon_id=str(s[0]),
+        title=s[1],
+        passage_ref=p_ref,
+        author_name=s[4] or "Mục sư Giảng luận",
+        theme=s[3] or "",
+        big_idea=s[6] or "",
+        key_verse=key_verse_ref,
+        key_verse_text=key_verse_text,
+        historical_context=f"Khảo cứu thần học phân đoạn {p_ref}.",
+        introduction_and_hook=f"Lời Chúa truyền giảng tới Hội Thánh: {s[1]}.",
+        points=pts,
+        practical_applications=apps,
+        conclusion_and_call=f"Lời Chúa tại {p_ref} là mỏ neo vững chắc cho linh hồn giữa mọi phong ba.",
+        theological_citations=cits,
+        markdown_manuscript=s[10]
+    )
+
+
+@router.post("/sermons/podcast-package", response_model=PodcastPackageResponse)
+def create_custom_podcast_package(req: PodcastPackageRequest, db: Session = Depends(get_db)):
+    """
+    Generate dynamic audible podcast package and RSS/Show Notes exporter from any sermon manuscript or builder output (§50).
+    """
+    from app.routers.bible import get_verse_range
+
+    s_id = req.sermon_id or f"sermon-pod-{uuid4().hex[:12]}"
+    p_ref = req.passage_ref or ""
+
+    key_verse_ref = req.key_verse
+    key_verse_text = req.key_verse_text
+
+    if not key_verse_text and p_ref:
+        v_data = get_verse_range(ref=p_ref, db=db)
+        verses = v_data.get("verses", [])
+        if verses:
+            key_verse_text = verses[0].get("text")
+            key_verse_ref = key_verse_ref or f"{verses[0].get('book')} {verses[0].get('chapter')}:{verses[0].get('verse')}"
+
+    return build_podcast_package(
+        sermon_id=s_id,
+        title=req.title or f"Bài Giảng Giải Kinh {p_ref}",
+        passage_ref=p_ref,
+        author_name=req.author_name or "Mục sư Giảng luận",
+        theme=req.theme or "",
+        big_idea=req.big_idea or "",
+        key_verse=key_verse_ref,
+        key_verse_text=key_verse_text,
+        historical_context=req.historical_context,
+        introduction_and_hook=req.introduction_and_hook,
+        points=req.points or [],
+        practical_applications=req.practical_applications or [],
+        conclusion_and_call=req.conclusion_and_call,
+        theological_citations=req.theological_citations or [],
+        markdown_manuscript=req.markdown_manuscript
+    )
+
 
 
 

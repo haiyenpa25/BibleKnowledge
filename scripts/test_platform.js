@@ -363,7 +363,31 @@ async function main() {
   if (rProjects.ok && rProjects.data && rProjects.data.length > 0) {
     const testProjectId = rProjects.data[0].id;
     const rLeaderGuide = await testEndpoint(`/api/study/projects/${testProjectId}/export-leader-guide`, d => (!d.markdown_curriculum || !Array.isArray(d.learning_objectives)) && 'Invalid leader guide payload');
+    report('GET /api/study/projects/{id}/export-leader-guide (Export small group curriculum & leader guide §50)', rLeaderGuide.ok, rLeaderGuide.error);
   }
+
+  // Expository Podcast Studio & Audio Package Exporter (§50)
+  const rPodcastCommunity = await testEndpoint(
+    '/api/study/sermons/community/sermon-roma-8-victory/podcast-package',
+    d => (!d || !d.episode_title || !Array.isArray(d.chapters) || d.chapters.length < 3 || !d.show_notes_markdown || !d.rss_item_xml || !d.vtt_chapters) && 'Invalid community sermon podcast package'
+  );
+  report('GET /api/study/sermons/community/{id}/podcast-package (Synthesize podcast package with chapters & RSS enclosure §50)', rPodcastCommunity.ok, rPodcastCommunity.error);
+
+  const rPodcastSynthesize = await testEndpoint(
+    '/api/study/sermons/podcast-package',
+    d => (!d || !d.episode_title || !Array.isArray(d.chapters) || !d.narration_segments || d.narration_segments.length < 2) && 'Invalid podcast manuscript synthesis response',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Đấng Chăn Chiên Lành Của Linh Hồn',
+        passage_ref: 'Thi Thiên 23:1-6',
+        author_name: 'Mục Sư Khách Mời',
+        markdown_manuscript: '# Đấng Chăn Chiên Lành Của Linh Hồn\n\n## 1. Sự Thỏa Thuộc Đầy Dẫy\nĐức Giê-hô-va là Đấng chăn giữ tôi; tôi chẳng thiếu thốn gì. Ngài dẫn tôi đến mé nước bình tịnh.\n\n## 2. Sự Giải Cứu Khỏi Trũng Bóng Chết\nDầu khi tôi đi trong trũng bóng chết, tôi sẽ chẳng sợ tai họa nào vì Chúa ở cùng tôi.\n\n## Áp Dụng Thực Hành\nHãy phó thác những gánh nặng lo âu của bạn cho Đấng Chăn Hiền Lành hôm nay.\n\n## Lời Cầu Nguyện\nLạy Chúa, xin ngự trị và chăn dắt linh hồn con trọn đời. Amen.'
+      })
+    }
+  );
+  report('POST /api/study/sermons/podcast-package (On-demand sermon manuscript podcast structuring & chapter marker synthesis §50)', rPodcastSynthesize.ok, rPodcastSynthesize.error);
 
   // Personal Study Notes & Spiritual Journaling Engine (§2.1, §4, §50)
   const rStudyNotes = await testEndpoint('/api/study/notes?limit=20', d => (!Array.isArray(d) || d.length === 0) && 'No study notes returned');

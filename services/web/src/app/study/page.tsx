@@ -47,7 +47,19 @@ import {
   RefreshCw,
   Cloud,
   CloudOff,
-  Database
+  Database,
+  Radio,
+  Play,
+  Pause,
+  Square,
+  SkipForward,
+  SkipBack,
+  Volume2,
+  VolumeX,
+  Music,
+  Rss,
+  Headphones,
+  Mic
 } from "lucide-react";
 
 interface ExpositoryPoint {
@@ -89,6 +101,46 @@ interface SermonPreset {
   theme: string;
   audience: string;
   summary: string;
+}
+
+interface PodcastChapter {
+  index: number;
+  title: string;
+  time_formatted: string;
+  seconds: number;
+  duration_seconds: number;
+  type: string;
+  scripture_ref?: string;
+  summary: string;
+  narration_text: string;
+}
+
+interface PodcastNarrationSegment {
+  segment_id: string;
+  chapter_index: number;
+  speaker: string;
+  heading: string;
+  text: string;
+  estimated_duration_sec: number;
+}
+
+interface PodcastPackageResponse {
+  podcast_id: string;
+  episode_title: string;
+  series_name: string;
+  author_name: string;
+  passage_ref: string;
+  publication_date: string;
+  total_words: number;
+  total_duration_seconds: number;
+  total_duration_formatted: string;
+  ambient_pad_chord: string;
+  ambient_pad_frequencies: number[];
+  chapters: PodcastChapter[];
+  narration_segments: PodcastNarrationSegment[];
+  rss_item_xml: string;
+  show_notes_markdown: string;
+  vtt_chapters: string;
 }
 
 interface StudyBundleData {
@@ -261,6 +313,26 @@ export default function StudyPage() {
   const [sermonError, setSermonError] = useState<string | null>(null);
   const [copiedSermon, setCopiedSermon] = useState<boolean>(false);
   const [savedSermonMsg, setSavedSermonMsg] = useState<string | null>(null);
+
+  // Expository Podcast Synthesis & Audio Exporter State (§50)
+  const [isPodcastPlayerOpen, setIsPodcastPlayerOpen] = useState<boolean>(false);
+  const [podcastData, setPodcastData] = useState<PodcastPackageResponse | null>(null);
+  const [loadingPodcast, setLoadingPodcast] = useState<boolean>(false);
+  const [podcastError, setPodcastError] = useState<string | null>(null);
+  const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
+  const [isPodcastPlaying, setIsPodcastPlaying] = useState<boolean>(false);
+  const [isPodcastPaused, setIsPodcastPaused] = useState<boolean>(false);
+  const [podcastSpeed, setPodcastSpeed] = useState<number>(1.0);
+  const [ambientPadEnabled, setAmbientPadEnabled] = useState<boolean>(true);
+  const [ambientVolume, setAmbientVolume] = useState<number>(0.25);
+  const [isPodcastExporterOpen, setIsPodcastExporterOpen] = useState<boolean>(false);
+  const [podcastExportTab, setPodcastExportTab] = useState<"rss" | "notes" | "vtt" | "json">("notes");
+  const [copiedPodcastSnippet, setCopiedPodcastSnippet] = useState<boolean>(false);
+
+  // Web Audio API Ambient Pad & Utterance Refs
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const oscillatorsRef = React.useRef<OscillatorNode[]>([]);
+  const masterGainRef = React.useRef<GainNode | null>(null);
 
   // Study Bundle Export Modal State (§50)
   const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
@@ -852,6 +924,281 @@ Lạy Chúa... Con tạ ơn Ngài... Xin Thánh Linh dẫn dắt con... Amen.`
     } finally {
       setSharingSermon(false);
     }
+  };
+
+  // ==============================================================================
+  // EXPOSITORY PODCAST AUDIO SYNTHESIS & EXPORTER ENGINE (§50)
+  // ==============================================================================
+
+  // Web Audio API Sacred Ambient Pad Drone
+  const startAmbientPad = (frequencies: number[] = [146.83, 220.00, 293.66, 369.99]) => {
+    if (!ambientPadEnabled) return;
+    try {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioContextRef.current = new AudioCtx();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      oscillatorsRef.current.forEach((osc) => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch {}
+      });
+      oscillatorsRef.current = [];
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.001, ctx.currentTime);
+      masterGain.gain.exponentialRampToValueAtTime(Math.max(0.001, ambientVolume * 0.12), ctx.currentTime + 1.5);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(450, ctx.currentTime);
+      filter.Q.setValueAtTime(1.2, ctx.currentTime);
+
+      masterGain.connect(filter);
+      filter.connect(ctx.destination);
+      masterGainRef.current = masterGain;
+
+      const newOscs: OscillatorNode[] = [];
+      frequencies.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        osc.type = idx % 2 === 0 ? "sine" : "triangle";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        const detuneCents = (idx % 2 === 0 ? 1 : -1) * (idx * 2 + 1);
+        osc.detune.setValueAtTime(detuneCents, ctx.currentTime);
+
+        const voiceGain = ctx.createGain();
+        voiceGain.gain.setValueAtTime(0.3, ctx.currentTime);
+
+        osc.connect(voiceGain);
+        voiceGain.connect(masterGain);
+        osc.start();
+        newOscs.push(osc);
+      });
+      oscillatorsRef.current = newOscs;
+    } catch (e) {
+      console.warn("Web Audio ambient pad initialization skipped:", e);
+    }
+  };
+
+  const stopAmbientPad = () => {
+    try {
+      if (masterGainRef.current && audioContextRef.current) {
+        const ctx = audioContextRef.current;
+        masterGainRef.current.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+      }
+      setTimeout(() => {
+        oscillatorsRef.current.forEach((osc) => {
+          try {
+            osc.stop();
+            osc.disconnect();
+          } catch {}
+        });
+        oscillatorsRef.current = [];
+      }, 850);
+    } catch {}
+  };
+
+  const updateAmbientVolume = (vol: number) => {
+    setAmbientVolume(vol);
+    if (masterGainRef.current && audioContextRef.current && ambientPadEnabled) {
+      const ctx = audioContextRef.current;
+      masterGainRef.current.gain.setTargetAtTime(vol * 0.12, ctx.currentTime, 0.1);
+    }
+  };
+
+  const toggleAmbientPad = () => {
+    if (ambientPadEnabled) {
+      stopAmbientPad();
+      setAmbientPadEnabled(false);
+    } else {
+      setAmbientPadEnabled(true);
+      if (isPodcastPlaying && !isPodcastPaused && podcastData) {
+        startAmbientPad(podcastData.ambient_pad_frequencies);
+      }
+    }
+  };
+
+  // Web Speech API Chapter Narration
+  const playPodcastChapter = (chapIndex: number, currentData = podcastData) => {
+    if (!currentData || !currentData.chapters || currentData.chapters.length === 0) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      alert("Trình duyệt không hỗ trợ Web Speech API.");
+      return;
+    }
+
+    const safeIndex = Math.max(0, Math.min(chapIndex, currentData.chapters.length - 1));
+    setCurrentChapterIndex(safeIndex);
+
+    window.speechSynthesis.cancel();
+
+    const chapter = currentData.chapters[safeIndex];
+    const utterance = new SpeechSynthesisUtterance(chapter.narration_text);
+    utterance.rate = podcastSpeed;
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const viVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("vi"));
+    if (viVoice) {
+      utterance.voice = viVoice;
+    }
+
+    utterance.onstart = () => {
+      setIsPodcastPlaying(true);
+      setIsPodcastPaused(false);
+      startAmbientPad(currentData.ambient_pad_frequencies);
+    };
+
+    utterance.onend = () => {
+      if (safeIndex + 1 < currentData.chapters.length) {
+        playPodcastChapter(safeIndex + 1, currentData);
+      } else {
+        setIsPodcastPlaying(false);
+        setIsPodcastPaused(false);
+        stopAmbientPad();
+      }
+    };
+
+    utterance.onerror = (e) => {
+      console.warn("Speech synthesis notice:", e);
+      setIsPodcastPlaying(false);
+      setIsPodcastPaused(false);
+      stopAmbientPad();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleTogglePlayPause = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!isPodcastPlaying) {
+      playPodcastChapter(currentChapterIndex);
+    } else if (isPodcastPaused) {
+      window.speechSynthesis.resume();
+      setIsPodcastPaused(false);
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        audioContextRef.current.resume();
+      }
+    } else {
+      window.speechSynthesis.pause();
+      setIsPodcastPaused(true);
+    }
+  };
+
+  const handleStopPodcast = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    stopAmbientPad();
+    setIsPodcastPlaying(false);
+    setIsPodcastPaused(false);
+  };
+
+  const handlePrevChapter = () => {
+    if (currentChapterIndex > 0) {
+      playPodcastChapter(currentChapterIndex - 1);
+    }
+  };
+
+  const handleNextChapter = () => {
+    if (podcastData && currentChapterIndex + 1 < podcastData.chapters.length) {
+      playPodcastChapter(currentChapterIndex + 1);
+    }
+  };
+
+  // Launch Podcast from current Sermon Builder
+  const handleOpenPodcastForSermonBuilder = async () => {
+    if (!sermonResult) return;
+    handleStopPodcast();
+    setLoadingPodcast(true);
+    setPodcastError(null);
+    setIsPodcastPlayerOpen(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermons/podcast-package`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sermonResult.title,
+          passage_ref: sermonResult.passage_ref,
+          author_name: "Mục sư Giảng luận",
+          theme: sermonTheme || sermonResult.title,
+          big_idea: sermonResult.big_idea,
+          key_verse: sermonResult.key_verse,
+          key_verse_text: sermonResult.key_verse_text,
+          historical_context: sermonResult.historical_context,
+          introduction_and_hook: sermonResult.introduction_and_hook,
+          points: sermonResult.points || [],
+          practical_applications: sermonResult.practical_applications || [],
+          conclusion_and_call: sermonResult.conclusion_and_call,
+          theological_citations: sermonResult.theological_citations || [],
+          markdown_manuscript: sermonResult.markdown_manuscript
+        })
+      });
+      if (res.ok) {
+        const data: PodcastPackageResponse = await res.json();
+        setPodcastData(data);
+        setCurrentChapterIndex(0);
+      } else {
+        setPodcastError("Không thể tạo gói podcast giải kinh từ bài giảng này.");
+      }
+    } catch (e) {
+      setPodcastError("Lỗi kết nối máy chủ khi tạo podcast.");
+    } finally {
+      setLoadingPodcast(false);
+    }
+  };
+
+  // Launch Podcast from Community Sermon
+  const handleOpenPodcastForCommunity = async (sermonId: string) => {
+    handleStopPodcast();
+    setLoadingPodcast(true);
+    setPodcastError(null);
+    setIsPodcastPlayerOpen(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermons/community/${sermonId}/podcast-package`);
+      if (res.ok) {
+        const data: PodcastPackageResponse = await res.json();
+        setPodcastData(data);
+        setCurrentChapterIndex(0);
+      } else {
+        setPodcastError("Không thể nạp dữ liệu podcast cho bài giảng cộng đồng này.");
+      }
+    } catch (e) {
+      setPodcastError("Lỗi kết nối máy chủ khi tải podcast.");
+    } finally {
+      setLoadingPodcast(false);
+    }
+  };
+
+  const handleClosePodcastPlayer = () => {
+    handleStopPodcast();
+    setIsPodcastPlayerOpen(false);
+  };
+
+  // Copy or Download Podcast Export Snippets
+  const handleCopyPodcastContent = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedPodcastSnippet(true);
+    setTimeout(() => setCopiedPodcastSnippet(false), 2000);
+  };
+
+  const handleDownloadPodcastFile = (content: string, filename: string, mimeType: string) => {
+    if (!content) return;
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Fetch Study Groups
@@ -2236,6 +2583,15 @@ ${sermonResult.introduction_and_hook}
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   type="button"
+                  onClick={handleOpenPodcastForSermonBuilder}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-600/30"
+                  title="Chuyển đổi bản thảo thành Podcast âm thanh có lồng nhạc nền thánh"
+                >
+                  <Radio className="w-3.5 h-3.5 text-amber-200" />
+                  <span>🎙️ Podcast Âm Thanh</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsShareModalOpen(true)}
                   className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
                   title="Chia sẻ bản thảo lên kho cộng đồng để nhận phản biện đồng nghiệp"
@@ -2316,7 +2672,21 @@ ${sermonResult.introduction_and_hook}
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-amber-400 font-medium">
                       <span>{p.theme}</span>
-                      <span className="text-slate-500">Xem ngay →</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPodcastForCommunity(p.id);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-semibold flex items-center gap-0.5 transition-all"
+                          title="Nghe podcast bài giảng mẫu này"
+                        >
+                          <Headphones className="w-2.5 h-2.5" />
+                          <span>Podcast</span>
+                        </button>
+                        <span className="text-slate-500">Xem ngay →</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -2449,6 +2819,15 @@ ${sermonResult.introduction_and_hook}
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenPodcastForSermonBuilder}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-600/30"
+                      title="Mở phòng thu podcast và nghe bài giảng với nhạc nền thánh"
+                    >
+                      <Radio className="w-3.5 h-3.5 text-amber-200" />
+                      <span>🎙️ Phát Podcast</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleBuildSermon(sermonPassageRef, sermonAudience, sermonTheme, true)}
@@ -2855,6 +3234,19 @@ ${sermonResult.introduction_and_hook}
                         >
                           <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? "fill-rose-400 text-rose-400" : ""}`} />
                           <span>{s.likes_count}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPodcastForCommunity(s.id);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition-all shadow-sm"
+                          title="Nghe Podcast giải kinh cho bài giảng này"
+                        >
+                          <Radio className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Podcast</span>
                         </button>
 
                         <button
@@ -4778,6 +5170,18 @@ ${sermonResult.introduction_and_hook}
                 <button
                   type="button"
                   onClick={() => {
+                    handleOpenPodcastForCommunity(selectedCommunitySermon.id);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-bold border border-amber-500/40 flex items-center gap-1.5 shadow-md shadow-amber-600/30"
+                  title="Nghe podcast giải kinh bài giảng này"
+                >
+                  <Radio className="w-3.5 h-3.5 text-amber-200" />
+                  <span>🎙️ Nghe Podcast</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
                     navigator.clipboard.writeText(selectedCommunitySermon.markdown_manuscript);
                     alert("Đã sao chép bản thảo Markdown vào clipboard!");
                   }}
@@ -5506,6 +5910,545 @@ ${sermonResult.introduction_and_hook}
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Tải File Markdown (.MD)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ===================================================================== */}
+      {/* 2.11. ADVANCED EXPOSITORY PODCAST STUDIO & AUDIO SYNTHESIZER (§50)    */}
+      {/* ===================================================================== */}
+      {isPodcastPlayerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-5xl bg-gradient-to-b from-slate-900 via-slate-950 to-black border border-amber-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Top Studio Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-rose-600 flex items-center justify-center shadow-lg shadow-amber-600/30">
+                  <Radio className="w-5 h-5 text-white animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      BibleKnowledge Podcast Studio §50
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      • {podcastData?.series_name || "Tiếng Nói Giảng Luận & Giải Kinh"}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white line-clamp-1 mt-0.5">
+                    {loadingPodcast ? "Đang chuẩn bị phòng thu podcast..." : (podcastData?.episode_title || "Phòng Thu Podcast Giảng Luận")}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {podcastData && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPodcastExporterOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                    title="Mở gói xuất bản RSS và Show Notes Markdown"
+                  >
+                    <Rss className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Xuất Gói Podcast</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClosePodcastPlayer}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Studio Body */}
+            {loadingPodcast ? (
+              <div className="p-20 flex flex-col items-center justify-center gap-4 text-center">
+                <Loader2 className="w-10 h-10 animate-spin text-amber-400" />
+                <p className="text-sm font-semibold text-slate-200">
+                  Đang khởi tạo cấu trúc phân đoạn, ngữ liệu nguyên văn và nhạc nền thánh...
+                </p>
+                <span className="text-xs text-slate-500">
+                  Chuẩn hóa mốc thời gian (timestamps) và kịch bản Web Speech API
+                </span>
+              </div>
+            ) : podcastError ? (
+              <div className="p-16 flex flex-col items-center justify-center gap-3 text-center">
+                <p className="text-rose-400 text-sm font-medium">{podcastError}</p>
+                <button
+                  type="button"
+                  onClick={handleClosePodcastPlayer}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold"
+                >
+                  Đóng
+                </button>
+              </div>
+            ) : podcastData ? (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* Left Column: Live Narration Teleprompter / Active Exegesis Card (7 cols) */}
+                <div className="lg:col-span-7 flex flex-col gap-4">
+                  {/* Episode Meta Pill Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/30 via-rose-950/20 to-slate-900 border border-amber-900/40 flex flex-col gap-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
+                          {podcastData.passage_ref}
+                        </span>
+                        <span className="text-slate-300 font-medium">Giảng sư: <strong>{podcastData.author_name}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+                        <span>Thời lượng: <strong>{podcastData.total_duration_formatted}</strong></span>
+                        <span>•</span>
+                        <span>{podcastData.total_words} từ</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Playing Chapter Card */}
+                  {(() => {
+                    const currentChapter = podcastData.chapters[currentChapterIndex] || podcastData.chapters[0];
+                    const currentSeg = podcastData.narration_segments[currentChapterIndex] || podcastData.narration_segments[0];
+                    return (
+                      <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col gap-4 shadow-xl relative overflow-hidden">
+                        {/* Status bar */}
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center font-black text-xs">
+                              {currentChapterIndex + 1}
+                            </span>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                {currentSeg?.speaker || "Người Dẫn Giảng"}
+                              </span>
+                              <h4 className="text-sm font-bold text-white">
+                                {currentChapter.title}
+                              </h4>
+                            </div>
+                          </div>
+
+                          {/* Sound wave equalizer animation */}
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950 border border-slate-800">
+                            {isPodcastPlaying && !isPodcastPaused ? (
+                              <div className="flex items-center gap-1 h-3.5">
+                                <span className="w-1 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s] h-3"></span>
+                                <span className="w-1 bg-rose-400 rounded-full animate-bounce [animation-delay:-0.15s] h-4"></span>
+                                <span className="w-1 bg-amber-300 rounded-full animate-bounce h-2.5"></span>
+                                <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.2s] h-3.5"></span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500">Đang dừng</span>
+                            )}
+                            <span className="text-[10px] font-mono text-amber-400 ml-1">
+                              {currentChapter.time_formatted}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Teleprompter Spoken Text */}
+                        <div className="p-5 rounded-2xl bg-black/50 border border-slate-800/90 max-h-72 overflow-y-auto">
+                          <p className="font-serif text-sm sm:text-base text-slate-100 leading-relaxed whitespace-pre-line select-text">
+                            {currentChapter.narration_text}
+                          </p>
+                        </div>
+
+                        {/* Chapter Summary Footnote */}
+                        <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                          <span className="line-clamp-1 italic">
+                            💡 {currentChapter.summary}
+                          </span>
+                          <span className="shrink-0 text-[11px] font-mono text-slate-500">
+                            {currentChapter.duration_seconds}s
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Right Column: Interactive Chapter Track & Timeline Navigator (5 cols) */}
+                <div className="lg:col-span-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-amber-400" />
+                      Mục Lục & Phân Đoạn ({podcastData.chapters.length})
+                    </span>
+                    <span className="text-[11px] text-slate-500">Nhấn để nghe ngay</span>
+                  </div>
+
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {podcastData.chapters.map((ch, idx) => {
+                      const isActive = idx === currentChapterIndex;
+                      const typeBadgeColors: Record<string, string> = {
+                        intro: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+                        point: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+                        application: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+                        prayer: "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      };
+                      const typeLabels: Record<string, string> = {
+                        intro: "Dẫn Nhập",
+                        point: `Điểm ${ch.index}`,
+                        application: "Ứng Dụng",
+                        prayer: "Cầu Nguyện"
+                      };
+
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => playPodcastChapter(idx)}
+                          className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
+                            isActive
+                              ? "bg-amber-950/40 border-amber-500/70 shadow-lg shadow-amber-950/40"
+                              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                              isActive ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-300"
+                            }`}>
+                              {ch.time_formatted}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-1.5 py-0.2 rounded text-[9px] font-semibold border ${typeBadgeColors[ch.type] || "bg-slate-800 text-slate-400"}`}>
+                                  {typeLabels[ch.type] || ch.type}
+                                </span>
+                                {isActive && isPodcastPlaying && !isPodcastPaused && (
+                                  <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                                    <Volume2 className="w-3 h-3 animate-pulse" /> Đang phát
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className={`text-xs font-bold line-clamp-1 mt-0.5 ${isActive ? "text-amber-200" : "text-white"}`}>
+                                {ch.title}
+                              </h5>
+                            </div>
+                          </div>
+
+                          <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isActive ? "text-amber-400 translate-x-1" : "text-slate-600"}`} />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sacred Drone Status Box */}
+                  <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-between gap-3 mt-auto">
+                    <div className="flex items-center gap-2">
+                      <Music className={`w-4 h-4 ${ambientPadEnabled ? "text-amber-400" : "text-slate-600"}`} />
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Nhạc Nền Thánh (Sacred Pad)</span>
+                        <p className="text-xs font-semibold text-slate-200 line-clamp-1">{podcastData.ambient_pad_chord}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleAmbientPad}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+                        ambientPadEnabled
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          : "bg-slate-800 text-slate-500 border-slate-700"
+                      }`}
+                    >
+                      {ambientPadEnabled ? "Đang bật" : "Tắt pad"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Bottom Audio Control Console */}
+            {podcastData && (
+              <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/95 flex flex-col gap-3">
+                {/* Track Progress Bar */}
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <span>{podcastData.chapters[currentChapterIndex]?.time_formatted || "00:00"}</span>
+                  <div className="flex-1 mx-3 h-1.5 bg-slate-800 rounded-full overflow-hidden relative">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.round(((currentChapterIndex + 1) / podcastData.chapters.length) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  <span>{podcastData.total_duration_formatted}</span>
+                </div>
+
+                {/* Controls Row */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  {/* Left: Playback Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePrevChapter}
+                      disabled={currentChapterIndex === 0}
+                      className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 disabled:opacity-30 border border-slate-800 flex items-center justify-center transition-all"
+                      title="Phân đoạn trước"
+                    >
+                      <SkipBack className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleTogglePlayPause}
+                      className="px-5 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-500/30 active:scale-95"
+                    >
+                      {isPodcastPlaying && !isPodcastPaused ? (
+                        <>
+                          <Pause className="w-4 h-4 fill-slate-950" />
+                          <span>Tạm Dừng</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 fill-slate-950" />
+                          <span>{isPodcastPaused ? "Tiếp Tục" : "Phát Audio"}</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleStopPodcast}
+                      className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 flex items-center justify-center transition-all"
+                      title="Dừng hẳn và tua về đầu"
+                    >
+                      <Square className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleNextChapter}
+                      disabled={currentChapterIndex >= podcastData.chapters.length - 1}
+                      className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 disabled:opacity-30 border border-slate-800 flex items-center justify-center transition-all"
+                      title="Phân đoạn tiếp theo"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Center: Playback Speed Selector */}
+                  <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 px-1">Tốc độ:</span>
+                    {[0.8, 1.0, 1.2, 1.5].map((spd) => (
+                      <button
+                        key={spd}
+                        type="button"
+                        onClick={() => setPodcastSpeed(spd)}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all ${
+                          podcastSpeed === spd
+                            ? "bg-amber-500 text-slate-950 font-bold"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {spd}x
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Right: Ambient Volume & Exporter */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                      {ambientVolume > 0 && ambientPadEnabled ? (
+                        <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                      ) : (
+                        <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                      <span className="text-[10px] hidden sm:inline">Âm lượng pad:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={ambientVolume}
+                        onChange={(e) => updateAmbientVolume(parseFloat(e.target.value))}
+                        className="w-16 accent-amber-500 cursor-pointer h-1.5"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPodcastExporterOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Xuất Package</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: EXPOSITORY PODCAST PACKAGE EXPORTER (RSS & SHOW NOTES)         */}
+      {/* ===================================================================== */}
+      {isPodcastExporterOpen && podcastData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/80">
+              <div className="flex items-center gap-2.5">
+                <Rss className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Gói Xuất Bản Podcast Giảng Luận (Expository Podcast Package)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Tương thích Apple Podcasts, Spotify, RSS 2.0 và tài liệu Show Notes Markdown
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPodcastExporterOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-800 bg-slate-950/40 text-xs overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setPodcastExportTab("notes")}
+                className={`px-3.5 py-2 font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  podcastExportTab === "notes"
+                    ? "border-amber-400 text-amber-400"
+                    : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                📋 Show Notes (Markdown)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPodcastExportTab("rss")}
+                className={`px-3.5 py-2 font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  podcastExportTab === "rss"
+                    ? "border-amber-400 text-amber-400"
+                    : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                📡 RSS 2.0 Enclosure (XML)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPodcastExportTab("vtt")}
+                className={`px-3.5 py-2 font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  podcastExportTab === "vtt"
+                    ? "border-amber-400 text-amber-400"
+                    : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                ⏱️ WebVTT Chapter Markers
+              </button>
+              <button
+                type="button"
+                onClick={() => setPodcastExportTab("json")}
+                className={`px-3.5 py-2 font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  podcastExportTab === "json"
+                    ? "border-amber-400 text-amber-400"
+                    : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                ⚙️ JSON Bundle Đầy Đủ
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              {podcastExportTab === "notes" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Định dạng Markdown chứa đầy đủ mốc thời gian, câu gốc, đề cương và áp dụng:</span>
+                    <span>{podcastData.show_notes_markdown.length.toLocaleString()} ký tự</span>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 whitespace-pre-wrap max-h-96 overflow-y-auto select-text leading-relaxed">
+                    {podcastData.show_notes_markdown}
+                  </pre>
+                </div>
+              )}
+
+              {podcastExportTab === "rss" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Thẻ XML &lt;item&gt; chuẩn RSS 2.0 có iTunes extensions:</span>
+                    <span>Sẵn sàng dán vào feed podcast</span>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-amber-200 whitespace-pre-wrap max-h-96 overflow-y-auto select-text leading-relaxed">
+                    {podcastData.rss_item_xml}
+                  </pre>
+                </div>
+              )}
+
+              {podcastExportTab === "vtt" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Chuẩn WebVTT Chapter cues cho trình phát podcast:</span>
+                    <span>{podcastData.chapters.length} mốc thời gian</span>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-200 whitespace-pre-wrap max-h-96 overflow-y-auto select-text leading-relaxed">
+                    {podcastData.vtt_chapters}
+                  </pre>
+                </div>
+              )}
+
+              {podcastExportTab === "json" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Dữ liệu JSON phân cấp:</span>
+                    <span>Toàn bộ {podcastData.chapters.length} chapters và narration segments</span>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-indigo-200 whitespace-pre-wrap max-h-96 overflow-y-auto select-text leading-relaxed">
+                    {JSON.stringify(podcastData, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-slate-950/70">
+              <span className="text-xs text-slate-400">
+                Tệp xuất chuẩn hóa cho lưu trữ hoặc tích hợp hệ thống phát sóng số.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const content = podcastExportTab === "notes" ? podcastData.show_notes_markdown
+                      : podcastExportTab === "rss" ? podcastData.rss_item_xml
+                      : podcastExportTab === "vtt" ? podcastData.vtt_chapters
+                      : JSON.stringify(podcastData, null, 2);
+                    handleCopyPodcastContent(content);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                >
+                  {copiedPodcastSnippet ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedPodcastSnippet ? "Đã Sao Chép!" : "Sao Chép Đoạn Này"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanName = (podcastData.episode_title || "podcast").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+                    if (podcastExportTab === "notes") {
+                      handleDownloadPodcastFile(podcastData.show_notes_markdown, `${cleanName}_show_notes.md`, "text/markdown");
+                    } else if (podcastExportTab === "rss") {
+                      handleDownloadPodcastFile(podcastData.rss_item_xml, `${cleanName}_feed_item.xml`, "application/xml");
+                    } else if (podcastExportTab === "vtt") {
+                      handleDownloadPodcastFile(podcastData.vtt_chapters, `${cleanName}_chapters.vtt`, "text/vtt");
+                    } else {
+                      handleDownloadPodcastFile(JSON.stringify(podcastData, null, 2), `${cleanName}_package.json`, "application/json");
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-600/30"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Tải Tệp {podcastExportTab.toUpperCase()}</span>
                 </button>
               </div>
             </div>
