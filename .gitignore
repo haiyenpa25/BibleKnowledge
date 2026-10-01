@@ -1,10 +1,14 @@
 # Dependencies
 node_modules/
 vendor/
+.next/
+dist/
+build/
 
 # Environment and secrets
 .env
 .env.*
+!.env.example
 *.local
 *.key
 *.pem
@@ -31,4 +35,7 @@ temp/
 
 # Large local data files
 data/sources/
-
+data/bible/vi1934/raw/
+*.sqlite
+*.db
+scripts/*dump*.json
