@@ -183,10 +183,16 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <a 
+              href="/bible"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30"
+            >
+              <BookOpen className="w-4 h-4" /> Đọc Kinh Thánh 1925 (66 Sách) →
+            </a>
+            <a 
               href="http://localhost:8000/docs" 
               target="_blank" 
               rel="noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-all shadow-lg shadow-blue-600/30"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card text-slate-300 hover:text-white font-medium text-sm transition-all"
             >
               <Server className="w-4 h-4" /> FastAPI Swagger Docs <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </a>

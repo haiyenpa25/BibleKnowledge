@@ -32,6 +32,74 @@ def list_books(db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/chapter")
+def get_chapter(
+    book: str = Query(..., description="Book code, OSIS, or name (e.g. 'sa', 'Gen', 'Sáng-thế Ký')"),
+    chapter: int = Query(1, ge=1, description="Chapter number (1..N)"),
+    db: Session = Depends(get_db)
+):
+    """Get all verses for a specific chapter of a book."""
+    clean = book.strip().lower()
+    sql_book = text("""
+        SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+        FROM bible_books
+        WHERE LOWER(code) = :c OR LOWER(osis) = :c OR LOWER(name_vi) = :c OR LOWER(name_en) = :c
+        LIMIT 1
+    """)
+    b = db.execute(sql_book, {"c": clean}).fetchone()
+    if not b:
+        sql_fallback = text("""
+            SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+            FROM bible_books
+            WHERE LOWER(name_vi) LIKE :c
+            LIMIT 1
+        """)
+        b = db.execute(sql_fallback, {"c": f"%{clean}%"}).fetchone()
+
+    if not b:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy sách: '{book}'")
+
+    if chapter > b.total_chapters:
+        raise HTTPException(status_code=400, detail=f"Sách {b.name_vi} chỉ có {b.total_chapters} đoạn.")
+
+    sql_verses = text("""
+        SELECT global_id, verse_code, chapter, verse, section_title, text, cross_references
+        FROM bible_verses
+        WHERE book_id = :book_id AND chapter = :chapter
+        ORDER BY verse ASC
+    """)
+    rows = db.execute(sql_verses, {"book_id": b.id, "chapter": chapter}).fetchall()
+
+    return {
+        "book": {
+            "id": b.id,
+            "order": b.book_order,
+            "code": b.code,
+            "osis": b.osis,
+            "name_vi": b.name_vi,
+            "name_en": b.name_en,
+            "testament": b.testament,
+            "total_chapters": b.total_chapters
+        },
+        "chapter": chapter,
+        "total_verses": len(rows),
+        "has_previous": chapter > 1 or b.book_order > 1,
+        "has_next": chapter < b.total_chapters or b.book_order < 66,
+        "verses": [
+            {
+                "global_id": r.global_id,
+                "verse_code": r.verse_code,
+                "chapter": r.chapter,
+                "verse": r.verse,
+                "section_title": r.section_title or "",
+                "text": r.text,
+                "cross_references": r.cross_references or []
+            }
+            for r in rows
+        ]
+    }
+
+
 @router.get("/verse-range")
 def get_verse_range(
     ref: str = Query(..., description="Scripture reference (e.g. 'Giăng 3:16', 'Giăng 3:16-18', 'Ma-thi-ơ 14:22 - 15:5')"),
