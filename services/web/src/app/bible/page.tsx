@@ -17,7 +17,17 @@ import {
   Compass, 
   Loader2,
   Share2,
-  BookMarked
+  BookMarked,
+  Languages,
+  Users,
+  MapPin,
+  Calendar,
+  FileText,
+  ExternalLink,
+  Plus,
+  Trash2,
+  Tag,
+  ArrowRight
 } from "lucide-react";
 
 interface BookMeta {
@@ -60,6 +70,79 @@ interface SearchResult {
   text: string;
 }
 
+interface VerseDetails {
+  verse: {
+    global_id: number;
+    verse_code: number;
+    book_id: number;
+    book_code: string;
+    book_name: string;
+    book_en: string;
+    testament: "OT" | "NT";
+    chapter: number;
+    verse: number;
+    section_title: string;
+    text: string;
+    reference: string;
+  };
+  entities: {
+    people: {
+      id: string;
+      slug: string;
+      name_vi: string;
+      name_en: string;
+      role: string;
+      summary: string;
+    }[];
+    places: {
+      id: string;
+      slug: string;
+      name_vi: string;
+      name_en: string;
+      modern_name: string;
+      latitude: number;
+      longitude: number;
+      description: string;
+    }[];
+    events: {
+      id: string;
+      slug: string;
+      title: string;
+      period: string;
+      description: string;
+    }[];
+  };
+  lexicon: {
+    id: string;
+    strong_number: string;
+    language: "greek" | "hebrew";
+    lemma: string;
+    transliteration: string;
+    pronunciation?: string;
+    part_of_speech?: string;
+    definition: string;
+    theological_significance?: string;
+    matched_by: string;
+  }[];
+  bookmark: {
+    is_bookmarked: boolean;
+    color: string | null;
+    note: string | null;
+  };
+  user_notes: {
+    id: string;
+    title: string;
+    scripture_ref: string;
+    content: string;
+    tags: string[];
+    updated_at: string;
+  }[];
+  cross_references: {
+    reference: string;
+    preview_text: string;
+  }[];
+}
+
 // Canonical Categorization for 66 Books
 const BOOK_CATEGORIES = {
   OT: [
@@ -83,8 +166,8 @@ export default function BibleReaderPage() {
 
   // Data states
   const [books, setBooks] = useState<BookMeta[]>([]);
-  const [currentBookCode, setCurrentBookCode] = useState("sa");
-  const [currentChapter, setCurrentChapter] = useState(1);
+  const [currentBookCode, setCurrentBookCode] = useState("mat");
+  const [currentChapter, setCurrentChapter] = useState(14);
   const [chapterData, setChapterData] = useState<ChapterData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +177,11 @@ export default function BibleReaderPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
+
+  // Verse Details (Entities, Strong Lexicon, Notes, Bookmark)
+  const [verseDetails, setVerseDetails] = useState<VerseDetails | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "lexicon" | "entities" | "notes">("insight");
 
   // AI Explain State
   const [aiLoading, setAiLoading] = useState(false);
@@ -108,6 +196,12 @@ export default function BibleReaderPage() {
   // Bookmark / Copy feedback
   const [copied, setCopied] = useState(false);
   const [bookmarkedVerses, setBookmarkedVerses] = useState<number[]>([]);
+
+  // Inline Note Creation State
+  const [newNoteTitle, setNewNoteTitle] = useState("");
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [newNoteTags, setNewNoteTags] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   // Fetch all 66 books once
   useEffect(() => {
@@ -125,11 +219,28 @@ export default function BibleReaderPage() {
     loadBooks();
   }, [apiUrl]);
 
+  // Fetch user bookmarks from database
+  useEffect(() => {
+    async function loadBookmarks() {
+      try {
+        const res = await fetch(`${apiUrl}/api/study/bookmarks`);
+        if (res.ok) {
+          const data = await res.json();
+          setBookmarkedVerses(data.map((b: { verse_code: number }) => b.verse_code));
+        }
+      } catch (e) {
+        console.error("Failed to load bookmarks:", e);
+      }
+    }
+    loadBookmarks();
+  }, [apiUrl]);
+
   // Fetch chapter data when currentBookCode or currentChapter changes
   useEffect(() => {
     async function loadChapter() {
       setLoading(true);
       setSelectedVerse(null);
+      setVerseDetails(null);
       setAiExplanation(null);
       try {
         const res = await fetch(`${apiUrl}/api/bible/chapter?book=${currentBookCode}&chapter=${currentChapter}`);
@@ -146,6 +257,30 @@ export default function BibleReaderPage() {
     loadChapter();
   }, [currentBookCode, currentChapter, apiUrl]);
 
+  // When a verse is selected, fetch deep theological details
+  useEffect(() => {
+    if (!selectedVerse) {
+      setVerseDetails(null);
+      return;
+    }
+
+    async function loadVerseDetails() {
+      setDetailsLoading(true);
+      try {
+        const res = await fetch(`${apiUrl}/api/bible/verse-details?verse_code=${selectedVerse?.verse_code}`);
+        if (res.ok) {
+          const data = await res.json();
+          setVerseDetails(data);
+        }
+      } catch (e) {
+        console.error("Failed to load verse details:", e);
+      } finally {
+        setDetailsLoading(false);
+      }
+    }
+    loadVerseDetails();
+  }, [selectedVerse, apiUrl]);
+
   // Current active book object
   const currentBook = useMemo(() => {
     return books.find(b => b.code.toLowerCase() === currentBookCode.toLowerCase()) || chapterData?.book || null;
@@ -157,7 +292,6 @@ export default function BibleReaderPage() {
     if (currentChapter > 1) {
       setCurrentChapter(prev => prev - 1);
     } else {
-      // Go to previous book's last chapter
       const prevOrder = currentBook.order - 1;
       const prevBook = books.find(b => b.order === prevOrder);
       if (prevBook) {
@@ -172,7 +306,6 @@ export default function BibleReaderPage() {
     if (currentChapter < currentBook.total_chapters) {
       setCurrentChapter(prev => prev + 1);
     } else {
-      // Go to next book chapter 1
       const nextOrder = currentBook.order + 1;
       const nextBook = books.find(b => b.order === nextOrder);
       if (nextBook) {
@@ -198,11 +331,89 @@ export default function BibleReaderPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Toggle local bookmark
-  function toggleBookmark(verseCode: number) {
-    setBookmarkedVerses(prev => 
-      prev.includes(verseCode) ? prev.filter(c => c !== verseCode) : [...prev, verseCode]
-    );
+  // Persistent Bookmark Toggle
+  async function toggleBookmark(verse: Verse) {
+    if (!currentBook) return;
+    const isBookmarked = bookmarkedVerses.includes(verse.verse_code);
+    const scriptureRef = `${currentBook.name_vi} ${verse.chapter}:${verse.verse}`;
+
+    if (isBookmarked) {
+      // Delete from DB
+      try {
+        await fetch(`${apiUrl}/api/study/bookmarks/${verse.verse_code}`, { method: "DELETE" });
+        setBookmarkedVerses(prev => prev.filter(c => c !== verse.verse_code));
+        if (verseDetails) {
+          setVerseDetails({
+            ...verseDetails,
+            bookmark: { is_bookmarked: false, color: null, note: null }
+          });
+        }
+      } catch (e) {
+        console.error("Failed to delete bookmark:", e);
+      }
+    } else {
+      // Save to DB
+      try {
+        await fetch(`${apiUrl}/api/study/bookmarks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verse_code: verse.verse_code,
+            reference: scriptureRef,
+            color: "amber",
+            note: ""
+          })
+        });
+        setBookmarkedVerses(prev => [...prev, verse.verse_code]);
+        if (verseDetails) {
+          setVerseDetails({
+            ...verseDetails,
+            bookmark: { is_bookmarked: true, color: "amber", note: "" }
+          });
+        }
+      } catch (e) {
+        console.error("Failed to add bookmark:", e);
+      }
+    }
+  }
+
+  // Save Inline Personal Note
+  async function handleCreateNote() {
+    if (!selectedVerse || !currentBook || !newNoteTitle.trim() || !newNoteContent.trim()) return;
+    setNoteSaving(true);
+    const scriptureRef = `${currentBook.name_vi} ${selectedVerse.chapter}:${selectedVerse.verse}`;
+    const tagArray = newNoteTags.split(",").map(t => t.trim()).filter(Boolean);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/study/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newNoteTitle.trim(),
+          scripture_ref: scriptureRef,
+          content: newNoteContent.trim(),
+          tags: tagArray
+        })
+      });
+
+      if (res.ok) {
+        const savedNote = await res.json();
+        setNewNoteTitle("");
+        setNewNoteContent("");
+        setNewNoteTags("");
+        // Refresh verse details
+        if (verseDetails) {
+          setVerseDetails({
+            ...verseDetails,
+            user_notes: [savedNote, ...verseDetails.user_notes]
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to save study note:", e);
+    } finally {
+      setNoteSaving(false);
+    }
   }
 
   // Ask AI to explain verse
@@ -376,11 +587,10 @@ export default function BibleReaderPage() {
             </div>
 
             {/* Verses Flow with Pericopes */}
-            <div className={`flex flex-col gap-4 font-serif leading-relaxed ${
+            <div className={`flex flex-col gap-3 font-serif leading-relaxed ${
               fontSize === "sm" ? "text-base md:text-lg" : fontSize === "lg" ? "text-xl md:text-2xl" : "text-lg md:text-xl"
             }`}>
               {chapterData.verses.map((v, idx) => {
-                // Check if section title changed compared to previous verse
                 const isNewSection = v.section_title && (idx === 0 || chapterData.verses[idx - 1].section_title !== v.section_title);
                 const isSelected = selectedVerse?.global_id === v.global_id;
                 const isBookmarked = bookmarkedVerses.includes(v.verse_code);
@@ -400,17 +610,23 @@ export default function BibleReaderPage() {
                     <div
                       onClick={() => {
                         setSelectedVerse(v);
-                        setAiExplanation(null);
+                        setActiveDrawerTab("insight");
                       }}
-                      className={`group p-2.5 rounded-xl cursor-pointer transition-all duration-150 flex items-start gap-3 ${
+                      className={`group p-3 rounded-2xl cursor-pointer transition-all duration-200 flex items-start gap-3.5 border ${
                         isSelected 
-                          ? "bg-blue-950/60 border border-blue-500/40 shadow-md shadow-blue-950/50" 
-                          : "hover:bg-slate-900/50 border border-transparent"
+                          ? "bg-blue-950/70 border-blue-500/60 shadow-lg shadow-blue-950/60" 
+                          : isBookmarked
+                            ? "bg-amber-950/20 border-amber-500/30 hover:border-amber-400/50"
+                            : "hover:bg-slate-900/60 border-transparent hover:border-slate-800"
                       }`}
                     >
                       {/* Verse Number Pill */}
                       <span className={`select-none text-xs font-sans font-bold pt-1 min-w-[1.75rem] text-right ${
-                        isSelected ? "text-blue-400" : "text-slate-500 group-hover:text-blue-400"
+                        isSelected 
+                          ? "text-blue-400" 
+                          : isBookmarked 
+                            ? "text-amber-400 font-extrabold" 
+                            : "text-slate-500 group-hover:text-blue-400"
                       }`}>
                         {v.verse}
                       </span>
@@ -435,7 +651,9 @@ export default function BibleReaderPage() {
                         )}
 
                         {isBookmarked && (
-                          <span className="inline-block ml-2 text-amber-400 text-xs">★</span>
+                          <span className="inline-block ml-2 text-amber-400 text-xs" title="Đã lưu vào danh sách Đánh Dấu">
+                            ★
+                          </span>
                         )}
                       </div>
                     </div>
@@ -468,22 +686,34 @@ export default function BibleReaderPage() {
         ) : null}
       </main>
 
-      {/* Selected Verse Action Drawer (Bottom Sticky Panel) */}
+      {/* Selected Verse Deep Theological Context Drawer (Bottom Sliding Panel) */}
       {selectedVerse && (
-        <aside className="fixed bottom-0 inset-x-0 z-50 bg-[#0f172a]/95 backdrop-blur-xl border-t border-slate-700 shadow-2xl p-4 md:px-8 max-w-4xl mx-auto rounded-t-3xl transition-transform animate-in slide-in-from-bottom duration-200">
-          <div className="flex flex-col gap-3">
-            {/* Header: Verse Ref & Close Button */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-400 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30">
-                  {currentBook?.name_vi} {selectedVerse.chapter}:{selectedVerse.verse}
+        <aside className="fixed bottom-0 inset-x-0 z-50 bg-[#0c1220]/95 backdrop-blur-2xl border-t border-slate-700/80 shadow-2xl p-4 md:px-8 max-w-4xl mx-auto rounded-t-3xl transition-all animate-in slide-in-from-bottom duration-200 flex flex-col gap-3">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-400 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center gap-1.5">
+                <BookMarked className="w-3.5 h-3.5" />
+                {currentBook?.name_vi} {selectedVerse.chapter}:{selectedVerse.verse}
+              </span>
+              {selectedVerse.section_title && (
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  • {selectedVerse.section_title}
                 </span>
-                {selectedVerse.section_title && (
-                  <span className="text-xs text-slate-400 hidden sm:inline">
-                    • {selectedVerse.section_title}
-                  </span>
-                )}
-              </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Jump to Deep Passage Exegesis in /study */}
+              <Link
+                href={`/study?ref=${encodeURIComponent(`${currentBook?.name_vi} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                className="px-2.5 py-1 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-700/50 text-[11px] font-semibold text-indigo-300 hover:text-white flex items-center gap-1 transition-colors"
+                title="Mở phân tích thần học & bối cảnh đoạn văn"
+              >
+                <span>Nghiên cứu đoạn</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+
               <button 
                 type="button"
                 onClick={() => setSelectedVerse(null)}
@@ -492,61 +722,395 @@ export default function BibleReaderPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
 
-            {/* Verse Snippet Text */}
-            <p className="text-xs md:text-sm font-serif text-slate-300 italic line-clamp-2">
-              &ldquo;{selectedVerse.text}&rdquo;
-            </p>
+          {/* Verse Snippet Text */}
+          <p className="text-xs md:text-sm font-serif text-slate-300 italic line-clamp-2 px-1">
+            &ldquo;{selectedVerse.text}&rdquo;
+          </p>
 
-            {/* Action Bar Buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
-              {/* Copy Button */}
-              <button
-                type="button"
-                onClick={() => handleCopyVerse(selectedVerse)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium flex items-center gap-1.5 transition-colors"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? "Đã chép" : "Sao chép"}</span>
-              </button>
+          {/* Drawer Navigation Tabs */}
+          <div className="flex items-center gap-1.5 pt-1 overflow-x-auto text-xs font-medium border-b border-slate-800/60 pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveDrawerTab("insight")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                activeDrawerTab === "insight"
+                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI & Tổng Quan</span>
+            </button>
 
-              {/* Bookmark Button */}
-              <button
-                type="button"
-                onClick={() => toggleBookmark(selectedVerse.verse_code)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium flex items-center gap-1.5 transition-colors"
-              >
-                <Bookmark className={`w-3.5 h-3.5 ${bookmarkedVerses.includes(selectedVerse.verse_code) ? "text-amber-400 fill-amber-400" : ""}`} />
-                <span>{bookmarkedVerses.includes(selectedVerse.verse_code) ? "Đã lưu" : "Đánh dấu"}</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => setActiveDrawerTab("lexicon")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                activeDrawerTab === "lexicon"
+                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Languages className="w-3.5 h-3.5 text-amber-400" />
+              <span>Từ Ngữ Gốc ({verseDetails?.lexicon?.length || 0})</span>
+            </button>
 
-              {/* AI Explain Button */}
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={() => handleAskAi(selectedVerse)}
-                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-semibold text-white flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30"
-              >
-                {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                <span>Hỏi AI Giải Thích</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveDrawerTab("entities")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                activeDrawerTab === "entities"
+                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Thực Thể ({(verseDetails?.entities?.people?.length || 0) + (verseDetails?.entities?.places?.length || 0) + (verseDetails?.entities?.events?.length || 0)})</span>
+            </button>
 
-            {/* AI Explanation Result Box */}
-            {aiExplanation && (
-              <div className="mt-2 p-3.5 rounded-xl bg-slate-900/90 border border-blue-500/30 max-h-60 overflow-y-auto text-xs text-slate-200 leading-relaxed flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-blue-400 font-bold">
-                  <Sparkles className="w-3.5 h-3.5" /> Giải nghĩa thần học & bối cảnh (Ollama Qwen):
+            <button
+              type="button"
+              onClick={() => setActiveDrawerTab("notes")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                activeDrawerTab === "notes"
+                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Ghi Chú ({verseDetails?.user_notes?.length || 0})</span>
+            </button>
+          </div>
+
+          {/* Tab Content Display */}
+          <div className="max-h-64 overflow-y-auto pr-1">
+            {/* TAB 1: INSIGHT & AI EXPLANATION */}
+            {activeDrawerTab === "insight" && (
+              <div className="flex flex-col gap-3">
+                {/* Actions Row */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {/* Copy Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyVerse(selectedVerse)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium flex items-center gap-1.5 transition-colors"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? "Đã chép" : "Sao chép"}</span>
+                  </button>
+
+                  {/* Bookmark Button (DB synced) */}
+                  <button
+                    type="button"
+                    onClick={() => toggleBookmark(selectedVerse)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium flex items-center gap-1.5 transition-colors"
+                  >
+                    <Bookmark className={`w-3.5 h-3.5 ${bookmarkedVerses.includes(selectedVerse.verse_code) ? "text-amber-400 fill-amber-400" : ""}`} />
+                    <span>{bookmarkedVerses.includes(selectedVerse.verse_code) ? "Đã đánh dấu" : "Đánh dấu"}</span>
+                  </button>
+
+                  {/* Ask AI Button */}
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    onClick={() => handleAskAi(selectedVerse)}
+                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-semibold text-white flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30"
+                  >
+                    {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span>Hỏi AI Giải Thích</span>
+                  </button>
                 </div>
-                <div className="whitespace-pre-wrap font-sans text-slate-300">
-                  {aiExplanation}
-                </div>
+
+                {/* AI Explanation Box */}
+                {aiExplanation && (
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/30 text-xs text-slate-200 leading-relaxed flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold">
+                      <Sparkles className="w-3.5 h-3.5" /> Giải nghĩa thần học & bối cảnh (Ollama Qwen):
+                    </div>
+                    <div className="whitespace-pre-wrap font-sans text-slate-300">
+                      {aiExplanation}
+                    </div>
+                  </div>
+                )}
+
+                {aiError && (
+                  <div className="text-xs text-red-400">
+                    {aiError}
+                  </div>
+                )}
+
+                {/* Cross References Previews */}
+                {verseDetails?.cross_references && verseDetails.cross_references.length > 0 && (
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Các phân đoạn song song & tham chiếu chéo:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {verseDetails.cross_references.map(cr => (
+                        <div key={cr.reference} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs flex flex-col gap-1">
+                          <span className="font-bold text-blue-400 flex items-center gap-1">
+                            ⚓ {cr.reference}
+                          </span>
+                          {cr.preview_text ? (
+                            <p className="font-serif text-slate-400 italic line-clamp-2">
+                              &ldquo;{cr.preview_text}&rdquo;
+                            </p>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">Nhấp để xem liên kết</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {aiError && (
-              <div className="text-xs text-red-400 mt-1">
-                {aiError}
+            {/* TAB 2: STRONG LEXICON (ORIGINAL LANGUAGES) */}
+            {activeDrawerTab === "lexicon" && (
+              <div className="flex flex-col gap-3">
+                {detailsLoading ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-slate-400 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    <span>Đang tra cứu từ điển ngữ căn Strong...</span>
+                  </div>
+                ) : verseDetails?.lexicon && verseDetails.lexicon.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {verseDetails.lexicon.map(item => (
+                      <div 
+                        key={item.id}
+                        className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 transition-all flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
+                              {item.strong_number}
+                            </span>
+                            <span className="text-xs uppercase font-semibold text-slate-400">
+                              {item.language === "greek" ? "Hy Lạp" : "Hê-bơ-rơ"}
+                            </span>
+                          </div>
+                          <Link
+                            href={`/study?word=${item.strong_number}`}
+                            className="text-[11px] text-blue-400 hover:underline flex items-center gap-1"
+                          >
+                            <span>Xem tra cứu</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        </div>
+
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xl font-bold text-amber-200" dir={item.language === "hebrew" ? "rtl" : "ltr"}>
+                            {item.lemma}
+                          </span>
+                          <span className="text-xs italic text-slate-400">
+                            {item.transliteration} ({item.pronunciation})
+                          </span>
+                        </div>
+
+                        {item.part_of_speech && (
+                          <div className="text-[11px] text-slate-400">
+                            Từ loại: <span className="text-slate-300">{item.part_of_speech}</span>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-slate-200 leading-snug">
+                          {item.definition}
+                        </p>
+
+                        {item.theological_significance && (
+                          <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                            <span className="text-amber-400 font-semibold">Ý nghĩa thần học: </span>
+                            {item.theological_significance}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 py-6 text-center">
+                    Không tìm thấy từ ngữ căn Strong đặc biệt cho câu này. Hãy mở chế độ Phân Tích Thần Học ở trang Nghiên Cứu.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: CONNECT LAYER ENTITIES (PEOPLE, PLACES, EVENTS) */}
+            {activeDrawerTab === "entities" && (
+              <div className="flex flex-col gap-4">
+                {detailsLoading ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-slate-400 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    <span>Đang trích xuất mạng lưới thực thể...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {/* People */}
+                    {verseDetails?.entities.people && verseDetails.entities.people.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" /> Nhân vật Kinh Thánh:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {verseDetails.entities.people.map(p => (
+                            <div key={p.slug} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs">{p.name_vi}</span>
+                                <Link 
+                                  href={`/explore?tab=graph&search=${encodeURIComponent(p.name_vi)}`}
+                                  className="text-[10px] text-blue-400 hover:underline flex items-center gap-0.5"
+                                >
+                                  Graph <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                              </div>
+                              <span className="text-[11px] text-slate-400">{p.role}</span>
+                              <p className="text-[11px] text-slate-300 line-clamp-2">{p.summary}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Places */}
+                    {verseDetails?.entities.places && verseDetails.entities.places.length > 0 && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5" /> Địa danh & Tọa độ Địa lý:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {verseDetails.entities.places.map(pl => (
+                            <div key={pl.slug} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs">{pl.name_vi}</span>
+                                <Link 
+                                  href={`/explore?tab=map&place=${encodeURIComponent(pl.slug)}`}
+                                  className="text-[10px] text-emerald-400 hover:underline flex items-center gap-0.5"
+                                >
+                                  Bản đồ <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                              </div>
+                              <span className="text-[11px] text-slate-400">Hiện đại: {pl.modern_name}</span>
+                              <p className="text-[11px] text-slate-300 line-clamp-2">{pl.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Events */}
+                    {verseDetails?.entities.events && verseDetails.entities.events.length > 0 && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" /> Sự kiện & Biến cố Cứu chuộc:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {verseDetails.entities.events.map(ev => (
+                            <div key={ev.slug} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs">{ev.title}</span>
+                                <Link 
+                                  href={`/explore?tab=timeline&event=${encodeURIComponent(ev.slug)}`}
+                                  className="text-[10px] text-amber-400 hover:underline flex items-center gap-0.5"
+                                >
+                                  Timeline <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                              </div>
+                              <span className="text-[11px] text-slate-400">Thời kỳ: {ev.period}</span>
+                              <p className="text-[11px] text-slate-300 line-clamp-2">{ev.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(!verseDetails?.entities.people?.length && !verseDetails?.entities.places?.length && !verseDetails?.entities.events?.length) && (
+                      <div className="text-xs text-slate-400 py-6 text-center">
+                        Không có thực thể đặc biệt được liên kết trực tiếp với câu này. Bạn có thể mở Knowledge Graph toàn diện ở trang Khám Phá.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: PERSONAL STUDY NOTES (POSTGRESQL SYNC) */}
+            {activeDrawerTab === "notes" && (
+              <div className="flex flex-col gap-4">
+                {/* Existing Notes List */}
+                {verseDetails?.user_notes && verseDetails.user_notes.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Ghi chú đã lưu ({verseDetails.user_notes.length}):
+                    </span>
+                    {verseDetails.user_notes.map(note => (
+                      <div key={note.id} className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-xs text-white">{note.title}</h4>
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(note.updated_at).toLocaleDateString("vi-VN")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans">
+                          {note.content}
+                        </p>
+                        {note.tags && note.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {note.tags.map(t => (
+                              <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                                #{t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">
+                    Chưa có ghi chú nào cho câu này. Hãy viết bài học và suy ngẫm cá nhân của bạn bên dưới:
+                  </p>
+                )}
+
+                {/* Create Note Inline Form */}
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2.5">
+                  <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5" /> Thêm Ghi Chú Mới Cho Câu Này
+                  </span>
+                  <input
+                    type="text"
+                    value={newNoteTitle}
+                    onChange={e => setNewNoteTitle(e.target.value)}
+                    placeholder="Tiêu đề ghi chú (VD: Suy ngẫm về đức tin của Phi-e-rơ)..."
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <textarea
+                    rows={2}
+                    value={newNoteContent}
+                    onChange={e => setNewNoteContent(e.target.value)}
+                    placeholder="Nội dung suy ngẫm, bài học thuộc linh, hoặc điều cần áp dụng..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none font-sans"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <input
+                      type="text"
+                      value={newNoteTags}
+                      onChange={e => setNewNoteTags(e.target.value)}
+                      placeholder="Thẻ gắn (cách nhau dấu phẩy, VD: ductin, phero)..."
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={noteSaving || !newNoteTitle.trim() || !newNoteContent.trim()}
+                      onClick={handleCreateNote}
+                      className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-bold text-white flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30"
+                    >
+                      {noteSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                      <span>Lưu Ghi Chú</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -600,9 +1164,9 @@ export default function BibleReaderPage() {
                               type="button"
                               onClick={() => selectBookAndChapter(b.code, 1)}
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                                b.code === currentBookCode 
-                                  ? "bg-blue-600 text-white font-bold" 
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                                currentBookCode.toLowerCase() === b.code.toLowerCase()
+                                  ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
+                                  : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
                               }`}
                             >
                               {b.name_vi}
@@ -639,9 +1203,9 @@ export default function BibleReaderPage() {
                               type="button"
                               onClick={() => selectBookAndChapter(b.code, 1)}
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                                b.code === currentBookCode 
-                                  ? "bg-blue-600 text-white font-bold" 
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                                currentBookCode.toLowerCase() === b.code.toLowerCase()
+                                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/20"
+                                  : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
                               }`}
                             >
                               {b.name_vi}
@@ -658,13 +1222,13 @@ export default function BibleReaderPage() {
         </div>
       )}
 
-      {/* Chapter Grid Modal */}
+      {/* Chapter Selection Modal */}
       {isChapterModalOpen && currentBook && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-slate-700 max-w-xl w-full max-h-[75vh] rounded-3xl p-6 flex flex-col gap-4 shadow-2xl overflow-hidden">
+          <div className="bg-[#0f172a] border border-slate-700 max-w-xl w-full max-h-[80vh] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white">
-                Chọn Đoạn trong {currentBook.name_vi} ({currentBook.total_chapters} đoạn)
+              <h3 className="text-base font-bold text-white">
+                Chọn đoạn trong sách <span className="text-blue-400">{currentBook.name_vi}</span>
               </h3>
               <button 
                 type="button"
@@ -675,36 +1239,35 @@ export default function BibleReaderPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-1 grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
-              {Array.from({ length: currentBook.total_chapters }, (_, i) => i + 1).map(ch => (
-                <button
-                  key={ch}
-                  type="button"
-                  onClick={() => {
-                    setCurrentChapter(ch);
-                    setIsChapterModalOpen(false);
-                  }}
-                  className={`h-11 rounded-xl font-bold text-sm transition-all flex items-center justify-center ${
-                    ch === currentChapter
-                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/40"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                  }`}
-                >
-                  {ch}
-                </button>
-              ))}
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                {Array.from({ length: currentBook.total_chapters }, (_, i) => i + 1).map(cNum => (
+                  <button
+                    key={cNum}
+                    type="button"
+                    onClick={() => selectBookAndChapter(currentBook.code, cNum)}
+                    className={`py-2 rounded-xl text-sm font-semibold transition-all ${
+                      currentChapter === cNum
+                        ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/30"
+                        : "bg-slate-800/60 text-slate-300 hover:bg-slate-700 hover:text-white"
+                    }`}
+                  >
+                    {cNum}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Full-Text Search Modal */}
+      {/* Full-text Search Modal */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-slate-700 max-w-2xl w-full max-h-[80vh] rounded-3xl p-6 flex flex-col gap-4 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Search className="w-5 h-5 text-blue-400" /> Tìm Kiếm Toàn Văn Kinh Thánh
+          <div className="bg-[#0f172a] border border-slate-700 max-w-2xl w-full max-h-[85vh] rounded-3xl p-6 flex flex-col gap-4 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Search className="w-4 h-4 text-blue-400" /> Tìm kiếm toàn văn Kinh Thánh
               </h3>
               <button 
                 type="button"
@@ -715,62 +1278,62 @@ export default function BibleReaderPage() {
               </button>
             </div>
 
-            {/* Search Input Bar */}
-            <div className="flex gap-2">
+            {/* Input Bar */}
+            <form 
+              onSubmit={e => { e.preventDefault(); handleSearch(); }}
+              className="flex items-center gap-2"
+            >
               <input
                 type="text"
-                autoFocus
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleSearch(); }}
-                placeholder="Nhập từ khóa (ví dụ: bánh hằng sống, yêu thương, đức tin)..."
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                placeholder="Nhập từ khóa (VD: 'yêu thương', 'bình an', 'đức tin')..."
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button
-                type="button"
-                disabled={searchLoading}
-                onClick={handleSearch}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                type="submit"
+                disabled={searchLoading || !searchQuery.trim()}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all disabled:opacity-50"
               >
-                {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                Tìm
+                {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tìm"}
               </button>
-            </div>
+            </form>
 
             {/* Results List */}
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2.5 pt-2">
-              {searchResults.length === 0 && !searchLoading && searchQuery.trim() && (
-                <div className="text-center text-slate-500 text-xs py-8">
-                  Không tìm thấy kết quả nào phù hợp với từ khóa.
-                </div>
-              )}
-              {searchResults.map(r => (
-                <div
-                  key={r.global_id}
-                  onClick={() => {
-                    const matchedBook = books.find(b => b.name_vi.toLowerCase() === r.book.toLowerCase());
-                    if (matchedBook) {
-                      selectBookAndChapter(matchedBook.code, r.chapter);
-                      setIsSearchOpen(false);
-                    }
-                  }}
-                  className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-blue-500/50 hover:bg-slate-800/50 cursor-pointer transition-colors flex flex-col gap-1"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-blue-400">
-                      {r.book} {r.chapter}:{r.verse}
-                    </span>
-                    {r.section_title && (
-                      <span className="text-slate-400 text-[11px] truncate max-w-[200px]">
-                        § {r.section_title}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3">
+              {searchResults.length > 0 ? (
+                searchResults.map(r => (
+                  <div
+                    key={r.global_id}
+                    onClick={() => {
+                      const matchedBook = books.find(b => b.name_vi.toLowerCase() === r.book.toLowerCase());
+                      if (matchedBook) {
+                        selectBookAndChapter(matchedBook.code, r.chapter);
+                        setIsSearchOpen(false);
+                      }
+                    }}
+                    className="p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 cursor-pointer transition-colors flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-blue-400">
+                        {r.book} {r.chapter}:{r.verse}
                       </span>
-                    )}
+                      {r.section_title && (
+                        <span className="text-[10px] text-slate-500 truncate max-w-[200px]">
+                          {r.section_title}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-serif text-slate-300 line-clamp-2">
+                      {r.text}
+                    </p>
                   </div>
-                  <p className="text-xs font-serif text-slate-300 line-clamp-2">
-                    {r.text}
-                  </p>
+                ))
+              ) : searchQuery && !searchLoading ? (
+                <div className="text-center py-10 text-xs text-slate-500">
+                  Không tìm thấy câu Kinh Thánh phù hợp cho từ khóa &quot;{searchQuery}&quot;
                 </div>
-              ))}
+              ) : null}
             </div>
           </div>
         </div>

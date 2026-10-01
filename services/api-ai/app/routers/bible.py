@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import re
+import json
 from app.db.session import get_db
 
 router = APIRouter(prefix="/bible", tags=["Bible Core"])
@@ -358,4 +359,317 @@ def get_daily_insight(db: Session = Depends(get_db)):
             "total_nodes": total_nodes
         }
     }
+
+
+@router.get("/verse-details")
+def get_verse_details(
+    verse_code: Optional[int] = Query(None, description="Exact verse code, e.g. 43003016"),
+    ref: Optional[str] = Query(None, description="Scripture ref, e.g. 'Giăng 3:16'"),
+    book: Optional[str] = Query(None, description="Book name or code"),
+    chapter: Optional[int] = Query(None, description="Chapter number"),
+    verse: Optional[int] = Query(None, description="Verse number"),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve comprehensive theological context for a single verse:
+    - Canonical text & translation info
+    - Associated Biblical Entities (People, Places, Events)
+    - Original Language Strong's Lexicon entries (Greek/Hebrew)
+    - User Bookmarks & Personal Study Notes
+    - Cross-reference verse previews
+    """
+    v_row = None
+
+    if verse_code:
+        v_row = db.execute(
+            text("""
+            SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                   b.id as book_id, b.code as book_code, b.name_vi as book_name, b.name_en as book_en,
+                   b.testament, b.book_order
+            FROM bible_verses v
+            JOIN bible_books b ON v.book_id = b.id
+            WHERE v.verse_code = :vc
+            LIMIT 1
+            """),
+            {"vc": verse_code}
+        ).fetchone()
+    elif ref:
+        # Match using get_verse_range style parser
+        from app.routers.bible import get_verse_range
+        try:
+            res = get_verse_range(ref=ref, db=db)
+            if res.get("verses"):
+                first_v = res["verses"][0]
+                return get_verse_details(verse_code=first_v["verse_code"], db=db)
+        except Exception:
+            pass
+    elif book and chapter and verse:
+        v_row = db.execute(
+            text("""
+            SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                   b.id as book_id, b.code as book_code, b.name_vi as book_name, b.name_en as book_en,
+                   b.testament, b.book_order
+            FROM bible_verses v
+            JOIN bible_books b ON v.book_id = b.id
+            WHERE (LOWER(b.name_vi) = LOWER(:b) OR LOWER(b.code) = LOWER(:b) OR LOWER(b.osis) = LOWER(:b))
+              AND v.chapter = :c AND v.verse = :v
+            LIMIT 1
+            """),
+            {"b": book.strip(), "c": chapter, "v": verse}
+        ).fetchone()
+
+    if not v_row:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu Kinh Thánh yêu cầu.")
+
+    verse_id = v_row.id
+    v_code = v_row.verse_code
+    scripture_ref = f"{v_row.book_name} {v_row.chapter}:{v_row.verse}"
+    testament = v_row.testament
+
+    # 1. Fetch linked Entities from verse_entities
+    entities_rows = db.execute(
+        text("""
+        SELECT e.entity_type, e.mention_type,
+               p.id as person_id, p.slug as person_slug, p.name_vi as person_name, p.name_en as person_name_en,
+               p.title_or_role as person_role, p.summary as person_summary,
+               pl.id as place_id, pl.slug as place_slug, pl.name_vi as place_name, pl.name_en as place_name_en,
+               pl.modern_name as place_modern, pl.latitude, pl.longitude, pl.description as place_desc,
+               ev.id as event_id, ev.slug as event_slug, ev.title as event_title, ev.period as event_period,
+               ev.description as event_desc
+        FROM verse_entities e
+        LEFT JOIN people p ON e.entity_type = 'person' AND e.entity_id = p.id
+        LEFT JOIN places pl ON e.entity_type = 'place' AND e.entity_id = pl.id
+        LEFT JOIN events ev ON e.entity_type = 'event' AND e.entity_id = ev.id
+        WHERE e.verse_id = :vid
+        """),
+        {"vid": verse_id}
+    ).fetchall()
+
+    people_list = []
+    places_list = []
+    events_list = []
+    seen_people = set()
+    seen_places = set()
+    seen_events = set()
+
+    for r in entities_rows:
+        if r.entity_type == "person" and r.person_id and r.person_slug not in seen_people:
+            seen_people.add(r.person_slug)
+            people_list.append({
+                "id": str(r.person_id),
+                "slug": r.person_slug,
+                "name_vi": r.person_name,
+                "name_en": r.person_name_en,
+                "role": r.person_role,
+                "summary": r.person_summary
+            })
+        elif r.entity_type == "place" and r.place_id and r.place_slug not in seen_places:
+            seen_places.add(r.place_slug)
+            places_list.append({
+                "id": str(r.place_id),
+                "slug": r.place_slug,
+                "name_vi": r.place_name,
+                "name_en": r.place_name_en,
+                "modern_name": r.place_modern,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+                "description": r.place_desc
+            })
+        elif r.entity_type == "event" and r.event_id and r.event_slug not in seen_events:
+            seen_events.add(r.event_slug)
+            events_list.append({
+                "id": str(r.event_id),
+                "slug": r.event_slug,
+                "title": r.event_title,
+                "period": r.event_period,
+                "description": r.event_desc
+            })
+
+    # Dynamic Fallback: if no people found, check verse text for core names
+    if not people_list:
+        p_candidates = db.execute(text("SELECT id, slug, name_vi, name_en, title_or_role, summary FROM people")).fetchall()
+        for pc in p_candidates:
+            if pc.name_vi in v_row.text or (pc.slug == "chua-gie-xu" and ("Chúa" in v_row.text or "Giê-xu" in v_row.text)):
+                if pc.slug not in seen_people:
+                    seen_people.add(pc.slug)
+                    people_list.append({
+                        "id": str(pc.id),
+                        "slug": pc.slug,
+                        "name_vi": pc.name_vi,
+                        "name_en": pc.name_en,
+                        "role": pc.title_or_role,
+                        "summary": pc.summary
+                    })
+
+    if not places_list:
+        pl_candidates = db.execute(text("SELECT id, slug, name_vi, name_en, modern_name, latitude, longitude, description FROM places")).fetchall()
+        for plc in pl_candidates:
+            if plc.name_vi in v_row.text and plc.slug not in seen_places:
+                seen_places.add(plc.slug)
+                places_list.append({
+                    "id": str(plc.id),
+                    "slug": plc.slug,
+                    "name_vi": plc.name_vi,
+                    "name_en": plc.name_en,
+                    "modern_name": plc.modern_name,
+                    "latitude": plc.latitude,
+                    "longitude": plc.longitude,
+                    "description": plc.description
+                })
+
+    # 2. Strong Lexicon Search (Greek for NT, Hebrew for OT, plus key_verses match)
+    lang_filter = "greek" if testament == "NT" else "hebrew"
+    lex_rows = db.execute(
+        text("SELECT id, strong_number, language, lemma, transliteration, pronunciation, part_of_speech, definition, theological_significance, key_verses FROM strong_lexicon WHERE language = :lang"),
+        {"lang": lang_filter}
+    ).fetchall()
+
+    matched_lexicon = []
+    v_text_lower = v_row.text.lower()
+
+    # Keyword mappings to Strong numbers for accurate matching
+    keyword_map = {
+        "yêu thương": ["G0026", "H2617"],
+        "yêu": ["G0026", "H2617"],
+        "ân điển": ["G5485"],
+        "ơn": ["G5485"],
+        "đức tin": ["G4102", "H0539"],
+        "tin": ["G4102", "H0539"],
+        "lời": ["G3056"],
+        "đạo": ["G3056"],
+        "thánh linh": ["G4151", "H7307"],
+        "thần": ["G4151", "H7307"],
+        "thông công": ["G2842"],
+        "ban đầu": ["H7225"],
+        "dựng nên": ["H1254"],
+        "sáng tạo": ["H1254"],
+        "nhân từ": ["H2617"],
+        "thương xót": ["H2617"],
+        "bình an": ["H7965"],
+        "giao ước": ["H1285"],
+        "đức chúa trời": ["H0430", "G2316"],
+        "giê-hô-va": ["H3068"],
+        "chúa": ["G2962", "H3068"],
+        "chủ": ["G2962"],
+        "đấng christ": ["G5547"],
+        "mê-si-a": ["G5547"],
+        "tin lành": ["G2098"],
+        "phúc âm": ["G2098"],
+        "ăn năn": ["G3341"],
+        "cứu rỗi": ["G4991"],
+        "cứu": ["G4991"],
+        "thánh": ["H6944"]
+    }
+
+    matched_strong_nums = set()
+
+    for kw, s_nums in keyword_map.items():
+        if kw in v_text_lower:
+            for sn in s_nums:
+                matched_strong_nums.add(sn)
+
+    for lr in lex_rows:
+        kv_list = lr.key_verses
+        if isinstance(kv_list, str):
+            try:
+                kv_list = json.loads(kv_list)
+            except Exception:
+                kv_list = [kv_list]
+
+        # Match by explicit verse reference or by theological keyword
+        is_ref_match = any(scripture_ref.lower() in k.lower() for k in kv_list)
+        is_num_match = lr.strong_number in matched_strong_nums
+
+        if is_ref_match or is_num_match:
+            matched_lexicon.append({
+                "id": lr.id,
+                "strong_number": lr.strong_number,
+                "language": lr.language,
+                "lemma": lr.lemma,
+                "transliteration": lr.transliteration,
+                "pronunciation": lr.pronunciation,
+                "part_of_speech": lr.part_of_speech,
+                "definition": lr.definition,
+                "theological_significance": lr.theological_significance,
+                "matched_by": "reference" if is_ref_match else "keyword"
+            })
+
+    # 3. Bookmark status
+    bm_row = db.execute(
+        text("SELECT id, color, note, created_at FROM user_bookmarks WHERE verse_code = :vc"),
+        {"vc": v_code}
+    ).fetchone()
+    bookmark_info = {
+        "is_bookmarked": bm_row is not None,
+        "color": bm_row.color if bm_row else None,
+        "note": bm_row.note if bm_row else None
+    }
+
+    # 4. User Study Notes for this verse/passage
+    notes_rows = db.execute(
+        text("""
+        SELECT id, title, scripture_ref, content, tags, updated_at
+        FROM user_study_notes
+        WHERE scripture_ref ILIKE :pat
+        ORDER BY updated_at DESC
+        """),
+        {"pat": f"%{v_row.book_name}%{v_row.chapter}:{v_row.verse}%"}
+    ).fetchall()
+
+    user_notes = [
+        {
+            "id": str(n.id),
+            "title": n.title,
+            "scripture_ref": n.scripture_ref,
+            "content": n.content,
+            "tags": n.tags if isinstance(n.tags, list) else [],
+            "updated_at": n.updated_at.isoformat() if n.updated_at else ""
+        }
+        for n in notes_rows
+    ]
+
+    # 5. Cross Reference Previews
+    raw_cross = v_row.cross_references or []
+    cross_previews = []
+    for ref_str in raw_cross[:4]:
+        # Try to find preview verse text
+        preview_text = ""
+        try:
+            from app.routers.bible import get_verse_range
+            cr_res = get_verse_range(ref=ref_str, db=db)
+            if cr_res.get("verses"):
+                preview_text = cr_res["verses"][0]["text"]
+        except Exception:
+            preview_text = ""
+        cross_previews.append({
+            "reference": ref_str,
+            "preview_text": preview_text
+        })
+
+    return {
+        "verse": {
+            "global_id": v_row.id,
+            "verse_code": v_row.verse_code,
+            "book_id": v_row.book_id,
+            "book_code": v_row.book_code,
+            "book_name": v_row.book_name,
+            "book_en": v_row.book_en,
+            "testament": v_row.testament,
+            "chapter": v_row.chapter,
+            "verse": v_row.verse,
+            "section_title": v_row.section_title or "",
+            "text": v_row.text,
+            "reference": scripture_ref
+        },
+        "entities": {
+            "people": people_list,
+            "places": places_list,
+            "events": events_list
+        },
+        "lexicon": matched_lexicon,
+        "bookmark": bookmark_info,
+        "user_notes": user_notes,
+        "cross_references": cross_previews
+    }
+
 
