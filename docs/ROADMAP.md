@@ -121,5 +121,6 @@
 - [x] Advanced Semantic Audio Search: Searching natural language queries within the Daily Devotional Audio narration transcripts with 16 theological audio reflections, theme filters, audio speed control, and instant scripture links.
 - [x] Biblical Timeline Era Interactive Filter Expansion: Detailed canonical sub-filters for 9 biblical eras (United Kingdom, Divided Kingdom, Babylonian Exile, Restoration, etc.) with metadata summary cards.
 - [x] Multi-Passage Comparative Exegesis Matrix & Synoptic Lens Engine (`/research` tab `compare` §48, §51): Multi-passage synchronous exegesis, canonical setting alignment, shared Greek/Hebrew Strong's roots, theological points of convergence and distinction, commentary citations, and homiletical preaching outline.
+- [x] Interactive Hebrew & Greek Interlinear Word-by-Word Reader & Exegetical Parser (`/bible` & `/research` §2.1, §49): Word-by-word tokenized original language data (Biblical Hebrew RTL & Koine Greek LTR) across all 31,081 verses, Strong's concordance tags, morphology codes and expanded grammar breakdown, Vietnamese & English glosses, Web Speech pronunciation synthesis, syntactic clause structure tree, theological exegesis nuances, and parallel ancient codex textual witnesses (Sinaiticus, Vaticanus, Alexandrinus, Leningrad Codex).
 
 

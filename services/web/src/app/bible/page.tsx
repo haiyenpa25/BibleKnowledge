@@ -372,8 +372,14 @@ export default function BibleReaderPage() {
   // Verse Details (Entities, Strong Lexicon, Notes, Bookmark)
   const [verseDetails, setVerseDetails] = useState<VerseDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "exegesis" | "harmony" | "citations" | "lexicon" | "entities" | "notes" | "translations">("insight");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "exegesis" | "interlinear" | "harmony" | "citations" | "lexicon" | "entities" | "notes" | "translations">("insight");
   const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
+
+  // Word-by-Word Interlinear Exegesis State (§2.1, §49)
+  const [interlinearData, setInterlinearData] = useState<any | null>(null);
+  const [interlinearLoading, setInterlinearLoading] = useState(false);
+  const [interlinearError, setInterlinearError] = useState<string | null>(null);
+  const [copiedInterlinear, setCopiedInterlinear] = useState(false);
 
   // Inline Exegesis State (§13)
   const [exegesisData, setExegesisData] = useState<PassageExegesisData | null>(null);
@@ -791,6 +797,39 @@ export default function BibleReaderPage() {
       setExegesisError(e.message || "Lỗi kết nối khi tải giải kinh.");
     } finally {
       setExegesisLoading(false);
+    }
+  }
+
+  // Word-by-word Interlinear Fetcher (§2.1, §49)
+  async function handleLoadInterlinear(verseCodeOrRef?: number | string) {
+    setActiveDrawerTab("interlinear");
+    setInterlinearLoading(true);
+    setInterlinearError(null);
+
+    try {
+      let query = "";
+      if (typeof verseCodeOrRef === "number") {
+        query = `verse_code=${verseCodeOrRef}`;
+      } else if (typeof verseCodeOrRef === "string") {
+        query = `ref=${encodeURIComponent(verseCodeOrRef)}`;
+      } else if (selectedVerse) {
+        query = `verse_code=${selectedVerse.verse_code}`;
+      } else {
+        return;
+      }
+
+      const res = await fetch(`${apiUrl}/api/bible/verse-interlinear?${query}`);
+      if (res.ok) {
+        const data = await res.json();
+        setInterlinearData(data);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setInterlinearError(errJson.detail || "Không thể tải phân tích nguyên ngữ liên dòng.");
+      }
+    } catch (e: any) {
+      setInterlinearError(e.message || "Lỗi kết nối khi tải phân tích liên dòng.");
+    } finally {
+      setInterlinearLoading(false);
     }
   }
 
@@ -1880,6 +1919,34 @@ export default function BibleReaderPage() {
                                 ))}
                               </div>
                             )}
+
+                            {/* Interlinear Detail Trigger Button */}
+                            <div className="pt-2 flex items-center justify-between border-t border-slate-800/60 text-xs">
+                              <span className="text-[11px] text-slate-400">
+                                {v.lexicon?.length || 0} từ ngữ căn • {currentBook?.testament === "OT" ? "Hê-bơ-rơ (Hebrew)" : "Hy Lạp (Greek)"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const baseVerse: Verse = {
+                                    global_id: v.global_id,
+                                    verse_code: v.verse_code,
+                                    chapter: v.chapter,
+                                    verse: v.verse,
+                                    section_title: v.section_title,
+                                    text: v.text_vi,
+                                    cross_references: v.cross_references
+                                  };
+                                  setSelectedVerse(baseVerse);
+                                  handleLoadInterlinear(v.verse_code);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1.5 transition-all text-[11px]"
+                              >
+                                <Languages className="w-3.5 h-3.5" />
+                                <span>Phân Tích Cú Pháp Liên Dòng Chi Tiết (§49)</span>
+                              </button>
+                            </div>
                           </div>
                         </React.Fragment>
                       );
@@ -2003,6 +2070,22 @@ export default function BibleReaderPage() {
             >
               <Layers className="w-3.5 h-3.5 text-amber-400" />
               <span>Giải Kinh Phân Đoạn (§13)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveDrawerTab("interlinear");
+                if (selectedVerse) handleLoadInterlinear(selectedVerse.verse_code);
+              }}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                activeDrawerTab === "interlinear"
+                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Languages className="w-3.5 h-3.5 text-amber-400" />
+              <span>Nguyên Ngữ Liên Dòng (§2.1, §49)</span>
             </button>
 
             <button
@@ -2712,6 +2795,271 @@ export default function BibleReaderPage() {
                 ) : (
                   <div className="text-xs text-slate-400 py-6 text-center">
                     Không tìm thấy từ ngữ căn Strong đặc biệt cho câu này. Hãy mở chế độ Phân Tích Thần Học ở trang Nghiên Cứu.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: INTERLINEAR ORIGINAL LANGUAGE & EXEGESIS (§2.1, §49) */}
+            {activeDrawerTab === "interlinear" && (
+              <div className="flex flex-col gap-4">
+                {interlinearLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+                    <span className="text-xs font-medium">Đang phân tích từng từ nguyên ngữ {currentBook?.testament === "OT" ? "Hê-bơ-rơ" : "Hy Lạp"} & đối chiếu cổ bản...</span>
+                  </div>
+                ) : interlinearError ? (
+                  <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/30 text-rose-300 text-xs">
+                    {interlinearError}
+                  </div>
+                ) : interlinearData ? (
+                  <div className="flex flex-col gap-5">
+                    {/* Header meta card */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900/70 to-slate-900 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-base">
+                          {interlinearData.original_language === "hebrew" ? "ע" : "Ω"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-amber-300">
+                              {interlinearData.reference}
+                            </span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              {interlinearData.original_language === "hebrew" ? "Hê-bơ-rơ Cựu Ước (Biblical Hebrew)" : "Hy Lạp Tân Ước (Koine Greek)"}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">
+                              {interlinearData.reading_direction === "rtl" ? "Hướng đọc: Phải sang Trái (RTL)" : "Hướng đọc: Trái sang Phải (LTR)"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-1">
+                            Phân tích từ-theo-từ gồm ngữ căn Strong, hình thái học (morphology), ngữ pháp cú pháp và các bản thảo chép tay cổ.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!interlinearData) return;
+                            const md = `### Phân Tích Nguyên Ngữ Liên Dòng: ${interlinearData.reference}\n\n**Bản Dịch 1925:** ${interlinearData.vietnamese_1925_text}\n**KJV:** ${interlinearData.kjv_english_text}\n**Nguyên Ngữ:** ${interlinearData.original_language === "hebrew" ? "Biblical Hebrew" : "Koine Greek"}\n\n| # | Nguyên Văn | Phiên Âm | Strong | Từ Loại / Hình Thái | Nghĩa Việt | English |\n|---|---|---|---|---|---|---|\n` +
+                              (interlinearData.tokens || []).map((t: any) => `| ${t.position} | ${t.original_text} | ${t.transliteration} | ${t.strong_number} | ${t.morphology_code} (${t.morphology_expanded || ""}) | ${t.vietnamese_gloss} | ${t.english_gloss} |`).join("\n") +
+                              `\n\n**Ý Nghĩa Thần Học:** ${interlinearData.theological_insight || ""}`;
+                            navigator.clipboard.writeText(md);
+                            setCopiedInterlinear(true);
+                            setTimeout(() => setCopiedInterlinear(false), 2000);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-sm"
+                        >
+                          {copiedInterlinear ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                          <span>{copiedInterlinear ? "Đã chép Markdown!" : "Sao Chép Phân Tích"}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Side-by-side Scripture Context */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          Bản Truyền Thống 1925 (Tiếng Việt)
+                        </span>
+                        <p className="text-sm font-serif text-slate-200 leading-relaxed">
+                          {interlinearData.vietnamese_1925_text}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-slate-800 md:pl-4 pt-2 md:pt-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                          King James Version (KJV 1611)
+                        </span>
+                        <p className="text-xs font-serif italic text-slate-300 leading-relaxed">
+                          {interlinearData.kjv_english_text}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Word-by-Word Interlinear Flow / Cards */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <span>📖</span> Dòng Từ Nguyên Ngữ Từng Chữ ({interlinearData.tokens?.length || 0} từ)
+                        </h4>
+                        <span className="text-[11px] text-slate-400">
+                          {interlinearData.reading_direction === "rtl" ? "Trình bày theo thứ tự tiếng Hê-bơ-rơ (Phải sang Trái)" : "Trình bày theo thứ tự tiếng Hy Lạp (Trái sang Phải)"}
+                        </span>
+                      </div>
+
+                      <div 
+                        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 ${
+                          interlinearData.reading_direction === "rtl" ? "direction-rtl" : ""
+                        }`}
+                        dir={interlinearData.reading_direction || "ltr"}
+                      >
+                        {(interlinearData.tokens || []).map((token: any) => (
+                          <div
+                            key={token.position}
+                            className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all flex flex-col justify-between gap-2 shadow-sm text-left group"
+                            dir="ltr"
+                          >
+                            {/* Card Top: Position & Pronounce button */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-bold text-slate-500">
+                                #{token.position}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {token.strong_number && (
+                                  <Link
+                                    href={`/research?tab=lexicon&search=${token.strong_number}`}
+                                    className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                                    title="Tra cứu Strong trong Concordance"
+                                  >
+                                    {token.strong_number}
+                                  </Link>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                                      window.speechSynthesis.cancel();
+                                      const utt = new SpeechSynthesisUtterance(token.original_text || token.lemma);
+                                      utt.lang = interlinearData.original_language === "greek" ? "el-GR" : "he-IL";
+                                      utt.rate = 0.85;
+                                      window.speechSynthesis.speak(utt);
+                                    }
+                                  }}
+                                  className="p-1 rounded text-slate-500 hover:text-amber-300 transition-colors"
+                                  title="Nghe phát âm chuẩn"
+                                >
+                                  <Volume2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Original Word */}
+                            <div className="my-1 text-center">
+                              <span
+                                className={`block font-serif font-bold text-xl text-amber-200 group-hover:text-amber-100 transition-colors ${
+                                  interlinearData.original_language === "hebrew" ? "text-2xl font-hebrew" : ""
+                                }`}
+                                dir={interlinearData.reading_direction || "ltr"}
+                              >
+                                {token.original_text}
+                              </span>
+                              <span className="block text-[11px] italic text-slate-400 mt-0.5">
+                                {token.transliteration}
+                              </span>
+                            </div>
+
+                            {/* Morphology & Grammar Badges */}
+                            <div className="flex flex-col gap-1 border-t border-slate-800/80 pt-1.5">
+                              <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-800 truncate" title={token.morphology_expanded || token.morphology_code}>
+                                {token.morphology_code}
+                              </span>
+                              <div className="text-xs font-bold text-emerald-300 truncate" title={`Nghĩa tiếng Việt: ${token.vietnamese_gloss}`}>
+                                {token.vietnamese_gloss}
+                              </div>
+                              <div className="text-[10px] text-slate-400 italic truncate" title={`English: ${token.english_gloss}`}>
+                                {token.english_gloss}
+                              </div>
+                            </div>
+
+                            {/* Definition Tooltip note */}
+                            {token.lexicon_definition && (
+                              <div className="text-[10px] text-slate-400 border-t border-slate-900 pt-1 line-clamp-2" title={token.lexicon_definition}>
+                                {token.lexicon_definition}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Syntactic Structure Clause Analysis */}
+                    {interlinearData.syntactic_structure && interlinearData.syntactic_structure.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                          <Network className="w-3.5 h-3.5" /> Phân Tích Cấu Trúc Cú Pháp &amp; Mệnh Đề (Syntactic Structure)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {interlinearData.syntactic_structure.map((clause: any, cIdx: number) => (
+                            <div key={cIdx} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-1 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-amber-300">{clause.clause}</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-300 border border-cyan-500/20 font-mono">
+                                  {clause.type}
+                                </span>
+                              </div>
+                              <p className="text-slate-300 text-[11px] leading-relaxed mt-0.5">
+                                <span className="text-slate-500">Chức năng: </span>{clause.theological_function || clause.function}
+                              </p>
+                              {clause.grammatical_elements && (
+                                <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-1">
+                                  {Object.entries(clause.grammatical_elements).map(([k, v]: any) => (
+                                    <span key={k} className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300">
+                                      <b className="text-slate-400">{k}:</b> {String(v)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Theological Insight Panel */}
+                    {interlinearData.theological_insight && (
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/30 to-slate-900/70 border border-amber-500/30 flex flex-col gap-2 shadow-md">
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Luận Điểm Giải Kinh Thần Học Nguyên Ngữ (Exegetical Insight)
+                        </span>
+                        <p className="text-xs text-slate-200 leading-relaxed font-serif">
+                          {interlinearData.theological_insight}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Ancient Codex Manuscripts & Textual Variants */}
+                    {interlinearData.codex_sources && interlinearData.codex_sources.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5" /> Bằng Chứng Bản Thảo Chép Tay Cổ (Textual Witnesses &amp; Codices)
+                          </h4>
+                          <span className="text-[10px] text-slate-400">
+                            {interlinearData.codex_sources.length} Bản cổ bản chứng thực
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                          {interlinearData.codex_sources.map((codex: any, idx: number) => (
+                            <div key={idx} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white truncate">{codex.name}</span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                  {codex.siglum}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400">Niên đại: {codex.date}</span>
+                              <span className="text-[10px] text-slate-500 truncate">Lưu trữ: {codex.location}</span>
+                              {codex.reading && (
+                                <p className="text-[11px] text-purple-200 font-serif italic mt-1 border-t border-slate-800/80 pt-1">
+                                  &ldquo;{codex.reading}&rdquo;
+                                </p>
+                              )}
+                              {codex.notes && (
+                                <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
+                                  {codex.notes}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                    Chọn một câu Kinh Thánh để tải phân tích nguyên ngữ liên dòng từng chữ.
                   </div>
                 )}
               </div>

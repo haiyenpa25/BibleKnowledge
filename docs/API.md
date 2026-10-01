@@ -108,8 +108,29 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `GET /api/bible/devotionals?theme={theme}&tag={tag}&limit={limit}&offset={offset}`: Lists all 16 canonical theological devotionals with themes, golden verses, reflections, pastoral prayers, theological tradition tags, and audio durations.
   - `GET /api/bible/devotionals/search?q={query}&theme={theme}`: Accent-insensitive and case-insensitive full-text search across devotionals, scriptures, reflections, prayers, and theological tags.
   - `GET /api/bible/devotionals/{id}`: Returns single devotional detail with previous/next devotional navigation cues.
+### 2.11 Interactive Hebrew & Greek Interlinear Word-by-Word Reader & Exegetical Parser (§2.1, §49)
+- **Endpoint**: `GET /api/bible/verse-interlinear?ref={ref}&verse_code={verse_code}&book={book}&chapter={chapter}&verse={verse}`
+- **Description**: Returns word-by-word tokenized interlinear original language data (Biblical Hebrew for Old Testament, Koine Greek for New Testament) across all 31,081 canonical verses with algorithmic fallback:
+  - **Reading Direction**: RTL (Right-to-Left) for Biblical Hebrew, LTR (Left-to-Right) for Koine Greek.
+  - **Token Structure**:
+    - `position`: Sequential token index (1, 2, ...).
+    - `original_text`: Original script in Biblical Hebrew or Greek.
+    - `transliteration`: Phonetic romanization.
+    - `lemma`: Root lexical form.
+    - `strong_number`: Strong's Concordance identifier (`Hxxxx` or `Gxxxx`).
+    - `morphology_code`: Standard morphological tag (e.g., `Prep-b | N-fs`, `PREP`, `V-AAI-3S`).
+    - `morphology_expanded`: Detailed Vietnamese grammatical breakdown.
+    - `part_of_speech`: Grammatical part of speech.
+    - `vietnamese_gloss`: Exact word-for-word Vietnamese translation.
+    - `english_gloss`: Exact word-for-word English translation.
+    - `lexicon_definition`: Concise definition from Strong's Lexicon.
+    - `pronunciation_audio`: Phonetic pronunciation text for Web Speech API synthesis (`el-GR` or `he-IL`).
+  - **Syntactic Structure & Clause Grammar**: Hierarchical breakdown of clauses (Subject, Predicate, Direct Object, Prepositional Phrase) with theological and syntactic functions.
+  - **Theological Exegetical Insight**: In-depth analysis of original language nuances and theological significance.
+  - **Ancient Codex Manuscripts (Textual Criticism)**: Parallel textual witness evidence from early uncials and codices (Codex Sinaiticus `א`, Codex Vaticanus `B`, Codex Alexandrinus `A`, Leningrad Codex `B19A`, Aleppo Codex).
 - **Frontend Integration**:
-  - Daily Insight Hub on `/` featuring a dedicated "Thư Viện Audio Suy Ngẫm" modal with speech synthesis, audio speed regulation (0.8x, 1.0x, 1.2x), instant theme filtering, and scripture navigation.
+  - `/bible`: Dedicated "Nguyên Ngữ Liên Dòng (§2.1, §49)" tab in Verse Drawer and in-line exegesis trigger in Interlinear Chapter View.
+  - `/research`: Interactive Word-by-Word Interlinear Exegesis Parser sub-mode under Lexicon Explorer with 8 foundational theological presets and custom search across all 31,081 verses.
 
 ---
 

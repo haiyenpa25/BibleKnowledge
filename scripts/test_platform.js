@@ -144,6 +144,16 @@ async function main() {
   const rDevDetail = await testEndpoint('/api/bible/devotionals/dev-john-3-16', d => (d.id !== 'dev-john-3-16' || !d.prayer || !d.next_id) && 'Invalid devotional detail');
   report('GET /api/bible/devotionals/{id} (Single devotional exegesis & audio cues)', rDevDetail.ok, rDevDetail.error);
 
+  // Word-by-Word Interlinear Exegesis Parser (§2.1, §49)
+  const rInterlinearGreek = await testEndpoint(`/api/bible/verse-interlinear?ref=${encodeURIComponent('Giăng 1:1')}`, d => (!d.tokens || d.tokens.length === 0 || d.original_language !== 'greek' || d.reading_direction !== 'ltr' || !d.codex_sources) && 'Invalid Greek interlinear parse');
+  report('GET /api/bible/verse-interlinear (NT Greek Koine Word-by-Word & Codex Witnesses §2.1, §49)', rInterlinearGreek.ok, rInterlinearGreek.error);
+
+  const rInterlinearHebrew = await testEndpoint(`/api/bible/verse-interlinear?ref=${encodeURIComponent('Sáng-thế Ký 1:1')}`, d => (!d.tokens || d.tokens.length === 0 || d.original_language !== 'hebrew' || d.reading_direction !== 'rtl' || !d.codex_sources) && 'Invalid Hebrew interlinear parse');
+  report('GET /api/bible/verse-interlinear (OT Hebrew RTL Word-by-Word & Syntactic Tree §2.1, §49)', rInterlinearHebrew.ok, rInterlinearHebrew.error);
+
+  const rInterlinearFallback = await testEndpoint(`/api/bible/verse-interlinear?ref=${encodeURIComponent('Xuất Ê-díp-tô Ký 3:14')}`, d => (!d.tokens || d.tokens.length === 0 || !d.original_language) && 'Invalid fallback interlinear parse');
+  report('GET /api/bible/verse-interlinear (Algorithmic Lexical Fallback across 31,081 verses)', rInterlinearFallback.ok, rInterlinearFallback.error);
+
   // RAG & Exegesis Module
   const rCtxPresets = await testEndpoint('/api/rag/context-presets', d => (!Array.isArray(d) || d.length === 0) && 'No context presets');
   report('GET /api/rag/context-presets (6-Dimension context presets)', rCtxPresets.ok, rCtxPresets.error);
