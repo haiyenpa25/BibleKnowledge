@@ -39,7 +39,9 @@ import {
   FileDown,
   Eye,
   AlignLeft,
-  AlignJustify
+  AlignJustify,
+  Layers,
+  BrainCircuit
 } from "lucide-react";
 
 interface BookMeta {
@@ -1327,6 +1329,24 @@ export default function BibleReaderPage() {
                     {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                     <span>Hỏi AI Giải Thích</span>
                   </button>
+
+                  <Link
+                    href={`/study?ref=${encodeURIComponent(`${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-xs font-semibold text-purple-300 flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Mở phân tích giải kinh sâu đoạn văn này"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Phân Tích Giải Kinh</span>
+                  </Link>
+
+                  <Link
+                    href={`/research?query=${encodeURIComponent(`Nghiên cứu thần học chuyên sâu về ${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                    className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-xs font-semibold text-cyan-300 flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Nghiên cứu với Agent đa tầng và 275 sách thần học"
+                  >
+                    <BrainCircuit className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Nghiên Cứu Đa Tầng</span>
+                  </Link>
                 </div>
 
                 {/* AI Explanation Box */}

@@ -26,7 +26,8 @@ import {
   Play,
   Pause,
   Volume2,
-  ArrowRight
+  ArrowRight,
+  HelpCircle
 } from "lucide-react";
 
 interface GraphNode {
@@ -114,8 +115,42 @@ interface EntityDetail {
   }>;
 }
 
+interface MilestoneEvent {
+  title: string;
+  period: string;
+  description: string;
+}
+
+interface RelationshipItem {
+  target_name: string;
+  relation: string;
+}
+
+interface CharacterStudyData {
+  slug: string;
+  name_vi: string;
+  name_en: string;
+  original_name?: string;
+  title_or_role: string;
+  timeline_period: string;
+  summary: string;
+  key_verses: string[];
+  milestone_events: MilestoneEvent[];
+  relationships: RelationshipItem[];
+  ai_theological_portrait: string;
+  spiritual_lessons: string[];
+  reflection_questions: string[];
+}
+
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities">("graph");
+
+  // Character Dossier Modal State (§7)
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
+  const [dossierData, setDossierData] = useState<CharacterStudyData | null>(null);
+  const [loadingDossier, setLoadingDossier] = useState(false);
+  const [dossierError, setDossierError] = useState<string | null>(null);
+  const [isDossierSpeaking, setIsDossierSpeaking] = useState(false);
 
   // Graph State
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -237,6 +272,61 @@ export default function ExplorePage() {
       console.error("Failed to fetch entity detail:", err);
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  // Open Character Dossier Modal (§7)
+  const openCharacterDossier = async (slugOrName: string) => {
+    setIsDossierOpen(true);
+    setLoadingDossier(true);
+    setDossierData(null);
+    setDossierError(null);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsDossierSpeaking(false);
+    }
+    try {
+      const res = await fetch(`${apiUrl}/api/rag/character-study`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name_or_slug: slugOrName })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDossierData(data);
+      } else {
+        const err = await res.json();
+        setDossierError(err.detail || "Không thể tải hồ sơ nhân vật.");
+      }
+    } catch (e) {
+      setDossierError("Lỗi kết nối khi tải hồ sơ nhân vật.");
+    } finally {
+      setLoadingDossier(false);
+    }
+  };
+
+  const toggleDossierSpeech = (textToSpeak: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (isDossierSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsDossierSpeaking(false);
+    } else {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(textToSpeak);
+      utt.lang = "vi-VN";
+      utt.rate = 1.0;
+      utt.onend = () => setIsDossierSpeaking(false);
+      utt.onerror = () => setIsDossierSpeaking(false);
+      window.speechSynthesis.speak(utt);
+      setIsDossierSpeaking(true);
+    }
+  };
+
+  const closeDossier = () => {
+    setIsDossierOpen(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsDossierSpeaking(false);
     }
   };
 
@@ -698,6 +788,17 @@ export default function ExplorePage() {
                         <span>Đọc câu Kinh Thánh cốt lõi ({selectedEntityDetail.metadata.key_verse}) →</span>
                       </Link>
                     )}
+
+                    {selectedEntityDetail.type === "person" && (
+                      <button
+                        type="button"
+                        onClick={() => openCharacterDossier(selectedEntityDetail.slug)}
+                        className="mt-1 p-3 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-md shadow-purple-950/40"
+                      >
+                        <Sparkles className="w-4 h-4 text-purple-300" />
+                        <span>Hồ Sơ Nhân Vật &amp; Chân Dung Thần Học →</span>
+                      </button>
+                    )}
                   </div>
                 ) : null
               ) : (
@@ -1157,12 +1258,230 @@ export default function ExplorePage() {
                       </p>
                     )}
                   </div>
-                  <div className="text-[11px] text-blue-400/80 font-medium pt-2 border-t border-slate-800 flex items-center gap-1">
-                    <span>Xem mạng lưới liên kết →</span>
+                  <div className="text-[11px] pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-blue-400/80 font-medium group-hover:text-blue-300 transition-colors">
+                      Mạng lưới đồ thị →
+                    </span>
+                    {n.node_type === "person" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCharacterDossier(n.node_key);
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 text-[10px] font-semibold flex items-center gap-1 transition-all shadow-sm"
+                      >
+                        <Sparkles className="w-3 h-3 text-purple-300" />
+                        <span>Hồ sơ chi tiết</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 5. BIBLICAL CHARACTER DOSSIER MODAL (§7) */}
+      {/* ===================================================================== */}
+      {isDossierOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-[#0b101d] border border-slate-700/80 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-start justify-between gap-4 bg-slate-950/60">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-blue-600/30 shrink-0">
+                  {dossierData ? dossierData.name_vi.charAt(0) : "👤"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      Hồ Sơ Nhân Vật • Kinh Thánh
+                    </span>
+                    {dossierData?.original_name && (
+                      <span className="text-xs text-slate-400 font-serif italic">
+                        ({dossierData.original_name})
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-2xl font-black text-white mt-1">
+                    {dossierData?.name_vi || "Đang tải hồ sơ..."}
+                  </h2>
+                  {dossierData?.name_en && (
+                    <p className="text-xs text-slate-400 font-medium">
+                      {dossierData.name_en} • <span className="text-indigo-300">{dossierData.title_or_role}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {dossierData?.ai_theological_portrait && (
+                  <button
+                    type="button"
+                    onClick={() => toggleDossierSpeech(dossierData.ai_theological_portrait)}
+                    className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
+                      isDossierSpeaking
+                        ? "bg-rose-600/30 text-rose-300 border-rose-500/50 animate-pulse"
+                        : "bg-slate-900 border-slate-800 text-slate-300 hover:text-white"
+                    }`}
+                    title={isDossierSpeaking ? "Dừng đọc" : "Đọc thành tiếng chân dung nhân vật"}
+                  >
+                    <Volume2 className="w-4 h-4 text-indigo-400" />
+                    <span className="hidden sm:inline">{isDossierSpeaking ? "Đang đọc" : "Nghe"}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={closeDossier}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto flex flex-col gap-6 text-xs text-slate-300">
+              {loadingDossier ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                  <p className="text-sm font-semibold text-white">Đang tải chân dung thần học &amp; dữ kiện nhân vật...</p>
+                  <p className="text-xs text-slate-500">Khai phá sự kiện, phân đoạn Kinh Thánh và mạng lưới quan hệ.</p>
+                </div>
+              ) : dossierError ? (
+                <div className="p-6 rounded-2xl bg-red-950/30 border border-red-800/50 text-red-200">
+                  {dossierError}
+                </div>
+              ) : dossierData ? (
+                <>
+                  {/* Timeline Period Banner */}
+                  <div className="flex flex-wrap items-center justify-between p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      <span className="font-semibold text-slate-200">Thời kỳ lịch sử:</span>
+                      <span className="text-indigo-300">{dossierData.timeline_period}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/explore?tab=graph&search=${encodeURIComponent(dossierData.name_vi)}`}
+                        onClick={closeDossier}
+                        className="px-3 py-1 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        <Network className="w-3.5 h-3.5" /> Xem Graph Thực Thể
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* AI Theological Portrait */}
+                  <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3 shadow-lg">
+                    <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-blue-400" /> Chân Dung Thần Học &amp; Hành Trình Đức Tin
+                    </h3>
+                    <p className="text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                      {dossierData.ai_theological_portrait}
+                    </p>
+                  </div>
+
+                  {/* Grid 1: Key Verses & Relationships */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Key Scripture Verses */}
+                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5" /> Các Phân Đoạn Kinh Thánh Cốt Lõi
+                      </h4>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {dossierData.key_verses?.map((ref, idx) => (
+                          <Link
+                            key={idx}
+                            href={`/bible?ref=${encodeURIComponent(ref)}`}
+                            className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 text-blue-300 hover:text-white text-xs font-mono flex items-center gap-1 transition-all"
+                          >
+                            ⚓ {ref} <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Relationships */}
+                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                      <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" /> Mối Quan Hệ &amp; Nhân Vật Liên Hệ
+                      </h4>
+                      <div className="flex flex-col gap-1.5">
+                        {dossierData.relationships && dossierData.relationships.length > 0 ? (
+                          dossierData.relationships.map((rel, idx) => (
+                            <div key={idx} className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+                              <span className="font-semibold text-white">{rel.target_name}</span>
+                              <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                                {rel.relation}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-slate-500 text-xs italic">Chưa có liên kết quan hệ cụ thể.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Milestone Events */}
+                  {dossierData.milestone_events && dossierData.milestone_events.length > 0 && (
+                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                      <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Các Cột Mốc Sự Kiện Lịch Sử
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {dossierData.milestone_events.map((ev, idx) => (
+                          <div key={idx} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-white text-xs">{ev.title}</span>
+                              <span className="text-[10px] text-purple-300 font-mono">{ev.period}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{ev.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Spiritual Lessons & Reflection Questions */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                      <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> 3 Bài Học Thuộc Linh Cho Đời Sống
+                      </h4>
+                      <ul className="flex flex-col gap-2">
+                        {dossierData.spiritual_lessons?.map((les, idx) => (
+                          <li key={idx} className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 leading-relaxed flex items-start gap-2">
+                            <span className="text-teal-400 font-bold shrink-0">•</span>
+                            <span>{les}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <HelpCircle className="w-4 h-4 text-amber-400" /> Câu Hỏi Tự Vấn Suy Ngẫm
+                      </h4>
+                      <ul className="flex flex-col gap-2">
+                        {dossierData.reflection_questions?.map((q, idx) => (
+                          <li key={idx} className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 leading-relaxed flex items-start gap-2">
+                            <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] flex items-center justify-center shrink-0 border border-amber-500/30">
+                              {idx + 1}
+                            </span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
