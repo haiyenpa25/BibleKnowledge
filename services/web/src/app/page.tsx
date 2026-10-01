@@ -28,7 +28,10 @@ import {
   BookMarked,
   Library,
   FolderKanban,
-  ArrowRight
+  ArrowRight,
+  Compass,
+  FileText,
+  GitCompare
 } from "lucide-react";
 
 interface HealthStatus {
@@ -494,77 +497,125 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3 Action Pillars: Continue Reading, Daily Quiz, Review Flashcards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Core Action Pillars (§53): Bible Reader, Gospel Harmony, Academic Citations, Multi-Dimensional Context, Adaptive Learning */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
           {/* Card 1: Continue Reading */}
           <Link
             href="/bible?book=jhn&chapter=1"
-            className="p-5 rounded-3xl glass-card border border-blue-500/20 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3 group"
+            className="p-4 rounded-3xl glass-card border border-blue-500/20 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-2.5 group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">
-                Đọc Kinh Thánh (§53)
+                Đọc Kinh Thánh (§2.1, §53)
               </span>
               <BookOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-white group-hover:text-blue-200 transition-colors">
-                Tiếp Tục Đọc: Phúc Âm Giăng
+              <h4 className="text-xs md:text-sm font-bold text-white group-hover:text-blue-200 transition-colors">
+                Trình Đọc 66 Sách
               </h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Đoạn 1: Ban đầu có Đạo, Đạo ở cùng Đức Chúa Trời, và Đạo là Đức Chúa Trời.
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                Bản 1925, lời Chúa Giê-xu chữ đỏ, đối chiếu Hy-Hê Strong và âm thanh đọc.
               </p>
             </div>
-            <div className="text-xs text-blue-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
-              Mở Trình Đọc Kinh Thánh →
+            <div className="text-[11px] text-blue-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Đọc Kinh Thánh →
             </div>
           </Link>
 
-          {/* Card 2: Daily Quiz */}
+          {/* Card 2: Gospel Harmony */}
           <Link
-            href="/learn"
-            className="p-5 rounded-3xl glass-card border border-amber-500/20 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-3 group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                Thử Thách Hôm Nay (§53)
-              </span>
-              <GraduationCap className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white group-hover:text-amber-200 transition-colors">
-                Đố Vui Hằng Ngày (Daily Quiz)
-              </h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                5 câu hỏi trắc nghiệm & Who Am I ngẫu nhiên kiểm tra kiến thức Kinh Thánh.
-              </p>
-            </div>
-            <div className="text-xs text-amber-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
-              Bắt Đầu Làm Bài Ngay →
-            </div>
-          </Link>
-
-          {/* Card 3: Review Flashcards */}
-          <Link
-            href="/learn"
-            className="p-5 rounded-3xl glass-card border border-purple-500/20 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-3 group"
+            href="/explore?tab=harmony"
+            className="p-4 rounded-3xl glass-card border border-purple-500/20 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-2.5 group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">
-                Học Thích Ứng (§5, §53)
+                Đối Chiếu (§8, §18)
               </span>
-              <BookMarked className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+              <GitCompare className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors">
-                Ôn Tập Thẻ Ghi Nhớ (SM-2)
+              <h4 className="text-xs md:text-sm font-bold text-white group-hover:text-purple-200 transition-colors">
+                Gospel Harmony Explorer
               </h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Thuật toán Lặp lại ngắt quãng (Spaced Repetition) củng cố ghi nhớ dài hạn.
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                16 đại sự kiện đối chiếu 4 sách Tin Lành và song song Sử ký Cựu Ước.
               </p>
             </div>
-            <div className="text-xs text-purple-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
-              Ôn Luyện Flashcards →
+            <div className="text-[11px] text-purple-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Mở Bảng Đối Chiếu →
+            </div>
+          </Link>
+
+          {/* Card 3: Academic Citations */}
+          <Link
+            href="/library"
+            className="p-4 rounded-3xl glass-card border border-amber-500/20 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-2.5 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                Thư Viện (§38, §52)
+              </span>
+              <FileText className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-xs md:text-sm font-bold text-white group-hover:text-amber-200 transition-colors">
+                Trích Dẫn Học Thuật
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                275 tác phẩm, 171 tác giả, chuẩn SBL, Chicago, APA, BibTeX luận văn.
+              </p>
+            </div>
+            <div className="text-[11px] text-amber-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Khám Phá Nguồn Thần Học →
+            </div>
+          </Link>
+
+          {/* Card 4: Multi-Dimensional Context */}
+          <Link
+            href="/research"
+            className="p-4 rounded-3xl glass-card border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-2.5 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">
+                Giải Kinh (§15)
+              </span>
+              <Compass className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-xs md:text-sm font-bold text-white group-hover:text-emerald-200 transition-colors">
+                Bối Cảnh Đa Chiều
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                5 chiều kích phân tích: Lịch sử, văn hóa, ngôn ngữ, địa lý và cứu rỗi.
+              </p>
+            </div>
+            <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Phân Tích Đoạn Văn →
+            </div>
+          </Link>
+
+          {/* Card 5: Interactive Learning */}
+          <Link
+            href="/learn"
+            className="p-4 rounded-3xl glass-card border border-orange-500/20 hover:border-orange-500/40 transition-all flex flex-col justify-between gap-2.5 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wider">
+                Học Tập (§3, §5)
+              </span>
+              <GraduationCap className="w-4 h-4 text-orange-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-xs md:text-sm font-bold text-white group-hover:text-orange-200 transition-colors">
+                9 Chế Độ Game & SM-2
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                Đố vui Who Am I, Đúng/Sai, Thẻ lặp lại ngắt quãng, Thử thách timeline.
+              </p>
+            </div>
+            <div className="text-[11px] text-orange-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Vào Không Gian Học →
             </div>
           </Link>
         </div>
