@@ -121,6 +121,29 @@ class StudyProjectItem(BaseModel):
     updated_at: str
 
 
+class ProjectNoteCreate(BaseModel):
+    title: str = Field(..., max_length=255)
+    content: str
+
+
+class ProjectNoteItem(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    content: str
+    created_at: str
+
+
+class PinVerseRequest(BaseModel):
+    reference: str = Field(..., description="Bible reference, e.g. 'Giăng 3:16' or 'Rô-ma 8:28'")
+
+
+class PinEntityRequest(BaseModel):
+    type: str = Field(..., description="person, place, event, or topic")
+    slug: str
+    name: str
+
+
 # ==============================================================================
 # 1. Strong Lexicon Endpoints (Original Languages)
 # ==============================================================================
@@ -975,6 +998,229 @@ def export_project_to_flashcards(project_id: str, db: Session = Depends(get_db))
 
     db.commit()
     return {"message": f"Đã xuất thành công {created_count} thẻ ghi nhớ Flashcard vào hệ thống Học Tập!", "created_count": created_count}
+
+
+# --- Project Notes Endpoints (§50) ---
+
+@router.get("/projects/{project_id}/notes", response_model=List[ProjectNoteItem])
+def list_project_notes(project_id: str, db: Session = Depends(get_db)):
+    """List all notes associated with a specific study project."""
+    rows = db.execute(
+        text("SELECT id, project_id, title, content, created_at FROM project_notes WHERE project_id = :pid ORDER BY created_at DESC"),
+        {"pid": project_id}
+    ).fetchall()
+    return [
+        ProjectNoteItem(
+            id=str(r.id),
+            project_id=str(r.project_id),
+            title=r.title,
+            content=r.content,
+            created_at=r.created_at.isoformat() if r.created_at else ""
+        )
+        for r in rows
+    ]
+
+
+@router.post("/projects/{project_id}/notes", response_model=ProjectNoteItem)
+def create_project_note(project_id: str, req: ProjectNoteCreate, db: Session = Depends(get_db)):
+    """Create a new note attached to a specific study project."""
+    res = db.execute(
+        text("""
+        INSERT INTO project_notes (project_id, title, content, created_at)
+        VALUES (:pid, :title, :content, CURRENT_TIMESTAMP)
+        RETURNING id, created_at
+        """),
+        {"pid": project_id, "title": req.title.strip(), "content": req.content.strip()}
+    ).fetchone()
+    db.commit()
+
+    return ProjectNoteItem(
+        id=str(res.id),
+        project_id=project_id,
+        title=req.title,
+        content=req.content,
+        created_at=res.created_at.isoformat() if res.created_at else ""
+    )
+
+
+@router.delete("/projects/{project_id}/notes/{note_id}")
+def delete_project_note(project_id: str, note_id: str, db: Session = Depends(get_db)):
+    """Delete a note from a study project."""
+    db.execute(
+        text("DELETE FROM project_notes WHERE id = :id AND project_id = :pid"),
+        {"id": note_id, "pid": project_id}
+    )
+    db.commit()
+    return {"message": "Đã xóa ghi chú dự án thành công."}
+
+
+# --- Project Verse & Entity Pinning Endpoints (§50) ---
+
+@router.post("/projects/{project_id}/pin-verse", response_model=StudyProjectItem)
+def pin_verse_to_project(project_id: str, req: PinVerseRequest, db: Session = Depends(get_db)):
+    """Retrieve scripture text and pin a verse to the study project."""
+    p = get_study_project(project_id, db=db)
+    
+    # Retrieve authentic scripture text
+    verse_text = fetch_passage_verses(req.reference, db)
+    if not verse_text:
+        verse_text = f"Lời Chúa tại {req.reference}"
+
+    # Clean multi-line if single verse
+    clean_lines = [l.strip() for l in verse_text.split("\n") if l.strip()]
+    final_text = " ".join(clean_lines) if clean_lines else verse_text
+
+    pinned_list = list(p.pinned_verses)
+    # Check if already pinned
+    if not any(v.get("reference", "").lower() == req.reference.strip().lower() for v in pinned_list):
+        pinned_list.append({"reference": req.reference.strip(), "text": final_text})
+        db.execute(
+            text("UPDATE study_projects SET pinned_verses = :verses, updated_at = CURRENT_TIMESTAMP WHERE id = :id"),
+            {"verses": json.dumps(pinned_list, ensure_ascii=False), "id": project_id}
+        )
+        db.commit()
+
+    return get_study_project(project_id, db=db)
+
+
+@router.post("/projects/{project_id}/pin-entity", response_model=StudyProjectItem)
+def pin_entity_to_project(project_id: str, req: PinEntityRequest, db: Session = Depends(get_db)):
+    """Pin a knowledge graph entity (person, place, event, or topic) to the study project."""
+    p = get_study_project(project_id, db=db)
+    pinned_entities = list(p.pinned_entities)
+    if not any(e.get("slug") == req.slug for e in pinned_entities):
+        pinned_entities.append({"type": req.type, "slug": req.slug, "name": req.name})
+        db.execute(
+            text("UPDATE study_projects SET pinned_entities = :entities, updated_at = CURRENT_TIMESTAMP WHERE id = :id"),
+            {"entities": json.dumps(pinned_entities, ensure_ascii=False), "id": project_id}
+        )
+        db.commit()
+
+    return get_study_project(project_id, db=db)
+
+
+# --- AI Study Questions & Research Synthesis (§50) ---
+
+@router.post("/projects/{project_id}/generate-questions", response_model=StudyProjectItem)
+async def generate_project_questions(project_id: str, db: Session = Depends(get_db)):
+    """AI automatically generates 4-5 deep theological & devotional questions for the study project."""
+    r = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, pinned_entities FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    verses = parse_json_field(r.pinned_verses)
+    v_context = ", ".join(v.get("reference", "") for v in verses)
+
+    prompt = f"""Bạn là một học giả nghiên cứu Kinh Thánh. Hãy soạn 4 câu hỏi suy ngẫm sâu sắc cho đề tài nghiên cứu sau:
+Đề tài: {r.title}
+Thể loại: {r.category}
+Phân đoạn Kinh Thánh: {v_context if v_context else "Toàn cảnh Thánh Kinh"}
+
+Trả về định dạng JSON array hợp lệ (chỉ trả về JSON, không thêm chữ nào khác):
+[
+  "Câu hỏi 1...",
+  "Câu hỏi 2...",
+  "Câu hỏi 3...",
+  "Câu hỏi 4..."
+]
+"""
+    questions_list = []
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": settings.OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False
+                }
+            )
+            if resp.status_code == 200:
+                raw_text = resp.json().get("response", "").strip()
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                elif raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+                parsed = json.loads(raw_text.strip())
+                if isinstance(parsed, list):
+                    questions_list = [str(item) for item in parsed if item]
+    except Exception:
+        pass
+
+    if not questions_list:
+        questions_list = [
+            f"Bối cảnh lịch sử và ý định nguyên thủy của tác giả khi đề cập đến '{r.title}' là gì?",
+            f"Các phân đoạn Kinh Thánh trọng tâm làm sáng tỏ thân vị và công cuộc cứu chuộc của Đấng Christ như thế nào?",
+            f"Có những nguy cơ giải kinh lệch lạc nào (như chủ nghĩa luật pháp hoặc phóng túng) cần phải tránh?",
+            f"Lẽ thật này biến đổi thế giới quan và nếp sống phục vụ của tôi trong cộng đồng đức tin như thế nào?"
+        ]
+
+    db.execute(
+        text("UPDATE study_projects SET study_questions = :q, updated_at = CURRENT_TIMESTAMP WHERE id = :id"),
+        {"q": json.dumps(questions_list, ensure_ascii=False), "id": project_id}
+    )
+    db.commit()
+
+    return get_study_project(project_id, db=db)
+
+
+@router.post("/projects/{project_id}/generate-summary")
+async def generate_project_summary(project_id: str, db: Session = Depends(get_db)):
+    """AI synthesizes an executive theological research summary for the study project (§50)."""
+    r = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, ai_outline FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    verses = parse_json_field(r.pinned_verses)
+    outline = parse_json_field(r.ai_outline)
+    v_context = "\n".join(f"- {v.get('reference', '')}: {v.get('text', '')}" for v in verses[:4])
+    outline_context = "\n".join(f"- {o.get('section', '')}: {o.get('content', '')}" for o in outline[:4])
+
+    prompt = f"""Bạn là một học giả nghiên cứu Kinh Thánh. Hãy viết một bản tổng hợp nghiên cứu thần học súc tích, trang trọng cho đề tài:
+Đề tài: {r.title}
+Mô tả: {r.description}
+Kinh Thánh:
+{v_context if v_context else "Toàn cảnh Kinh Thánh"}
+Dàn ý:
+{outline_context if outline_context else "Khảo luận thần học"}
+
+Yêu cầu: Viết 2-3 đoạn văn tiếng Việt chuẩn mực, làm nổi bật chân lý mạc khải, sự hòa hợp Tân Cựu Ước và ứng dụng thuộc linh.
+"""
+    summary_text = ""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": settings.OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False
+                }
+            )
+            if resp.status_code == 200:
+                summary_text = resp.json().get("response", "").strip()
+    except Exception:
+        pass
+
+    if not summary_text:
+        summary_text = (
+            f"Nghiên cứu chuyên sâu về đề tài '{r.title}'. "
+            "Toàn bộ mạch mạc khải Kinh Thánh bày tỏ sự nhất quán tuyệt đối của ý chỉ Đức Chúa Trời. "
+            "Các phân đoạn Kinh Thánh trọng tâm khẳng định nền tảng đức tin vững chắc, "
+            "giúp người học không chỉ nắm vững tri thức học thuật mà còn kinh nghiệm quyền năng biến đổi của Lời Chúa trong nếp sống hằng ngày."
+        )
+
+    return {"project_id": project_id, "summary": summary_text}
 
 
 @router.get("/export-bundle")

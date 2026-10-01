@@ -72,6 +72,14 @@ interface StudyNote {
   updated_at: string;
 }
 
+interface ProjectNote {
+  id: string;
+  project_id: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
 interface StudyProject {
   id: string;
   title: string;
@@ -120,8 +128,20 @@ export default function StudyPage() {
   const [newProjectCategory, setNewProjectCategory] = useState("theology");
   const [savingProject, setSavingProject] = useState(false);
   const [generatingOutline, setGeneratingOutline] = useState(false);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const [exportingFlashcards, setExportingFlashcards] = useState(false);
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const [projectSummary, setProjectSummary] = useState<string | null>(null);
+
+  // Project Specific Notes & Pinning State (§50)
+  const [projectNotes, setProjectNotes] = useState<ProjectNote[]>([]);
+  const [loadingProjectNotes, setLoadingProjectNotes] = useState(false);
+  const [pinVerseInput, setPinVerseInput] = useState("");
+  const [pinningVerse, setPinningVerse] = useState(false);
+  const [newProjectNoteTitle, setNewProjectNoteTitle] = useState("");
+  const [newProjectNoteContent, setNewProjectNoteContent] = useState("");
+  const [savingProjectNote, setSavingProjectNote] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -336,6 +356,137 @@ export default function StudyPage() {
     }
   };
 
+  // Fetch Project Notes (§50)
+  const fetchProjectNotes = async (projectId: string) => {
+    setLoadingProjectNotes(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/notes`);
+      if (res.ok) {
+        const data = await res.json();
+        setProjectNotes(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch project notes:", err);
+    } finally {
+      setLoadingProjectNotes(false);
+    }
+  };
+
+  // Add Project Note (§50)
+  const handleCreateProjectNote = async (projectId: string) => {
+    if (!newProjectNoteTitle.trim() || !newProjectNoteContent.trim()) return;
+    setSavingProjectNote(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newProjectNoteTitle.trim(),
+          content: newProjectNoteContent.trim()
+        })
+      });
+      if (res.ok) {
+        setNewProjectNoteTitle("");
+        setNewProjectNoteContent("");
+        fetchProjectNotes(projectId);
+        setProjectMessage("Đã lưu ghi chú nghiên cứu vào dự án!");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingProjectNote(false);
+    }
+  };
+
+  // Delete Project Note (§50)
+  const handleDeleteProjectNote = async (projectId: string, noteId: string) => {
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/notes/${noteId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchProjectNotes(projectId);
+        setProjectMessage("Đã gỡ ghi chú khỏi dự án.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Pin Verse to Project (§50)
+  const handlePinVerse = async (projectId: string) => {
+    if (!pinVerseInput.trim()) return;
+    setPinningVerse(true);
+    setProjectMessage(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/pin-verse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: pinVerseInput.trim() })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSelectedProject(updated);
+        setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+        setPinVerseInput("");
+        setProjectMessage(`Đã ghim thành công phân đoạn: ${pinVerseInput.trim()}!`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPinningVerse(false);
+    }
+  };
+
+  // Generate Questions with AI (§50)
+  const handleGenerateQuestions = async (projectId: string) => {
+    setGeneratingQuestions(true);
+    setProjectMessage(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/generate-questions`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSelectedProject(updated);
+        setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+        setProjectMessage("Đã kiến tạo câu hỏi nghiên cứu AI thành công!");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
+  // Generate Summary with AI (§50)
+  const handleGenerateSummary = async (projectId: string) => {
+    setGeneratingSummary(true);
+    setProjectMessage(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/projects/${projectId}/generate-summary`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProjectSummary(data.summary);
+        setProjectMessage("Đã tổng hợp nghiên cứu thần học AI thành công!");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  // Sync Project Notes on selected project change
+  useEffect(() => {
+    if (selectedProject?.id) {
+      fetchProjectNotes(selectedProject.id);
+      setProjectSummary(null);
+    }
+  }, [selectedProject?.id]);
+
   return (
     <main className="min-h-screen px-4 py-8 md:px-12 lg:px-20 max-w-7xl mx-auto flex flex-col gap-8">
       {/* Header */}
@@ -492,10 +643,35 @@ export default function StudyPage() {
                         type="button"
                         disabled={generatingOutline}
                         onClick={() => handleGenerateOutline(selectedProject.id)}
-                        className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="AI tự động phân tích và lập dàn ý 3 phân đoạn"
                       >
-                        {generatingOutline ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                        <span>Lập Dàn Ý Bằng AI</span>
+                        {generatingOutline ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                        <span>Lập Dàn Ý AI</span>
+                      </button>
+
+                      {/* AI Generate Questions Button */}
+                      <button
+                        type="button"
+                        disabled={generatingQuestions}
+                        onClick={() => handleGenerateQuestions(selectedProject.id)}
+                        className="px-3 py-1.5 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="AI tự động tạo 4 câu hỏi suy ngẫm sâu sắc"
+                      >
+                        {generatingQuestions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />}
+                        <span>Tạo Câu Hỏi AI</span>
+                      </button>
+
+                      {/* AI Generate Summary Button */}
+                      <button
+                        type="button"
+                        disabled={generatingSummary}
+                        onClick={() => handleGenerateSummary(selectedProject.id)}
+                        className="px-3 py-1.5 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="AI tổng hợp bản luận giải nghiên cứu toàn cảnh"
+                      >
+                        {generatingSummary ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5 text-amber-400" />}
+                        <span>Tổng Hợp AI</span>
                       </button>
 
                       {/* Export Flashcards Button */}
@@ -503,24 +679,70 @@ export default function StudyPage() {
                         type="button"
                         disabled={exportingFlashcards}
                         onClick={() => handleExportFlashcards(selectedProject.id)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="Xuất các câu và dàn ý thành Flashcards SM-2"
                       >
-                        {exportingFlashcards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                        <span>Xuất Thành Flashcard</span>
+                        {exportingFlashcards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-emerald-400" />}
+                        <span>Xuất Flashcard</span>
                       </button>
                     </div>
                   </div>
 
                   {projectMessage && (
-                    <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                       <span>{projectMessage}</span>
+                    </div>
+                  )}
+
+                  {/* AI Research Executive Synthesis (§50) */}
+                  {projectSummary && (
+                    <div className="p-5 rounded-3xl bg-amber-950/30 border border-amber-500/40 flex flex-col gap-2.5 shadow-lg animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-400" /> Bản Tổng Hợp Nghiên Cứu Thần Học Toàn Cảnh (AI Synthesis):
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">
+                          Qwen2.5 Grounded
+                        </span>
+                      </div>
+                      <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+                        {projectSummary}
+                      </p>
                     </div>
                   )}
 
                   <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
                     {selectedProject.description}
                   </p>
+
+                  {/* Quick Pin Verse Input (§50) */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handlePinVerse(selectedProject.id);
+                    }}
+                    className="flex flex-col sm:flex-row gap-2 bg-slate-950/60 p-3 rounded-2xl border border-slate-800"
+                  >
+                    <div className="relative flex-1">
+                      <BookOpen className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={pinVerseInput}
+                        onChange={(e) => setPinVerseInput(e.target.value)}
+                        placeholder="Ghim thêm câu Kinh Thánh (ví dụ: Rô-ma 8:28, Giăng 14:6, Thi-thiên 23:1...)"
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={pinningVerse || !pinVerseInput.trim()}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-600/20 shrink-0"
+                    >
+                      {pinningVerse ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>Ghim Lời Chúa</span>
+                    </button>
+                  </form>
 
                   {/* Section 1: Pinned Scriptures */}
                   <div className="flex flex-col gap-2">
@@ -529,10 +751,14 @@ export default function StudyPage() {
                     </span>
                     <div className="grid grid-cols-1 gap-2">
                       {selectedProject.pinned_verses?.map((v, i) => (
-                        <div key={i} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col gap-1">
+                        <div key={i} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col gap-1.5 hover:border-blue-500/40 transition-colors">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-blue-300">⚓ {v.reference}</span>
-                            <Link href="/bible" className="text-[10px] text-blue-400 hover:underline flex items-center gap-0.5">
+                            <Link
+                              href={`/bible?ref=${encodeURIComponent(v.reference)}`}
+                              target="_blank"
+                              className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                            >
                               Mở trong Reader <ExternalLink className="w-2.5 h-2.5" />
                             </Link>
                           </div>
@@ -582,24 +808,124 @@ export default function StudyPage() {
                       </div>
                     ) : (
                       <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-500">
-                        Chưa có dàn ý. Hãy bấm &quot;Lập Dàn Ý Bằng AI&quot; ở trên để mô hình tự động kiến tạo.
+                        Chưa có dàn ý. Hãy bấm &quot;Lập Dàn Ý AI&quot; ở trên để mô hình tự động kiến tạo.
                       </div>
                     )}
                   </div>
 
-                  {/* Section 4: Study Questions */}
-                  {selectedProject.study_questions && selectedProject.study_questions.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <HelpCircle className="w-3.5 h-3.5" /> Câu Hỏi Nghiên Cứu &amp; Suy Ngẫm:
+                  {/* Section 4: Study Questions Checklist (§50) */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                        <HelpCircle className="w-3.5 h-3.5" /> Câu Hỏi Nghiên Cứu &amp; Khảo Luận ({selectedProject.study_questions?.length || 0}):
                       </span>
-                      <ul className="list-disc list-inside text-xs text-slate-300 flex flex-col gap-1 pl-2">
-                        {selectedProject.study_questions.map((q, i) => (
-                          <li key={i} className="leading-relaxed">{q}</li>
-                        ))}
-                      </ul>
+                      {selectedProject.study_questions?.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateQuestions(selectedProject.id)}
+                          className="text-[11px] text-cyan-400 hover:underline"
+                        >
+                          Tạo câu hỏi ngay
+                        </button>
+                      )}
                     </div>
-                  )}
+                    {selectedProject.study_questions && selectedProject.study_questions.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {selectedProject.study_questions.map((q, i) => (
+                          <div key={i} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
+                            <span className="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <span className="leading-relaxed font-sans">{q}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-500">
+                        Chưa có câu hỏi nghiên cứu. Bấm &quot;Tạo Câu Hỏi AI&quot; để tạo tự động.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section 5: Project Specific Notes (§50) */}
+                  <div className="flex flex-col gap-3 pt-4 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" /> Ghi Chú Riêng Trong Dự Án ({projectNotes.length}):
+                      </span>
+                    </div>
+
+                    {/* Inline Create Note Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleCreateProjectNote(selectedProject.id);
+                      }}
+                      className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2.5"
+                    >
+                      <input
+                        type="text"
+                        value={newProjectNoteTitle}
+                        onChange={(e) => setNewProjectNoteTitle(e.target.value)}
+                        placeholder="Tiêu đề ghi chú nghiên cứu..."
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans font-semibold"
+                      />
+                      <textarea
+                        value={newProjectNoteContent}
+                        onChange={(e) => setNewProjectNoteContent(e.target.value)}
+                        placeholder="Nội dung suy ngẫm, kết luận giải kinh hoặc phát hiện thần học..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans resize-none"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingProjectNote || !newProjectNoteTitle.trim() || !newProjectNoteContent.trim()}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+                        >
+                          {savingProjectNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                          <span>Lưu Ghi Chú Vào Dự Án</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Notes List */}
+                    {loadingProjectNotes ? (
+                      <div className="p-4 text-center text-xs text-slate-500">Đang tải ghi chú...</div>
+                    ) : projectNotes.length === 0 ? (
+                      <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-500">
+                        Chưa có ghi chú nào trong dự án này. Viết ghi chú đầu tiên ở trên.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {projectNotes.map((pn) => (
+                          <div key={pn.id} className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between gap-2">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <h5 className="font-bold text-xs text-emerald-300 line-clamp-1">{pn.title}</h5>
+                                <span className="text-[10px] text-slate-500">
+                                  {new Date(pn.created_at).toLocaleDateString("vi-VN")}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line">
+                                {pn.content}
+                              </p>
+                            </div>
+                            <div className="flex justify-end pt-1 border-t border-slate-900">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProjectNote(selectedProject.id, pn.id)}
+                                className="text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-1 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Xóa ghi chú</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="p-16 rounded-3xl bg-slate-900/40 border border-slate-800 text-center text-slate-500 text-xs">
