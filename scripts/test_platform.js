@@ -112,8 +112,8 @@ async function main() {
   const rPassage = await testEndpoint('/api/bible/passage?ref=Gi%C4%83ng%203:16', d => (!d.verses || d.verses.length === 0) && 'No passage verses');
   report('GET /api/bible/passage (Dynamic passage parser)', rPassage.ok, rPassage.error);
 
-  const rPlans = await testEndpoint('/api/bible/reading-plans', d => (!Array.isArray(d) || d.length !== 5) && `Expected 5 reading plans, got ${d?.length}`);
-  report('GET /api/bible/reading-plans (5 Systematic reading tracks)', rPlans.ok, rPlans.error);
+  const rPlans = await testEndpoint('/api/bible/reading-plans', d => (!Array.isArray(d) || d.length < 8) && `Expected at least 8 reading plans, got ${d?.length}`);
+  report(`GET /api/bible/reading-plans (${rPlans.data?.length || 8} Systematic & Seasonal reading tracks)`, rPlans.ok, rPlans.error);
 
   const rTodayPlan = await testEndpoint('/api/bible/reading-plans/today', d => !d.plan_title && 'Missing today plan title');
   report('GET /api/bible/reading-plans/today (Daily reading assignment)', rTodayPlan.ok, rTodayPlan.error);
@@ -124,6 +124,12 @@ async function main() {
 
   const rPassagePresets = await testEndpoint('/api/rag/passage-presets', d => (!Array.isArray(d) || d.length !== 6) && `Expected 6 passage presets, got ${d?.length}`);
   report('GET /api/rag/passage-presets (11-Dimension passage presets)', rPassagePresets.ok, rPassagePresets.error);
+
+  const rMorphGreek = await testEndpoint('/api/rag/morphology?code=G4102', d => (!d.lemma || d.strong_number !== 'G4102') && 'Invalid Greek morphology');
+  report('GET /api/rag/morphology?code=G4102 (Greek Pistis morphological analysis)', rMorphGreek.ok, rMorphGreek.error);
+
+  const rMorphHebrew = await testEndpoint('/api/bible/morphology?code=H7965', d => (!d.lemma || d.strong_number !== 'H7965') && 'Invalid Hebrew morphology');
+  report('GET /api/bible/morphology?code=H7965 (Hebrew Shalom morphological analysis)', rMorphHebrew.ok, rMorphHebrew.error);
 
   // Knowledge Graph Module
   const rGraphData = await testEndpoint('/api/graph/data', d => (!d.nodes || !d.edges) && 'Missing graph nodes/edges');
@@ -142,10 +148,10 @@ async function main() {
   const rCards = await testEndpoint('/api/learn/flashcards', d => (!Array.isArray(d) || d.length === 0) && 'No flashcards');
   report('GET /api/learn/flashcards (SM-2 Spaced repetition flashcards)', rCards.ok, rCards.error);
 
-  const rPacks = await testEndpoint('/api/learn/challenge-packs', d => (!Array.isArray(d) || d.length !== 5) && `Expected 5 challenge packs, got ${d?.length}`);
-  report('GET /api/learn/challenge-packs (5 Thematic curriculum challenge packs)', rPacks.ok, rPacks.error);
+  const rPacks = await testEndpoint('/api/learn/challenge-packs', d => (!Array.isArray(d) || d.length < 8) && `Expected at least 8 challenge packs, got ${d?.length}`);
+  report(`GET /api/learn/challenge-packs (${rPacks.data?.length || 8} Thematic curriculum challenge packs)`, rPacks.ok, rPacks.error);
 
-  const rLearnPlans = await testEndpoint('/api/learn/reading-plans', d => (!Array.isArray(d) || d.length !== 5) && `Expected 5 plans, got ${d?.length}`);
+  const rLearnPlans = await testEndpoint('/api/learn/reading-plans', d => (!Array.isArray(d) || d.length < 8) && `Expected at least 8 plans, got ${d?.length}`);
   report('GET /api/learn/reading-plans (Reading plans mounted under learn)', rLearnPlans.ok, rLearnPlans.error);
 
   const rMemorize = await testEndpoint('/api/learn/memorize-verses', d => (!Array.isArray(d) || d.length !== 12) && `Expected 12 memory verses, got ${d?.length}`);
@@ -250,7 +256,8 @@ async function main() {
     { path: '/learn', label: 'Learning Portal (/learn)' },
     { path: '/research', label: 'Theological Research (/research)' },
     { path: '/study', label: 'Homiletical Workspace (/study)' },
-    { path: '/library', label: 'Theological Library (/library)' }
+    { path: '/library', label: 'Theological Library (/library)' },
+    { path: '/manifest.json', label: 'PWA Web App Manifest (/manifest.json)' }
   ];
 
   for (const r of webRoutes) {

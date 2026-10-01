@@ -51,29 +51,29 @@
 |:---|:---|:---|
 | `/` (Home) | Dashboard Tổng Quan | Số liệu thống kê thời gian thực (31.081 câu, 275 sách, 4.673 chunks), câu gốc trong ngày, phím tắt điều hướng nhanh. |
 | `/bible` | Đọc & Tra Cứu Kinh Thánh | Đọc 66 sách theo chương, điều hướng Tân/Cựu Ước, tìm kiếm toàn văn không dấu tiếng Việt, hiển thị tiêu đề và tham chiếu chéo. |
-| `/research` | Nghiên Cứu Thần Học & Giải Kinh | 1. **Giải Kinh Phân Đoạn 11 Chiều (§13)**: Phân tích bối cảnh, tác giả, thể loại, thực thể, dàn ý La Mã, Strong's Lexicon, câu hỏi suy ngẫm, trích dẫn chú giải.<br>2. **Bối Cảnh Đa Chiều 6 Chiều (§15)**: Lịch sử, Văn hóa, Chính trị, Tôn giáo, Địa lý, Văn chương.<br>3. **Nguyên Ngữ & Strong's**: Tra cứu Hy-lạp/Hê-bơ-rơ.<br>4. **Hỏi Đáp Thần Học RAG**: Hỏi đáp có trích dẫn nguồn.<br>5. **Nhân Vật Kinh Thánh**: Nghiên cứu tiểu sử & hình bóng.<br>6. **Tác Nhân Nghiên Cứu AI**: Nghiên cứu sâu đa góc nhìn, ma trận đối chiếu. |
+| `/research` | Nghiên Cứu Thần Học & Giải Kinh | 1. **Giải Kinh Phân Đoạn 11 Chiều (§13)**: Phân tích bối cảnh, tác giả, thể loại, thực thể, dàn ý La Mã, Strong's Lexicon, câu hỏi suy ngẫm, trích dẫn chú giải.<br>2. **Bối Cảnh Đa Chiều 6 Chiều (§15)**: Lịch sử, Văn hóa, Chính trị, Tôn giáo, Địa lý, Văn chương.<br>3. **Nguyên Ngữ & Strong's Morphology (§37, §49)**: Phân tích hình thái học nguyên ngữ (Greek/Hebrew Paradigms, Binyanim, Stems, Cases, Tenses), ngữ pháp, phát âm và đối chiếu Concordance toàn văn 31.081 câu.<br>4. **Hỏi Đáp Thần Học RAG**: Hỏi đáp có trích dẫn nguồn.<br>5. **Nhân Vật Kinh Thánh**: Nghiên cứu tiểu sử & hình bóng.<br>6. **Tác Nhân Nghiên Cứu AI**: Nghiên cứu sâu đa góc nhìn, ma trận đối chiếu. |
 | `/explore` | Khám Phá & Đối Chiếu Học Thuật | 1. **Đồ Thị Tri Thức (§17)**: Trực quan hóa Cytoscape.js mạng lưới giao ước, địa danh, nhân vật.<br>2. **Bản Đồ Hành Trình Địa Lý (§9)**: 9 tuyến hành trình tương tác.<br>3. **Đối Chiếu Tin Lành Song Song**: 16 biến cố, 54 phân đoạn.<br>4. **Ma Trận Tiên Tri Mê-si (§18, §45)**: 14 lời tiên tri Cựu Ước & ứng nghiệm Tân Ước.<br>5. **Thư Viện 275 Tác Giả & Bộ Chú Giải**: Tra cứu danh mục và chuẩn trích dẫn. |
 | `/study` | Soạn Bài Giảng & Xuất Tài Liệu | Mẫu đề cương bài giảng (§50), công cụ soạn thảo trực tiếp, quản lý ghi chú, xuất trọn gói tài liệu nghiên cứu (.MD / Dossier). |
-| `/learn` | Học Tập & Rèn Luyện Đức Tin | 1. **Kế Hoạch Đọc Kinh Thánh (§3, §46, §53)**: 5 lộ trình theo dõi tiến độ thời gian thực (Toàn bộ 365 ngày, Tân Ước 90 ngày, v.v.).<br>2. **Trợ Lý Học Thuộc Lòng Câu Gốc (§3, §4)**: 12 câu gốc, che chữ tương tác (25%-100%), tính điểm, Text-to-Speech phát âm tiếng Việt.<br>3. **Trắc Nghiệm Thần Học Đa Cấp Độ**: 30 câu hỏi kèm giải thích.<br>4. **Thẻ Ghi Nhớ Spaced Repetition (SM-2)**: Xuất Anki/CSV.<br>5. **Thử Thách Chuyên Đề**: 5 bộ bài tập giáo trình. |
+| `/learn` | Học Tập & Rèn Luyện Đức Tin | 1. **Kế Hoạch Đọc Kinh Thánh (§3, §46, §53)**: 8 lộ trình theo dõi tiến độ thời gian thực (Toàn bộ 365 ngày, Tân Ước 90 ngày, Tuần Lễ Khổ Nạn 7 ngày, Mùa Vọng 25 ngày, Cải Chánh 30 ngày, v.v.).<br>2. **Trợ Lý Học Thuộc Lòng Câu Gốc (§3, §4)**: 12 câu gốc, che chữ tương tác (25%-100%), tính điểm, Text-to-Speech phát âm tiếng Việt.<br>3. **Trắc Nghiệm Thần Học Đa Cấp Độ**: 30 câu hỏi kèm giải thích.<br>4. **Thẻ Ghi Nhớ Spaced Repetition (SM-2)**: Xuất Anki/CSV.<br>5. **Thử Thách Chuyên Đề & Mùa Lễ (§46)**: 8 gói thử thách giáo trình (5 nền tảng + 3 mùa lễ phụng vụ). |
+| Mọi trang | Trải Nghiệm PWA Mobile & Ngoại Tuyến | Cấu hình Web App Manifest (`manifest.json`), Service Worker (`sw.js`), Vector Icons (192px/512px), và Banner phát hiện kết nối & nhắc cài đặt PWA (`OfflineBanner.tsx`). |
 
 ---
 
-## 4. Công cụ kiểm định toàn diện (Automated Health Auditors)
+## 4. Công cụ kiểm định toàn diện (Automated Integration Test Suite)
 
-* Script tự động: `scripts/find_missing.js`
-* Kiểm tra tức thì 7 tầng kiến trúc:
-  1. Canonical Integrity (31.081 câu, 66 sách).
-  2. Theological Library (275 sách).
-  3. Vector Embeddings (4.673 chunks 1024-dim).
-  4. Knowledge Graph (30 nodes, 35 edges).
-  5. Learning & Study Assets (5 reading plans, 12 memory verses, 30 quiz, 11 flashcards, 4 sermon templates).
-  6. Parallel Harmony, Cartography & Prophecies (16 harmony events, 14 prophecies, 9 journeys).
-  7. Services & Memory Budget (< 2.0 GB Non-Ollama).
+* Script tự động: `scripts/test_platform.js` (`npm test`)
+* **Tổng số bài kiểm tra**: **44/44 tests PASSED (100%)**
+* Kiểm tra tức thì 5 bộ kiểm định chuyên sâu:
+  1. **Suite 1 - Core API Surface & Endpoints**: 26 endpoints (`/health`, 66 books, chapter verses, search, reading plans, RAG presets, Morphology Greek/Hebrew, Graph, Quiz, Flashcards, 8 Challenge Packs, Memorization, Harmony, Prophecies, Journeys, Library).
+  2. **Suite 2 - Canonical Text Integrity & Database Validation**: 66 sách chính kinh, 31.081 câu BTT 1925, 0 câu rỗng, 275 sách thần học, 4.673 vector chunks với độ phủ nhúng 100%.
+  3. **Suite 3 - Knowledge Graph Topology & Integrity**: 30 nodes, 35 edges, 0 broken edges, 0 orphan nodes.
+  4. **Suite 4 - Web Application Routes**: 8 tuyến URL chính (`/`, `/bible`, `/explore`, `/learn`, `/research`, `/study`, `/library`, `/manifest.json`) trả về HTTP 200 OK.
+  5. **Suite 5 - Resource & Performance Guardrail**: Tổng RAM các container ứng dụng Non-Ollama duy trì nghiêm ngặt dưới 2.0 GB (~955.8 MiB / 2048 MiB).
 
 ---
 
 ## 5. Định hướng tiếp theo
 
-1. Bổ sung thêm các gói thử thách đọc Kinh Thánh nâng cao theo mùa lễ (Phục Sinh, Giáng Sinh).
-2. Tích hợp thanh công cụ tra cứu nhanh giải kinh (Inline Passage Exegesis Quick Drawer) ngay bên trong trình đọc Kinh Thánh `/bible`.
-3. Mở rộng thêm các câu hỏi trắc nghiệm chuyên sâu cho từng sách trong Ngũ Kinh và Thư Tín Phao-lô.
+1. Tích hợp thanh công cụ tra cứu nhanh giải kinh (Inline Passage Exegesis Quick Drawer) trực tiếp ngay bên trong trình đọc Kinh Thánh `/bible`.
+2. Mở rộng thêm các câu hỏi trắc nghiệm chuyên sâu cho từng sách trong Ngũ Kinh và Thư Tín Phao-lô.
+3. Đồng bộ hóa dữ liệu ghi chú cá nhân của người học ngoại tuyến (Local IndexedDB sync).

@@ -2677,6 +2677,122 @@ def _generate_pauline_30_plan_days() -> List[Dict[str, Any]]:
     return days
 
 
+def _generate_passion_week_plan_days() -> List[Dict[str, Any]]:
+    """Generates 7 days walking step-by-step through Passion Week from Palm Sunday to Easter."""
+    passion_flow = [
+        ("Chúa Nhật Lễ Lá — Khải Hoàn Tiến Vào Giê-ru-sa-lem", "Lu-ca 19:28-44", "lc", 19, "Hô-sa-na! Đáng chúc tụng Đấng nhân danh Chúa mà đến! Bình an ở trên trời, và vinh hiển trên các nơi rất cao!"),
+        ("Thứ Hai — Dẹp Sạch Đền Thờ & Cây Vả Không Trái", "Mác 11:12-25", "mc", 11, "Nhà ta sẽ gọi là nhà cầu nguyện cho muôn dân. Nhưng các ngươi đã làm thành cái hang trộm cướp."),
+        ("Thứ Ba — Tranh Luận Thẩm Quyền & Khải Thị Thời Kỳ Cuối Cùng", "Ma-thi-ơ 24:1-14; 25:31-46", "mt", 24, "Trời đất sẽ qua, nhưng lời ta nói chẳng bao giờ qua đi. Hãy tỉnh thức vì các ngươi không biết ngày nào Chúa mình sẽ đến."),
+        ("Thứ Tư — Sự Tĩnh Lặng, Âm Mưu Phản Bội & Xức Dầu Tại Bê-tha-ni", "Ma-thi-ơ 26:1-16", "mt", 26, "Người phụ nữ này đã làm một việc tốt cho ta; người đã ướp xác ta trước để chuẩn bị việc chôn cất."),
+        ("Thứ Năm Tuần Thánh — Rửa Chân, Tiệc Thánh & Lời Cầu Nguyện Ghết-sê-ma-nê", "Giăng 13:1-17; Ma-thi-ơ 26:36-46", "gi", 13, "Chén này là giao ước mới trong huyết ta vì các ngươi mà đổ ra. Xin ý Cha được nên, chớ không theo ý con."),
+        ("Thứ Sáu Tuần Khổ Nạn — Phiên Tòa, Gô-gô-tha & Sự Hy Sinh Chuộc Tội", "Giăng 19:1-42", "gi", 19, "Mọi sự đã được trọn! Ngài gục đầu, trút linh hồn."),
+        ("Chúa Nhật Phục Sinh — Ngôi Mộ Trống & Đấng Sống Khải Hoàn Đắc Thắng", "Lu-ca 24:1-35; Ma-thi-ơ 28:1-10", "lc", 24, "Sao các ngươi tìm người sống ở giữa kẻ chết? Ngài không ở đây đâu, Ngài đã sống lại rồi!")
+    ]
+    days = []
+    for idx, (title, pass_str, b_code, b_ch, golden) in enumerate(passion_flow, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": golden,
+            "devotional_prompt": "Chiêm nghiệm sự hy sinh tột đỉnh của Chúa Giê-xu trên thập tự giá và mừng vui đắc thắng trong quyền năng phục sinh vinh hiển của Ngài."
+        })
+    return days
+
+
+def _generate_advent_25_plan_days() -> List[Dict[str, Any]]:
+    """Generates 25 days following the Advent prophecies through the Incarnation."""
+    advent_flow = [
+        ("Dòng Dõi Người Nữ Giày Đạp Đầu Rắn", "Sáng-thế Ký 3:1-15", "st", 3, "Ta sẽ làm cho mày cùng người nữ, dòng dõi mày cùng dòng dõi người nữ nghịch thù nhau; người sẽ giày đạp đầu mày."),
+        ("Dòng Dõi Áp-ra-ham Ban Phước Cho Muôn Dân", "Sáng-thế Ký 12:1-3; 22:15-18", "st", 12, "Các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước."),
+        ("Cây Trượng Không Rời Khỏi Giu-đa (Si-lô Đến)", "Sáng-thế Ký 49:8-10", "st", 49, "Cây trượng chẳng hề dời khỏi Giu-đa, cho đến chừng Đấng Si-lô hiện tới, và các dân tộc đều vâng phục Ngài."),
+        ("Ngôi Sao Mọc Từ Gia-cốp", "Dân-số Ký 24:15-19", "ds", 24, "Một ngôi sao mọc lên từ Gia-cốp, một cây vương trượng dấy lên từ Y-sơ-ra-ên."),
+        ("Giao Ước Ngai Vàng Đa-vít Bền Vững Đời Đời", "2 Sa-mu-ên 7:12-16", "2sm", 7, "Nhà ngươi và nước ngươi sẽ được bền vững đời đời trước mặt ta; ngôi ngươi sẽ được lập vững bền mãi mãi."),
+        ("Ngươi Là Con Ta, Ngày Nay Ta Đã Sinh Ngươi", "Thi-thiên 2:1-12", "tt", 2, "Ngươi là Con ta; ngày nay ta đã sanh ngươi."),
+        ("Chiên Con Cứu Chuộc Nơi Bụi Rậm", "Sáng-thế Ký 22:1-14", "st", 22, "Chính Đức Chúa Trời sẽ tự sắm sẵn chiên con cho của lễ thiêu."),
+        ("Lời Tiên Tri Về Đấng Em-ma-nu-ên", "Ê-sai 7:10-14", "es", 7, "Này, một gái đồng trinh sẽ chịu thai, sanh một con trai, và đặt tên là Em-ma-nu-ên."),
+        ("Ánh Sáng Chiếu Soi Dân Đi Trong Tối Tăm", "Ê-sai 9:1-5", "es", 9, "Dân đi trong nơi tối tăm đã thấy sự sáng lớn; sự sáng đã chiếu trên những kẻ ở nơi bóng sự chết."),
+        ("Vì Có Một Con Trẻ Sanh Cho Chúng Ta", "Ê-sai 9:6-7", "es", 9, "Ngài sẽ được xưng là Đấng Mưu Luận Lạ Lùng, Đức Chúa Trời Quyền Năng, Cha Đời Đời, Chúa Bình An."),
+        ("Một Chồi Xuất Từ Gốc Gie-sê", "Ê-sai 11:1-10", "es", 11, "Thần của Đức Giê-hô-va sẽ ngự trên Ngài, là thần khôn ngoan và thông sáng, thần mưu toan và mạnh mẽ."),
+        ("Bết-lê-hem Ép-ra-ta: Nơi Đấng Cai Trị Xuất Thân", "Mi-chê 5:2", "mc", 5, "Hỡi Bết-lê-hem Ép-ra-ta... từ nơi ngươi sẽ ra cho ta một Đấng cai trị trong Y-sơ-ra-ên, gốc tích của Ngài từ thuở xưa, từ những ngày đời đời."),
+        ("Tiếng Kêu Trong Đồng Vắng Mở Đường Cho Chúa", "Ê-sai 40:1-11", "es", 40, "Có tiếng kêu rằng: Hãy mở đường trong đồng vắng cho Đức Giê-hô-va; hãy ban bằng đường cái cho Đức Chúa Trời chúng ta."),
+        ("Người Đầy Tớ Chịu Khổ Nhục Vì Tội Lỗi Chúng Ta", "Ê-sai 53:1-12", "es", 53, "Nhưng Người đã vì tội lỗi chúng ta mà bị vết, vì sự gian ác chúng ta mà bị thương."),
+        ("Lời Hứa Về Chồi Công Bình", "Giê-rê-mi 23:5-6", "gr", 23, "Tên người ta sẽ xưng Ngài là: Đức Giê-hô-va là sự công bình của chúng ta."),
+        ("Gia Phổ Đấng Christ: Lịch Sử Cứu Chuộc", "Ma-thi-ơ 1:1-17", "mt", 1, "Gia phổ Đức Chúa Giê-xu Christ, con cháu Đa-vít và con cháu Áp-ra-ham."),
+        ("Thiên Sứ Truyền Tin Cho Xa-cha-ri Về Giăng", "Lu-ca 1:5-25", "lc", 1, "Người sẽ lấy tinh thần và quyền năng của Ê-li mà đi trước mặt Chúa."),
+        ("Thiên Sứ Gáp-ri-ên Truyền Tin Cho Ma-ri", "Lu-ca 1:26-38", "lc", 1, "Thánh Linh sẽ ngự trên ngươi, và quyền phép Đấng Rất Cao sẽ che phủ ngươi; cho nên Con thánh sanh ra sẽ được xưng là Con Đức Chúa Trời."),
+        ("Bài Ca Magnificat Của Ma-ri", "Lu-ca 1:39-56", "lc", 1, "Linh hồn tôi ngợi khen Chúa, tâm thần tôi mừng rỡ trong Đức Chúa Trời là Cứu Chúa tôi."),
+        ("Giấc Mộng Của Giô-sép & Tên Cứu Thế Giê-xu", "Ma-thi-ơ 1:18-25", "mt", 1, "Ngươi khá đặt tên là Giê-xu, vì chính Ngài sẽ cứu dân mình ra khỏi tội."),
+        ("Đêm Bết-lê-hem: Ngôi Lời Giáng Sinh Nơi Máng Cỏ", "Lu-ca 2:1-7", "lc", 2, "Nàng sanh con trai đầu lòng, lấy khăn bọc con mình, đặt nằm trong máng cỏ, vì nhà quán không có chỗ cho họ."),
+        ("Thiên Binh Hát Xướng & Các Mục Đồng", "Lu-ca 2:8-20", "lc", 2, "Sáng danh Đức Chúa Trời trên các nơi rất cao, bình an dưới đất, ân trạch cho loài người!"),
+        ("Lời Tiên Tri Của Si-mê-ôn & Bà An-ne", "Lu-ca 2:21-38", "lc", 2, "Vì chính mắt tôi đã thấy ơn cứu rỗi của Ngài, mà Ngài đã sắm sẵn trước mặt muôn dân."),
+        ("Các Bác Sĩ Đông Phương Đến Thờ Lạy & Dâng Lễ Vật", "Ma-thi-ơ 2:1-12", "mt", 2, "Họ vào nhà, thấy con trẻ cùng Ma-ri, mẹ Ngài, thì sấp mình xuống mà thờ lạy Ngài."),
+        ("Ngôi Lời Trở Nên Xác Thịt — Đầy Ơn & Lẽ Thật", "Giăng 1:1-18", "gi", 1, "Ngôi Lời đã trở nên xác thịt, ở giữa chúng ta, đầy ơn và lẽ thật; chúng ta đã ngắm xem sự vinh hiển của Ngài, thật như vinh hiển của Con một đến từ nơi Cha.")
+    ]
+    days = []
+    for idx, (title, pass_str, b_code, b_ch, golden) in enumerate(advent_flow, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": golden,
+            "devotional_prompt": "Suy ngẫm mầu nhiệm Ngôi Lời nhập thể và hướng lòng trông đợi sự tái lâm vinh quang của Đấng Cứu Thế."
+        })
+    return days
+
+
+def _generate_reformation_30_plan_days() -> List[Dict[str, Any]]:
+    """Generates 30 days focusing on the Five Solas and Reformation Biblical theology."""
+    reformation_flow = [
+        ("Sola Scriptura: Lời Chúa Được Soi Dẫn Toàn Hảo", "2 Ti-mô-thê 3:14-17", "2tm", 3, "Cả Kinh Thánh đều là bởi Đức Chúa Trời soi dẫn, có ích cho sự dạy dỗ, bẻ trách, sửa trị, dạy người trong sự công bình."),
+        ("Sola Scriptura: Lời Chúa Là Ngọn Đèn Soi Lối", "Thi-thiên 119:97-105", "tt", 119, "Lời Chúa là ngọn đèn cho chân tôi, ánh sáng cho đường lối tôi."),
+        ("Sola Scriptura: Lời Hằng Sống Bền Vững Đời Đời", "1 Phi-e-rơ 1:22-25; Ê-sai 40:8", "1pe", 1, "Cỏ khô, hoa rụng, nhưng lời của Đức Chúa Trời chúng ta còn lại đời đời."),
+        ("Sola Scriptura: Nguồn Thẩm Quyền Của Các Sứ Đồ", "2 Phi-e-rơ 1:16-21", "2pe", 1, "Chẳng hề có lời tiên tri nào là bởi ý một người nào mà ra, bèn là bởi Đức Thánh Linh cảm động mà người ta đã nói bởi Đức Chúa Trời."),
+        ("Sola Scriptura: Kiểm Chứng Mọi Giáo Lý Bằng Kinh Thánh", "Công-vụ 17:10-12", "cv", 17, "Những người Bê-rê có tâm tình cao thượng hơn... ngày nào cũng tra xét Kinh Thánh để xem lời giảng có thật như vậy chăng."),
+        ("Sola Gratia: Ân Điển Cứu Rỗi Không Bởi Việc Làm", "Ê-phê-sô 2:1-10", "ep", 2, "Vả, ấy là nhờ ân điển, bởi đức tin, mà anh em được cứu, điều đó không phải đến từ anh em, bèn là sự ban cho của Đức Chúa Trời."),
+        ("Sola Gratia: Sự Lựa Chọn Bởi Ân Điển", "Rô-ma 11:1-6", "rm", 11, "Nhưng nếu là bởi ân điển, thì không còn phải bởi việc làm nữa; bằng chẳng thì ân điển không còn là ân điển."),
+        ("Sola Gratia: Sự Tái Sinh Bởi Lòng Thương Xót", "Tít 3:3-8", "tt", 3, "Không phải bởi việc công bình chúng ta đã làm, nhưng theo lòng thương xót Ngài, Ngài đã cứu chúng ta bởi sự rửa của sự tái sanh."),
+        ("Sola Gratia: Đấng Kêu Gọi & Tiền Định Trong Tình Yêu", "Rô-ma 8:28-39", "rm", 8, "Đấng đã không tiếc chính Con mình, nhưng vì chúng ta hết thảy mà phó Con ấy cho, há chẳng ban mọi sự luôn với Con ấy cho chúng ta sao?"),
+        ("Sola Gratia: Ân Điển Đủ Đầy Trong Sự Yếu Đuối", "2 Cô-rinh-tô 12:7-10", "2cr", 12, "Ân điển ta đủ cho ngươi rồi, vì sức mạnh của ta nên trọn vẹn trong sự yếu đuối."),
+        ("Sola Fide: Người Công Bình Sống Bởi Đức Tin", "Rô-ma 1:16-17; Ha-ba-cúc 2:4", "rm", 1, "Vì trong Tin Lành này có sự công bình của Đức Chúa Trời được bày tỏ từ đức tin đến đức tin, như có chép rằng: Người công bình sẽ sống bởi đức tin."),
+        ("Sola Fide: Sự Xưng Công Bình Ngoài Luật Pháp", "Rô-ma 3:21-31", "rm", 3, "Vì chúng ta kể rằng người ta được xưng công bình bởi đức tin, chẳng nhờ những việc làm của luật pháp."),
+        ("Sola Fide: Tấm Gương Đức Tin Áp-ra-ham", "Rô-ma 4:1-12", "rm", 4, "Áp-ra-ham tin Đức Chúa Trời, và điều đó kể là công bình cho người."),
+        ("Sola Fide: Kết Quả Của Sự Xưng Công Bình", "Rô-ma 5:1-11", "rm", 5, "Vậy chúng ta đã được xưng công bình bởi đức tin, thì được hòa thuận với Đức Chúa Trời, bởi Đức Chúa Giê-xu Christ chúng ta."),
+        ("Sola Fide: Đừng Trở Lại Dưới Ách Nô Lệ Của Luật Pháp", "Ga-la-ti 2:15-21; 3:1-14", "gl", 2, "Tôi đã bị đóng đinh vào thập tự giá với Đấng Christ; mà tôi sống, không phải là tôi sống nữa, nhưng Đấng Christ sống trong tôi."),
+        ("Sola Fide: Đức Tin Hành Động Bởi Lòng Yêu Thương", "Ga-la-ti 5:1-6", "gl", 5, "Điều có giá trị là đức tin hành động bởi lòng yêu thương."),
+        ("Sola Fide: Định Nghĩa & Sức Mạnh Của Đức Tin", "Hê-bơ-rơ 11:1-6", "hb", 11, "Vả, đức tin là sự biết chắc vững vàng của những điều mình đang trông mong, là bằng cớ của những điều mình chẳng xem thấy."),
+        ("Solus Christus: Đấng Trung Bảo Duy Nhất", "1 Ti-mô-thê 2:1-7", "1tm", 2, "Vì chỉ có một Đức Chúa Trời, và chỉ có một Đấng Trung bảo ở giữa Đức Chúa Trời và loài người, tức là Đức Chúa Giê-xu Christ, là người."),
+        ("Solus Christus: Con Đường, Lẽ Thật & Sự Sống", "Giăng 14:1-7", "gi", 14, "Ta là đường đi, lẽ thật, và sự sống; chẳng bởi ta thì không ai được đến cùng Cha."),
+        ("Solus Christus: Chẳng Có Sự Cứu Rỗi Trong Đấng Nào Khác", "Công-vụ 4:8-12", "cv", 4, "Chẳng có sự cứu rỗi trong đấng nào khác; vì ở dưới trời, chẳng có danh nào khác ban cho loài người, để chúng ta phải nhờ đó mà được cứu."),
+        ("Solus Christus: Thầy Tế Lễ Thượng Phẩm Đời Đời", "Hê-bơ-rơ 7:22-28", "hb", 7, "Ngài có thể cứu toàn vẹn những kẻ nhờ Ngài mà đến gần Đức Chúa Trời, vì Ngài hằng sống để cầu thay cho những kẻ ấy."),
+        ("Solus Christus: Của Lễ Chuộc Tội Một Lần Đủ Cả", "Hê-bơ-rơ 9:11-15, 24-28", "hb", 9, "Ngài đã vào nơi rất thánh một lần đủ cả, không phải với huyết của dê đực và bò con, nhưng với chính huyết mình, mà được sự chuộc tội đời đời."),
+        ("Solus Christus: Bức Màn Đã Xé & Đường Mới Sống Động", "Hê-bơ-rơ 10:19-25", "hb", 10, "Bởi huyết Đức Chúa Giê-xu, chúng ta được dạn dĩ bước vào nơi rất thánh, bởi con đường mới và sống mà Ngài đã mở qua bức màn, nghĩa là qua xác Ngài."),
+        ("Solus Christus: Đầu Của Hội Thánh & Trọng Tâm Vạn Vật", "Cô-lô-se 1:15-20", "cl", 1, "Ngài là đầu của thân thể, tức là đầu Hội Thánh... để trong mọi sự Ngài đều đứng hàng đầu."),
+        ("Soli Deo Gloria: Mọi Sự Thuộc Về Ngài & Quy Vinh Hiển", "Rô-ma 11:33-36", "rm", 11, "Vì muôn vật đều là từ Ngài, bởi Ngài, và hướng về Ngài. Vinh hiển cho Ngài đời đời vô cùng! A-men."),
+        ("Soli Deo Gloria: Làm Mọi Sự Vì Sự Vinh Hiển Của Chúa", "1 Cô-rinh-tô 10:31-33", "1cr", 10, "Vậy, anh em hoặc ăn, hoặc uống, hay là làm sự chi khác, hãy vì sự vinh hiển của Đức Chúa Trời mà làm."),
+        ("Soli Deo Gloria: Bài Ca Tôn Ngợi Chiên Con Trên Ngai", "Khải-huyền 4:8-11; 5:11-14", "kh", 5, "Đấng ngồi trên ngai và Chiên Con đáng được ngợi khen, tôn quí, vinh hiển và quyền phép cho đến đời đời!"),
+        ("Đời Sống Cơ Đốc: Thầy Tế Lễ Thuộc Linh Cho Muôn Tín Hữu", "1 Phi-e-rơ 2:4-10", "1pe", 2, "Nhưng anh em là dòng giống được lựa chọn, là chức thầy tế lễ nhà vua, là dân thánh, là dân thuộc về Đức Chúa Trời."),
+        ("Đời Sống Cơ Đốc: Biến Đổi Tâm Trí & Tận Hiến Thân Thể", "Rô-ma 12:1-8", "rm", 12, "Hãy dâng thân thể mình làm của lễ sống và thánh, đẹp lòng Đức Chúa Trời, ấy là sự thờ phượng phải lẽ của anh em."),
+        ("Tuyên Ngôn Đắc Thắng: Giữ Vững Đức Tin Đến Cuối Cùng", "2 Ti-mô-thê 4:6-8; Giu-đe 24-25", "2tm", 4, "Ta đã đánh trận tốt lành, đã xong sự chạy, đã giữ được đức tin. Hiện nay mão triều thiên của sự công bình đã để dành cho ta.")
+    ]
+    days = []
+    for idx, (title, pass_str, b_code, b_ch, golden) in enumerate(reformation_flow, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": golden,
+            "devotional_prompt": "Khẳng định nền tảng đức tin thuần khiết nơi Lời Chúa và dâng trọn vinh quang duy nhất cho Ba Ngôi Đức Chúa Trời."
+        })
+    return days
+
+
 # Registry of predefined plans
 READING_PLANS_REGISTRY = {
     "plan_1_year": {
@@ -2743,6 +2859,45 @@ READING_PLANS_REGISTRY = {
         "recommended_for": "Người dạy đạo, trưởng ban ngành, và người học thần học căn bản",
         "description": "Đào sâu những luận điểm thần học cốt lõi trong Rô-ma, 1&2 Cô-rinh-tô, Ga-la-ti, Ê-phê-sô, Phi-líp, Cô-lô-se và các thư tín mục vụ.",
         "days_generator": _generate_pauline_30_plan_days
+    },
+    "plan_passion_week": {
+        "id": "plan_passion_week",
+        "title": "Tuần Lễ Khổ Nạn & Sự Phục Sinh (7 Ngày)",
+        "subtitle": "Theo sát từng ngày từ Chúa Nhật Lễ Lá đến Sáng Phục Sinh Khải Hoàn",
+        "category": "Mùa Lễ & Chuyên Đề",
+        "total_days": 7,
+        "difficulty": "Sâu Nhiệm",
+        "icon": "Cross",
+        "badge_name": "Hiệp Một Nơi Thập Tự",
+        "recommended_for": "Tuần Thương Khó & Phục Sinh, bồi linh cá nhân và ban ngành",
+        "description": "Hành trình 7 ngày suy ngẫm từng biến cố then chốt: tiến vào thành Giê-ru-sa-lem, dẹp sạch đền thờ, tiệc ly, vườn Ghết-sê-ma-nê, đồi Gô-gô-tha và ngôi mộ trống rực rỡ vinh quang.",
+        "days_generator": _generate_passion_week_plan_days
+    },
+    "plan_advent_25": {
+        "id": "plan_advent_25",
+        "title": "Mùa Vọng & Đấng Mê-si Giáng Sinh (25 Ngày)",
+        "subtitle": "25 ngày từ lời tiên tri Cựu Ước đến máng cỏ Bết-lê-hem",
+        "category": "Mùa Lễ & Chuyên Đề",
+        "total_days": 25,
+        "difficulty": "Ấm Áp & Tươi Mới",
+        "icon": "Star",
+        "badge_name": "Ngôi Lời Nhập Thể",
+        "recommended_for": "Tháng 12, Mùa Vọng chuẩn bị tâm linh mừng Lễ Giáng Sinh",
+        "description": "Khảo cứu dòng chảy lời hứa Đấng Mê-si xuyên suốt Cựu Ước: dòng dõi người nữ, Em-ma-nu-ên, chồi Gie-sê, vua Bết-lê-hem đến sự hạ sinh khiêm nhường của Chúa Cứu Thế.",
+        "days_generator": _generate_advent_25_plan_days
+    },
+    "plan_reformation_30": {
+        "id": "plan_reformation_30",
+        "title": "Di Sản Đức Tin & Cải Chánh Giáo Hội (30 Ngày)",
+        "subtitle": "Năm Khái Luận Duy Nhất (Five Solas) và nền tảng Phúc Âm thuần khiết",
+        "category": "Mùa Lễ & Chuyên Đề",
+        "total_days": 30,
+        "difficulty": "Chuyên Sâu",
+        "icon": "ShieldCheck",
+        "badge_name": "Di Sản Cải Chánh",
+        "recommended_for": "Mùa Cải Chánh Giáo Hội (tháng 10), sinh viên thần học, ban chấp sự",
+        "description": "30 ngày đào sâu 5 trụ cột thần học Kinh Thánh: Duy Kinh Thánh (Sola Scriptura), Duy Ân Điển (Sola Gratia), Duy Đức Tin (Sola Fide), Duy Đấng Christ (Solus Christus) và Duy Đức Chúa Trời Được Vinh Hiển (Soli Deo Gloria).",
+        "days_generator": _generate_reformation_30_plan_days
     }
 }
 
@@ -2988,3 +3143,16 @@ def toggle_reading_plan_day(
         "badge_unlocked": pct >= 100.0,
         "badge_name": meta["badge_name"] if pct >= 100.0 else None
     }
+
+
+@router.get("/morphology")
+def get_morphology_alias(
+    code: Optional[str] = Query(None, description="Strong number or word code, e.g. 'G4102', 'H7965'"),
+    strong_number: Optional[str] = Query(None, description="Alias for code"),
+    lemma: Optional[str] = Query(None, description="Original language script, e.g. 'πίστις'"),
+    db: Session = Depends(get_db)
+):
+    """Alias to /api/rag/morphology for consistent original language parsing under /api/bible."""
+    from app.routers.rag import get_word_morphology
+    return get_word_morphology(code=code, strong_number=strong_number, lemma=lemma, db=db)
+

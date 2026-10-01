@@ -2,7 +2,7 @@ import json
 import re
 import unicodedata
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -2619,5 +2619,249 @@ def execute_passage_study(
     )
 
 
+# ==============================================================================
+# §37 & §49: ORIGINAL LANGUAGE MORPHOLOGICAL PARSER & EXEGESIS ENGINE
+# ==============================================================================
+
+class MorphologyAnalysisResponse(BaseModel):
+    strong_number: str
+    language: str
+    lemma: str
+    transliteration: str
+    pronunciation: str
+    part_of_speech: str
+    grammatical_category: str
+    morphological_parsing: Dict[str, Any]
+    definition: str
+    theological_significance: str
+    exegetical_insight: str
+    occurrences_count: int
+    key_scriptures: List[Dict[str, str]]
+    related_lemmas: List[Dict[str, str]]
 
 
+GREEK_MORPHOLOGY_PRESETS: Dict[str, Dict[str, Any]] = {
+    "G4102": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "declension": "Biến cách thứ ba (-ις, -εως)",
+            "gender": "Nữ tính (Feminine)",
+            "stem": "πιστι- (pisti-)",
+            "case_paradigm": {
+                "nominative_singular": "πίστις (pistis - Chủ cách)",
+                "genitive_singular": "πίστεως (pisteos - Sở hữu cách)",
+                "dative_singular": "πίστει (pistei - Tặng cách/Dụng cách)",
+                "accusative_singular": "πίστιν (pistin - Đối cách)"
+            },
+            "theological_aspect": "Không chỉ là đồng thuận trí tuệ (assensus) mà là sự ký thác trọn vẹn (fiducia) vào thân vị của Đấng Christ."
+        },
+        "exegetical_insight": "Trong thư tín Rô-ma và Ga-la-ti, ngữ cách 'ek pisteos' (bởi đức tin) biểu thị đức tin là khí cụ nhận lãnh sự xưng công bình của Đức Chúa Trời ngoài luật pháp việc làm.",
+        "related_lemmas": [
+            {"strong_number": "G4100", "lemma": "πιστεύω", "transliteration": "pisteuo", "gloss": "Tin, nương cậy (Động từ)"},
+            {"strong_number": "G4103", "lemma": "πιστός", "transliteration": "pistos", "gloss": "Thành tín, đáng tin cậy (Tính từ)"}
+        ]
+    },
+    "G0026": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "declension": "Biến cách thứ nhất (-η, -ης)",
+            "gender": "Nữ tính (Feminine)",
+            "stem": "ἀγαπ- (agap-)",
+            "case_paradigm": {
+                "nominative_singular": "ἀγάπη (agape - Chủ cách)",
+                "genitive_singular": "ἀγάπης (agapes - Sở hữu cách)",
+                "dative_singular": "ἀγάπῃ (agape - Tặng cách)",
+                "accusative_singular": "ἀγάπην (agapen - Đối cách)"
+            },
+            "theological_aspect": "Tình yêu tự nguyện, vô điều kiện và hy sinh tối thượng, bắt nguồn từ chính Đức Chúa Trời (1 Giăng 4:8) và được bày tỏ trọn vẹn nơi Thập Tự Giá."
+        },
+        "exegetical_insight": "Khác biệt với 'philia' (tình bằng hữu tương hỗ) hay 'eros' (tình cảm khao khát chiếm hữu), Agapē luôn hướng về đối tượng không xứng đáng và tìm kiếm lợi ích vĩnh cửu cho người khác.",
+        "related_lemmas": [
+            {"strong_number": "G0025", "lemma": "ἀγαπάω", "transliteration": "agapao", "gloss": "Yêu thương bằng hành động và ý chí (Động từ)"},
+            {"strong_number": "G0027", "lemma": "ἀγαπητός", "transliteration": "agapetos", "gloss": "Được yêu dấu, rất quý báu (Tính từ)"}
+        ]
+    },
+    "G3056": {
+        "grammatical_category": "Danh từ Nam tính (Noun Masculine)",
+        "morphological_parsing": {
+            "declension": "Biến cách thứ hai (-ος, -ου)",
+            "gender": "Nam tính (Masculine)",
+            "stem": "λογ- (log-)",
+            "case_paradigm": {
+                "nominative_singular": "λόγος (logos - Chủ cách)",
+                "genitive_singular": "λόγου (logou - Sở hữu cách)",
+                "dative_singular": "λόγῳ (logo - Tặng cách)",
+                "accusative_singular": "λόγον (logon - Đối cách)"
+            },
+            "theological_aspect": "Trong Phúc Âm Giăng 1:1-14, Logos là Ngôi Hai Thiên Chúa hằng hữu, Đấng Sáng Tạo và Mạc Khải Thần Thượng nhập thể thành người."
+        },
+        "exegetical_insight": "Thuật ngữ Logos nối kết cả tư tưởng Do Thái giáo (Dabar - Lời sáng tạo quyền năng của Đức Chúa Trời trong Cựu Ước) lẫn triết học Hy Lạp (nguyên lý lý tính vận hành vũ trụ), được thánh Giăng quy hướng trọn vẹn về Chúa Giê-xu Christ.",
+        "related_lemmas": [
+            {"strong_number": "G3004", "lemma": "λέγω", "transliteration": "lego", "gloss": "Nói, phán, công bố (Động từ)"},
+            {"strong_number": "G3051", "lemma": "λόγιον", "transliteration": "logion", "gloss": "Lời sấm truyền mạc khải thiêng liêng (Danh từ)"}
+        ]
+    },
+    "G5485": {
+        "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+        "morphological_parsing": {
+            "declension": "Biến cách thứ ba (-ις, -ιτος)",
+            "gender": "Nữ tính (Feminine)",
+            "stem": "χαριτ- (charit-)",
+            "case_paradigm": {
+                "nominative_singular": "χάρις (charis - Chủ cách)",
+                "genitive_singular": "χάριτος (charitos - Sở hữu cách)",
+                "dative_singular": "χάριτι (chariti - Tặng cách)",
+                "accusative_singular": "χάριν (charin - Đối cách)"
+            },
+            "theological_aspect": "Ơn ban nhưng không của Đức Chúa Trời cho kẻ có tội, cứu rỗi hoàn toàn ngoài mọi công đức loài người (Sola Gratia)."
+        },
+        "exegetical_insight": "Phao-lô mở đầu và kết thúc mọi thư tín bằng lời chúc ân điển (charis); đây là nền tảng của toàn bộ mối quan hệ mới giữa tội nhân được cứu và Đức Chúa Trời.",
+        "related_lemmas": [
+            {"strong_number": "G5463", "lemma": "χαίρω", "transliteration": "chairo", "gloss": "Vui mừng, hân hoan (Động từ)"},
+            {"strong_number": "G5486", "lemma": "χάρισμα", "transliteration": "charisma", "gloss": "Ân tứ thuộc linh nhưng không (Danh từ)"}
+        ]
+    }
+}
+
+HEBREW_MORPHOLOGY_PRESETS: Dict[str, Dict[str, Any]] = {
+    "H7965": {
+        "grammatical_category": "Danh từ Nam tính (Noun Masculine)",
+        "morphological_parsing": {
+            "root_pattern": "ש-ל-ם (Shin-Lamed-Mem)",
+            "gender": "Nam tính (Masculine)",
+            "nominal_form": "Qātôl pattern (Trạng thái trọn vẹn, thịnh vượng tâm linh)",
+            "binyan_associations": {
+                "qal": "שָׁלַם (Shalam - Yên ổn, trọn vẹn)",
+                "piel": "שִׁלֵּם (Shillem - Đền bù, hoàn tất, hòa giải trọn vẹn)",
+                "hiphil": "הִשְׁלִים (Hishlim - Thiết lập hòa bình, làm cho thuận hòa)"
+            },
+            "theological_aspect": "Shalom trong tư tưởng Do Thái vượt xa sự vắng bóng chiến tranh; đó là sự an khang toàn diện của linh hồn, thân xác và cộng đồng trong giao ước với Đức Chúa Trời."
+        },
+        "exegetical_insight": "Xuất hiện hơn 250 lần trong Cựu Ước; trong Dân-số ký 6:26, Lời Chúc Phước của Thầy Tế Lễ Thượng Phẩm kết thúc bằng lời cầu xin Đức Giê-hô-va ban 'Shalom' cho tuyển dân.",
+        "related_lemmas": [
+            {"strong_number": "H7999", "lemma": "שָׁלַם", "transliteration": "shalam", "gloss": "Làm cho trọn lành, trả xong nợ (Động từ)"},
+            {"strong_number": "H8002", "lemma": "שֶׁלֶם", "transliteration": "shelem", "gloss": "Của lễ thù ân, hòa bình (Danh từ)"}
+        ]
+    },
+    "H0539": {
+        "grammatical_category": "Động từ Căn bản (Verb Root)",
+        "morphological_parsing": {
+            "root_pattern": "א-מ-ן (Aleph-Mem-Nun)",
+            "binyan_stems": {
+                "niphal": "נֶאֱמַן (Ne'eman - Được xác chứng vững vàng, trung tín, đáng tin cậy)",
+                "hiphil": "הֶאֱמִין (He'emin - Tin tưởng tuyệt đối, nương tựa chắc chắn)"
+            },
+            "theological_aspect": "Gốc từ của chữ A-men (xác quyết). Trong Sáng-thế Ký 15:6, Áp-ra-ham 'he'emin' (tin cậy) nơi Đức Giê-hô-va, và Ngài kể điều đó là công bình cho người."
+        },
+        "exegetical_insight": "Đức tin trong Cựu Ước không phải là sự đồng ý lý thuyết trừu tượng, mà là sự tựa nương vào một điểm tựa tuyệt đối vững chắc không hề rúng động.",
+        "related_lemmas": [
+            {"strong_number": "H0543", "lemma": "אָמֵן", "transliteration": "amen", "gloss": "Quả thật, chắc chắn như vậy (Phó từ)"},
+            {"strong_number": "H0530", "lemma": "אֱמוּנָה", "transliteration": "emunah", "gloss": "Sự trung tín, đức tin kiên định (Danh từ)"}
+        ]
+    },
+    "H2617": {
+        "grammatical_category": "Danh từ Nam tính (Noun Masculine)",
+        "morphological_parsing": {
+            "root_pattern": "ח-ס-ד (Chet-Samekh-Dalet)",
+            "nominal_form": "Segolate noun (Ân nghĩa giao ước)",
+            "theological_aspect": "Tình yêu giao ước trung kiên và lòng thương xót bền bỉ (Covenant Loyal Love / Lovingkindness) của Đức Chúa Trời đối với dân Ngài dù họ bất toàn."
+        },
+        "exegetical_insight": "Thường đi kèm với 'Emet' (Chân lý): 'Chesed ve-Emet' (Ân điển và Lẽ thật), được phản ánh trọn vẹn trong Giăng 1:14 nơi thân vị Chúa Giê-xu.",
+        "related_lemmas": [
+            {"strong_number": "H2623", "lemma": "חָסִיד", "transliteration": "chasid", "gloss": "Người tin kính, người trung tín trong giao ước (Tính từ)"}
+        ]
+    }
+}
+
+
+@router.get("/morphology", response_model=MorphologyAnalysisResponse)
+def get_word_morphology(
+    code: Optional[str] = Query(None, description="Strong number or word code, e.g. 'G4102', 'H7965'"),
+    strong_number: Optional[str] = Query(None, description="Alias for code"),
+    lemma: Optional[str] = Query(None, description="Original language script, e.g. 'πίστις', 'shalom'"),
+    db: Session = Depends(get_db)
+):
+    """
+    Morphological parser & grammatical exegesis breakdown for Greek and Hebrew roots (§37, §49).
+    Provides detailed seminary-level paradigm breakdown, declension/conjugation, stems (Binyanim),
+    and theological application insights.
+    """
+    target = (code or strong_number or "").strip().upper()
+    
+    # Query database for lexicon entry
+    sql = text("""
+        SELECT strong_number, language, lemma, transliteration, pronunciation,
+               part_of_speech, definition, theological_significance, occurrences_count, key_verses
+        FROM strong_lexicon
+        WHERE UPPER(strong_number) = :s
+           OR (LOWER(lemma) = LOWER(:l) AND :l != '')
+           OR (LOWER(transliteration) = LOWER(:l) AND :l != '')
+        LIMIT 1;
+    """)
+    row = db.execute(sql, {"s": target, "l": (lemma or target).strip().lower()}).fetchone()
+
+    if not row:
+        # Fallback to default G4102
+        target = "G4102"
+        row = db.execute(sql, {"s": target, "l": ""}).fetchone()
+
+    sn = row.strong_number if row else target or "G4102"
+    lang = (row.language if row else "greek").lower()
+
+    # Check presets for deep grammar
+    preset = GREEK_MORPHOLOGY_PRESETS.get(sn) or HEBREW_MORPHOLOGY_PRESETS.get(sn)
+    if not preset:
+        # Generic grammatical categorization
+        is_verb = "verb" in (row.part_of_speech or "").lower() or "động từ" in (row.definition or "").lower()
+        if lang == "greek":
+            category = "Động từ Hy Lạp (Greek Verb)" if is_verb else "Danh từ / Tính từ Hy Lạp (Greek Substantive)"
+            morph_data = {
+                "system": "Hệ thống Văn phạm Tân Ước Koine Greek",
+                "aspect": "Chức năng cú pháp và vai trò ngữ nghĩa trong câu",
+                "part_of_speech": row.part_of_speech or "Substantive",
+                "exegetical_note": "Cần tra cứu kỹ văn mạch chương đoạn để xác định thì (Tense), Thể (Voice) và Lối (Mood) cụ thể của từ này."
+            }
+        else:
+            category = "Động từ Hê-bơ-rơ (Hebrew Verb)" if is_verb else "Danh từ Hê-bơ-rơ (Hebrew Noun)"
+            morph_data = {
+                "system": "Hệ thống Ngữ căn Cựu Ước Biblical Hebrew Triliteral Root",
+                "aspect": "Trạng thái hoàn thành (Qatal) hoặc chưa hoàn thành (Yiqtol)",
+                "part_of_speech": row.part_of_speech or "Noun",
+                "exegetical_note": "Cần phân tích tiếp đầu ngữ, tiếp vị ngữ và thể Binyan trong văn bản Masoretic."
+            }
+        preset = {
+            "grammatical_category": category,
+            "morphological_parsing": morph_data,
+            "exegetical_insight": f"Gốc từ {row.lemma} ({row.transliteration}) đóng vai trò then chốt trong việc làm sáng tỏ chân lý mạc khải của phân đoạn Kinh Thánh.",
+            "related_lemmas": []
+        }
+
+    raw_verses = row.key_verses if (row and isinstance(row.key_verses, list)) else []
+    resolved_scriptures: List[Dict[str, str]] = []
+    from app.routers.bible import get_verse_range
+    for ref_str in raw_verses[:4]:
+        v_text = ""
+        try:
+            res = get_verse_range(ref=ref_str, db=db)
+            if res.get("verses"):
+                v_text = res["verses"][0]["text"]
+        except Exception:
+            v_text = ""
+        resolved_scriptures.append({"reference": ref_str, "text": v_text})
+
+    return MorphologyAnalysisResponse(
+        strong_number=sn,
+        language=lang,
+        lemma=row.lemma if row else "πίστις",
+        transliteration=row.transliteration if row else "pistis",
+        pronunciation=row.pronunciation if row and row.pronunciation else "",
+        part_of_speech=row.part_of_speech if row and row.part_of_speech else "Noun",
+        grammatical_category=preset["grammatical_category"],
+        morphological_parsing=preset["morphological_parsing"],
+        definition=row.definition if row else "Đức tin, sự tín thác",
+        theological_significance=row.theological_significance if row and row.theological_significance else "",
+        exegetical_insight=preset["exegetical_insight"],
+        occurrences_count=row.occurrences_count if row else 243,
+        key_scriptures=resolved_scriptures,
+        related_lemmas=preset.get("related_lemmas", [])
+    )

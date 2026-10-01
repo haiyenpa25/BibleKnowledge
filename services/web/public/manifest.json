@@ -1,0 +1,26 @@
+{
+  "name": "BibleKnowledge — Nền Tảng Học & Nghiên Cứu Kinh Thánh AI",
+  "short_name": "BibleKnowledge",
+  "description": "Nền tảng Kinh Thánh tiếng Việt bản 1925 kết hợp đồ thị tri thức, nghiên cứu thần học và AI bản địa",
+  "start_url": "/bible",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "books", "reference"]
+}

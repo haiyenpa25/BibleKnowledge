@@ -3297,7 +3297,7 @@ export default function LearnPage() {
                   Gói Thử Thách Kinh Thánh Chuyên Đề (Challenge Packs)
                 </h2>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  5 chuyên đề khảo cứu trọng tâm • Đạt 80% để mở khóa Huy Hiệu Danh Dự cá nhân
+                  {challengePacks.length || 8} chuyên đề khảo cứu trọng tâm &amp; mùa lễ phụng vụ • Đạt 80% để mở khóa Huy Hiệu Danh Dự cá nhân
                 </p>
               </div>
             </div>
@@ -3961,6 +3961,8 @@ export default function LearnPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
               {[
                 { id: "all", label: "Tất cả kế hoạch" },
+                { id: "Mùa Lễ & Phụng Vụ", label: "Mùa Lễ & Phụng Vụ" },
+                { id: "Lịch Sử & Giáo Lý", label: "Lịch Sử & Giáo Lý" },
                 { id: "Toàn Kinh Thánh", label: "Toàn Kinh Thánh" },
                 { id: "Tân Ước", label: "Tân Ước" },
                 { id: "Khôn Ngoan & Thơ Ca", label: "Khôn Ngoan & Thi Ca" },

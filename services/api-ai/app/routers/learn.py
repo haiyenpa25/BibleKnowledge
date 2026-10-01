@@ -2077,6 +2077,264 @@ CHALLENGE_PACKS_DATA: List[Dict[str, Any]] = [
                 "points": 20
             }
         ]
+    },
+    {
+        "id": "pack-passion-week",
+        "slug": "tuan-le-kho-nan-thap-tu-gia",
+        "title": "Tuần Lễ Khổ Nạn & Thập Tự Giá (Passion Week & The Cross)",
+        "category": "Mùa Lễ Thần Học",
+        "icon_name": "Cross",
+        "badge_label": "Hiệp Một Nơi Thập Tự",
+        "description": "Hành trình 7 ngày từ Chúa Nhật Lễ Lá, Bữa Tiệc Ly, Vườn Ghết-sê-ma-nê đến Đồi Gô-gô-tha và Ngôi Mộ Trống rực rỡ vinh quang.",
+        "target_doctrine": "Ma-thi-ơ 21, 26, 27, 28; Mác 11, 14, 15, 16; Lu-ca 19, 22, 23, 24; Giăng 12, 13, 18, 19, 20",
+        "estimated_minutes": 6,
+        "difficulty_level": "Sâu Nhiệm",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "pw-1",
+                "question_text": "Khi Chúa Giê-xu khải hoàn tiến vào thành Giê-ru-sa-lem (Chúa Nhật Lễ Lá), đoàn dân đông đã cầm cành cây gì và tung hô điều gì?",
+                "options": [
+                    "Cành ô-li-ve và tung hô: 'Bình an cho thành thánh!'",
+                    "Cành chà là và tung hô: 'Hô-sa-na! Đáng chúc tụng Đấng nhân danh Chúa mà đến!'",
+                    "Cành bá hương và tung hô: 'Vinh hiển cho vua nước La-mã!'",
+                    "Cành nho và tung hô: 'Hỡi Đấng ban bánh hãy cứu chúng tôi!'"
+                ],
+                "correct_option": 1,
+                "explanation": "Giăng 12:13 ghi nhận đoàn dân lấy những nhánh chà là đi đón Ngài và reo lên: 'Hô-sa-na! Đáng chúc tụng Đấng nhân danh Chúa mà đến, là Vua của Y-sơ-ra-ên!' ứng nghiệm Xa-cha-ri 9:9.",
+                "scripture_reference": "Giăng 12:12-15; Ma-thi-ơ 21:8-9",
+                "points": 20
+            },
+            {
+                "id": "pw-2",
+                "question_text": "Trong Bữa Tiệc Ly (Thứ Năm Tuần Thánh), hành động khiêm nhường tột bậc nào của Chúa Giê-xu đã để lại tấm gương môn đồ hóa đời đời?",
+                "options": [
+                    "Ngài chia sẻ kho tàng tiền bạc cho các môn đồ",
+                    "Ngài quấn khăn và rửa chân cho từng môn đồ",
+                    "Ngài phong tước vị lãnh đạo tối cao cho Phi-e-rơ",
+                    "Ngài quở trách các nhà cầm quyền La-mã"
+                ],
+                "correct_option": 1,
+                "explanation": "Giăng 13:14-15: 'Nếu ta là Chúa và là Thầy, mà đã rửa chân cho các ngươi, thì các ngươi cũng phải rửa chân lẫn nhau. Vì ta đã làm gương cho các ngươi, để các ngươi cũng làm như ta đã làm cho các ngươi.'",
+                "scripture_reference": "Giăng 13:4-15",
+                "points": 20
+            },
+            {
+                "id": "pw-3",
+                "question_text": "Tại Vườn Ghết-sê-ma-nê, trọng tâm lời cầu nguyện đầu phục ý Cha của Chúa Giê-xu trong cơn đau thương tột cùng là gì?",
+                "options": [
+                    "Xin sai 12 đạo quân thiên sứ đến giải cứu con ngay lập tức",
+                    "Xin cho chén này lìa khỏi con, song không theo ý con, mà theo ý Cha",
+                    "Xin tiêu diệt những kẻ phản bội và thầy tế lễ thượng phẩm",
+                    "Xin dời đồi Gô-gô-tha ra khỏi xứ Giu-đê"
+                ],
+                "correct_option": 1,
+                "explanation": "Ma-thi-ơ 26:39: 'Cha ơi, nếu có thể được, xin cho chén này lìa khỏi con! Song không theo ý muốn con, mà theo ý muốn Cha.'",
+                "scripture_reference": "Ma-thi-ơ 26:39-42; Lu-ca 22:42-44",
+                "points": 20
+            },
+            {
+                "id": "pw-4",
+                "question_text": "Khi Chúa Giê-xu trút hơi thở cuối cùng trên thập tự giá (Giăng 19:30), Ngài đã tuyên bố lời chiến thắng cứu chuộc nào?",
+                "options": [
+                    "Mọi sự đã kết thúc trong bi kịch!",
+                    "Mọi sự đã được trọn! (Tetelestai)",
+                    "Các môn đồ hãy trốn đi!",
+                    "Ta sẽ trở lại trừng phạt thế gian!"
+                ],
+                "correct_option": 1,
+                "explanation": "Chúa phán: 'Mọi sự đã được trọn!' (Hy Lạp: Tetelestai - Nợ tội lỗi đã được thanh toán trọn vẹn một lần đủ cả), rồi gục đầu giao linh hồn cho Cha.",
+                "scripture_reference": "Giăng 19:30; Hê-bơ-rơ 9:12",
+                "points": 20
+            },
+            {
+                "id": "pw-5",
+                "question_text": "Sáng Chúa Nhật Phục Sinh, thiên sứ tại ngôi mộ trống đã hỏi các phụ nữ câu nói lịch sử làm thay đổi cả nhân loại nào?",
+                "options": [
+                    "Ai đã dời hòn đá lớn này đi?",
+                    "Sao các ngươi tìm người sống ở giữa kẻ chết? Ngài không ở đây đâu, Ngài đã sống lại rồi!",
+                    "Các môn đồ của Ngài đã chạy trốn phương nào?",
+                    "Các ngươi mang hương liệu đến đây làm chi nữa?"
+                ],
+                "correct_option": 1,
+                "explanation": "Lu-ca 24:5-6: 'Sao các ngươi tìm người sống ở giữa kẻ chết? Ngài không ở đây đâu, Ngài đã sống lại rồi! Hãy nhớ lại khi Ngài còn ở xứ Ga-li-lê, Ngài đã phán cùng các ngươi thể nào.'",
+                "scripture_reference": "Lu-ca 24:5-6; Ma-thi-ơ 28:5-6",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-advent-nativity",
+        "slug": "mua-vong-dang-me-si-giang-sinh",
+        "title": "Mùa Vọng & Đấng Mê-si Giáng Sinh (Advent & The Incarnation)",
+        "category": "Mùa Lễ Thần Học",
+        "icon_name": "Star",
+        "badge_label": "Ngôi Lời Nhập Thể",
+        "description": "Nghiên cứu chuỗi lời tiên tri Cựu Ước về sự hạ sinh của Chúa Cứu Thế và sự ứng nghiệm kỳ diệu nơi máng cỏ chuồng chiên Bết-lê-hem.",
+        "target_doctrine": "Ê-sai 7:14; 9:6; Mi-chê 5:2; Lu-ca 1-2; Ma-thi-ơ 1-2; Giăng 1:1-14",
+        "estimated_minutes": 5,
+        "difficulty_level": "Ấm Áp & Tươi Mới",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "an-1",
+                "question_text": "Trong Ê-sai 7:14, tiên tri báo trước dấu lạ thần thượng nào về sự ra đời của Đấng Cứu Thế?",
+                "options": [
+                    "Một người nữ hoàng hậu sẽ hạ sinh hoàng tử trong cung điện",
+                    "Này, một gái đồng trinh sẽ chịu thai, sanh một con trai, và đặt tên là Em-ma-nu-ên",
+                    "Một hài nhi sẽ giáng trần từ giữa các tầng mây",
+                    "Một tiên tri vĩ đại sẽ xuất thân từ thủ đô Rô-ma"
+                ],
+                "correct_option": 1,
+                "explanation": "Ê-sai 7:14 ứng nghiệm nguyên văn trong Ma-thi-ơ 1:22-23: Em-ma-nu-ên nghĩa là 'Đức Chúa Trời ở cùng chúng ta', xác chứng thần tính và sự giáng sinh bởi nữ đồng trinh Ma-ri.",
+                "scripture_reference": "Ê-sai 7:14; Ma-thi-ơ 1:22-23",
+                "points": 20
+            },
+            {
+                "id": "an-2",
+                "question_text": "Tiên tri Mi-chê 5:2 đã chỉ định chính xác địa danh nhỏ bé nào sẽ là nơi Đấng Cai Trị đời đời của Y-sơ-ra-ên xuất thân?",
+                "options": [
+                    "Thành Giê-ru-sa-lem hoa lệ",
+                    "Bết-lê-hem Ép-ra-ta thuộc xứ Giu-đa",
+                    "Làng Na-xa-rét xứ Ga-li-lê",
+                    "Thành Cáp-bê-na-um bên bờ biển"
+                ],
+                "correct_option": 1,
+                "explanation": "Mi-chê 5:2: 'Hỡi Bết-lê-hem Ép-ra-ta, ngươi ở trong hàng ngàn xứ Giu-đa là nhỏ lắm, song từ nơi ngươi sẽ ra cho ta một Đấng cai trị trong Y-sơ-ra-ên, gốc tích của Ngài từ thuở xưa, từ những ngày đời đời.'",
+                "scripture_reference": "Mi-chê 5:2; Ma-thi-ơ 2:4-6",
+                "points": 20
+            },
+            {
+                "id": "an-3",
+                "question_text": "Trong Lu-ca 1:35, thiên sứ Gáp-ri-ên đã giải thích cho Ma-ri mầu nhiệm thụ thai Con Đức Chúa Trời diễn ra như thế nào?",
+                "options": [
+                    "Bởi ý muốn tự nhiên và sự phối ngẫu của loài người",
+                    "Đức Thánh Linh sẽ ngự trên ngươi, và quyền phép Đấng Rất Cao sẽ che phủ ngươi",
+                    "Bởi phép lạ biến hóa của các thiên sứ hầu việc",
+                    "Bởi lời chúc phước của các thầy tế lễ trong đền thờ"
+                ],
+                "correct_option": 1,
+                "explanation": "Lu-ca 1:35: 'Đức Thánh Linh sẽ ngự trên ngươi, và quyền phép Đấng Rất Cao sẽ che phủ ngươi; cho nên Con thánh sanh ra sẽ được xưng là Con Đức Chúa Trời.'",
+                "scripture_reference": "Lu-ca 1:34-38",
+                "points": 20
+            },
+            {
+                "id": "an-4",
+                "question_text": "Ba lễ vật quý báu mà các bác sĩ Đông Phương dâng lên Hài Nhi Giê-xu (Ma-thi-ơ 2:11) là gì?",
+                "options": [
+                    "Bạc, ngọc trai và lụa là",
+                    "Vàng, nhũ hương và mộc dược",
+                    "Gươm báu, vương miện và áo tía",
+                    "Lúa mì, dầu ô-li-ve và rượu nho"
+                ],
+                "correct_option": 1,
+                "explanation": "Vàng tượng trưng cho Vương quyền của Vua; Nhũ hương tượng trưng cho Thần tính và chức vụ Thầy Tế Lễ; Mộc dược tượng trưng cho sự Thương Khó, cái chết chuộc tội và sự chôn cất của Đấng Christ.",
+                "scripture_reference": "Ma-thi-ơ 2:11",
+                "points": 20
+            },
+            {
+                "id": "an-5",
+                "question_text": "Lời mở đầu trong Phúc Âm Giăng (Giăng 1:1, 14) đã đúc kết mầu nhiệm Nhập Thể bằng mệnh đề thần học căn bản nào?",
+                "options": [
+                    "Đức Chúa Trời đã tạo dựng một tạo vật mới hoàn hảo",
+                    "Ban đầu có Ngôi Lời, Ngôi Lời ở cùng Đức Chúa Trời, và Ngôi Lời là Đức Chúa Trời... Ngôi Lời đã trở nên xác thịt, ở giữa chúng ta",
+                    "Con người đã tự nâng mình lên ngang hàng Thượng Đế",
+                    "Luật pháp Môi-se đã tự mình hoàn thành sự cứu chuộc"
+                ],
+                "correct_option": 1,
+                "explanation": "Giăng 1:1, 14: Ngôi Lời (Logos) đời đời đồng bản thể với Đức Chúa Trời đã hạ mình mặc lấy xác thịt loài người để cứu rỗi nhân loại, bày tỏ trọn vẹn ân điển và lẽ thật.",
+                "scripture_reference": "Giăng 1:1-14",
+                "points": 20
+            }
+        ]
+    },
+    {
+        "id": "pack-reformation-solas",
+        "slug": "nam-khai-luan-cai-chanh-giao-hoi",
+        "title": "Năm Khái Luận Cải Chánh Giáo Hội (Five Solas of the Reformation)",
+        "category": "Mùa Lễ Thần Học",
+        "icon_name": "ShieldCheck",
+        "badge_label": "Di Sản Cải Chánh",
+        "description": "Đào sâu năm nguyên lý Kinh Thánh nền tảng của phong trào Cải Chánh Giáo Hội thế kỷ XVI: Sola Scriptura, Sola Gratia, Sola Fide, Solus Christus và Soli Deo Gloria.",
+        "target_doctrine": "2 Ti-mô-thê 3:16; Ê-phê-sô 2:8-9; Rô-ma 1:17; 3:21-28; 1 Ti-mô-thê 2:5; Rô-ma 11:36",
+        "estimated_minutes": 6,
+        "difficulty_level": "Chuyên Sâu",
+        "total_questions": 5,
+        "passing_score": 80,
+        "questions": [
+            {
+                "id": "rf-1",
+                "question_text": "Nguyên lý 'Sola Scriptura' (Duy Kinh Thánh) khẳng định điều gì về thẩm quyền tối thượng đối với đức tin và đời sống Cơ Đốc nhân?",
+                "options": [
+                    "Truyền thống giáo hội và sắc chỉ giáo hoàng cao hơn bản văn Kinh Thánh",
+                    "Kinh Thánh là Lời Đức Chúa Trời soi dẫn, là thẩm quyền tối hậu và duy nhất không sai lạc về đức tin và nếp sống",
+                    "Mỗi cá nhân có quyền tự viết thêm các chương sách mới vào Kinh Thánh",
+                    "Lý trí triết học của con người đứng trên lời phán của Chúa"
+                ],
+                "correct_option": 1,
+                "explanation": "2 Ti-mô-thê 3:16-17: Cả Kinh Thánh đều do Đức Chúa Trời soi dẫn (theopneustos); Lời Chúa là thước đo chân lý tối thượng, mọi truyền thống và giáo huấn loài người đều phải phục tùng Kinh Thánh.",
+                "scripture_reference": "2 Ti-mô-thê 3:16-17; Thi-thiên 119:105",
+                "points": 20
+            },
+            {
+                "id": "rf-2",
+                "question_text": "Nguyên lý 'Sola Gratia' (Duy Ân Điển) bác bỏ quan niệm sai trật nào về ơn cứu rỗi?",
+                "options": [
+                    "Bác bỏ niềm tin rằng Đức Chúa Trời có lòng nhân từ",
+                    "Bác bỏ quan niệm con người có thể tích lũy công đức cá nhân hoặc việc lành để mua chuộc sự tha tội",
+                    "Bác bỏ sự cần thiết của sự ăn năn và biến đổi tâm tính",
+                    "Bác bỏ việc Hội Thánh cầu nguyện cho người khác"
+                ],
+                "correct_option": 1,
+                "explanation": "Ê-phê-sô 2:8-9: 'Vả, ấy là nhờ ân điển, bởi đức tin, mà anh em được cứu, điều đó không phải đến từ anh em, bèn là sự ban cho của Đức Chúa Trời. Ấy chẳng phải bởi việc làm đâu, hầu cho không ai khoe mình.'",
+                "scripture_reference": "Ê-phê-sô 2:8-9; Tít 3:5",
+                "points": 20
+            },
+            {
+                "id": "rf-3",
+                "question_text": "Nguyên lý 'Sola Fide' (Duy Đức Tin) — viên đá góc nhà mà Martin Luther gọi là tiêu chuẩn của một Hội Thánh đứng vững hay sụp đổ — dạy rằng:",
+                "options": [
+                    "Chỉ cần có cảm xúc tôn giáo là được cứu rỗi",
+                    "Tội nhân được Đức Chúa Trời xưng công bình duy bởi đức tin nơi công giá chuộc tội của Chúa Giê-xu",
+                    "Đức tin không cần hướng về Đấng Christ",
+                    "Việc lành bên ngoài quan trọng hơn sự tin cậy trong lòng"
+                ],
+                "correct_option": 1,
+                "explanation": "Rô-ma 3:28: 'Chúng ta kể rằng người ta được xưng công bình bởi đức tin, chẳng nhờ những việc làm của luật pháp.' Đức tin là bàn tay không nhận lãnh sự công bình trọn vẹn của Đấng Christ.",
+                "scripture_reference": "Rô-ma 1:17; 3:28; Ga-la-ti 2:16",
+                "points": 20
+            },
+            {
+                "id": "rf-4",
+                "question_text": "Nguyên lý 'Solus Christus' (Duy Đấng Christ) nhấn mạnh chân lý nào trong 1 Ti-mô-thê 2:5 và Công-vụ 4:12?",
+                "options": [
+                    "Có nhiều con đường và nhiều đấng trung bảo khác nhau để đến cùng Thượng Đế",
+                    "Chỉ duy Chúa Giê-xu Christ là Đấng Trung Bảo duy nhất giữa Đức Chúa Trời và loài người, ngoài Ngài chẳng có danh nào khác để được cứu",
+                    "Các thánh đồ đã qua đời có thể làm đấng trung bảo thay thế",
+                    "Các thiên sứ có quyền năng tha tội cho con người"
+                ],
+                "correct_option": 1,
+                "explanation": "1 Ti-mô-thê 2:5: 'Vì chỉ có một Đức Chúa Trời, và chỉ có một Đấng Trung bảo ở giữa Đức Chúa Trời và loài người, tức là Đức Chúa Giê-xu Christ, là người.' Công vụ 4:12 xác quyết chẳng có sự cứu rỗi trong đấng nào khác.",
+                "scripture_reference": "1 Ti-mô-thê 2:5; Giăng 14:6; Công-vụ 4:12",
+                "points": 20
+            },
+            {
+                "id": "rf-5",
+                "question_text": "Nguyên lý 'Soli Deo Gloria' (Duy Đức Chúa Trời Được Vinh Hiển) trong Rô-ma 11:36 và 1 Cô-rinh-tô 10:31 đặt định mục đích tối thượng của sự sáng tạo và ơn cứu rỗi là gì?",
+                "options": [
+                    "Để tôn vinh các giáo hoàng và hệ thống giáo hội trần thế",
+                    "Mọi sự đều từ Ngài, bởi Ngài, và hướng về Ngài; mọi vinh hiển trong sự cứu rỗi và đời sống đều thuộc về duy Đức Chúa Trời",
+                    "Để con người tự hào về sự thông minh và nỗ lực của mình",
+                    "Để làm thỏa mãn các triết lý nhân bản thế tục"
+                ],
+                "correct_option": 1,
+                "explanation": "Rô-ma 11:36: 'Vì muôn vật đều là từ Ngài, bởi Ngài, và hướng về Ngài. Vinh hiển cho Ngài đời đời vô cùng! A-men.' 1 Cô-rinh-tô 10:31 nhắc nhở: Dầu ăn, dầu uống, hay làm sự chi khác, hãy vì sự vinh hiển của Đức Chúa Trời mà làm.",
+                "scripture_reference": "Rô-ma 11:36; 1 Cô-rinh-tô 10:31; Khải-huyền 4:11",
+                "points": 20
+            }
+        ]
     }
 ]
 

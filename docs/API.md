@@ -146,6 +146,45 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Parameters**: `slug` (e.g. `abraham`, `david`, `peter`, `paul`).
 - **Response**: Biography, timeline, typology, theological significance, key verses, and lessons.
 
+### 3.7 Original Language Morphological Parser & Concordance (§37, §49)
+- **Endpoint**: `GET /api/rag/morphology?code={strong_code}` (Aliased: `GET /api/bible/morphology`)
+- **Parameters**: `code` (e.g., `G4102` for Greek *Pistis*, `H7965` for Hebrew *Shalom*, `G0026` for *Agape*).
+- **Description**: Returns seminary-grade grammatical parsing (declensions, gender, stems, case inflections for Greek; Binyanim verbal stems, root, affix analysis for Hebrew), theological synthesis, exegetical nuances, resolved Vietnamese 1925 key Scriptures, and related lemmas.
+- **Response Structure**:
+  ```json
+  {
+    "strong_number": "G4102",
+    "language": "greek",
+    "lemma": "πίστις",
+    "transliteration": "pistis",
+    "pronunciation": "pis'-tis",
+    "part_of_speech": "Danh từ, Giống cái",
+    "grammatical_category": "Danh từ Nữ tính (Noun Feminine)",
+    "morphological_parsing": {
+      "declension": "Biến cách thứ ba (-ις, -εως)",
+      "gender": "Nữ tính (Feminine)",
+      "stem": "πιστι- (pisti-)",
+      "case_paradigm": {
+        "nominative_singular": "πίστις (pistis - Chủ cách)",
+        "genitive_singular": "πίστεως (pisteos - Sở hữu cách)",
+        "dative_singular": "πίστει (pistei - Tặng cách/Dụng cách)",
+        "accusative_singular": "πίστιν (pistin - Đối cách)"
+      },
+      "theological_aspect": "Không chỉ là đồng thuận trí tuệ mà là sự ký thác trọn vẹn vào thân vị của Đấng Christ."
+    },
+    "definition": "Đức tin, lòng tin cậy vững chắc...",
+    "theological_significance": "Đức tin là phương tiện để con người tiếp nhận sự công bình...",
+    "exegetical_insight": "Trong thư tín Rô-ma và Ga-la-ti, ngữ cách 'ek pisteos'...",
+    "occurrences_count": 243,
+    "key_scriptures": [
+      { "reference": "Hê-bơ-rơ 11:1", "text": "..." }
+    ],
+    "related_lemmas": [
+      { "strong_number": "G4100", "lemma": "πιστεύω", "gloss": "Tin, nương cậy" }
+    ]
+  }
+  ```
+
 ---
 
 ## 4. Theological Knowledge Graph (`/api/graph`)
@@ -172,23 +211,29 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Endpoint**: `GET /api/learn/flashcards`
 - **Description**: Returns 11 active flashcards with Anki export and CSV export capability.
 
-### 5.3 Thematic Learning Challenges (§46)
-- **Endpoint**: `GET /api/learn/challenges`
-- **Description**: Returns 5 specialized curriculum packs:
+### 5.3 Thematic Learning Challenges & Packs (§46)
+- **Endpoint**: `GET /api/learn/challenge-packs`
+- **Description**: Returns 8 specialized curriculum packs (5 foundational + 3 liturgical seasonal):
   1. *Ngũ Kinh & Nền Tảng Giao Ước*
   2. *Lịch Sử & Vương Quốc Y-sơ-ra-ên*
   3. *Thi Ca & Văn Chương Khôn Ngoan*
   4. *Bốn Sách Tin Lành & Chức Vụ Đấng Christ*
   5. *Thư Tín & Giáo Lý Hội Thánh*
+  6. *Tuần Lễ Khổ Nạn & Thập Tự Giá* (Seasonal: Passion Week & Easter)
+  7. *Mùa Vọng & Đấng Mê-si Giáng Sinh* (Seasonal: Advent & Messianic Prophecies)
+  8. *Năm Khái Luận Cải Chánh Giáo Hội* (Seasonal: Five Solas of the Reformation)
 
-### 5.4 Systematic Bible Reading Plans (§3, §46, §53)
-- **Endpoint**: `GET /api/learn/reading-plans`
-- **Description**: Returns 5 structured reading plans:
+### 5.4 Systematic & Seasonal Bible Reading Plans (§3, §46, §53)
+- **Endpoint**: `GET /api/bible/reading-plans` (Aliased: `GET /api/learn/reading-plans`)
+- **Description**: Returns 8 structured reading plans:
   1. *Toàn Bộ Kinh Thánh Trong 365 Ngày* (Cựu Ước, Tân Ước, Thi Thiên, Châm Ngôn mỗi ngày).
   2. *Tân Ước Trong 90 Ngày* (Tập trung toàn bộ 260 chương Tân Ước).
   3. *Cuộc Đời Đấng Christ Trong 30 Ngày* (Hài hòa 4 sách Tin Lành).
   4. *Thi Thiên & Châm Ngôn Trong 60 Ngày* (Dưỡng linh và suy ngẫm).
   5. *Lịch Sử Cứu Chuộc Theo Thứ Tự Thời Gian (Chronological)*.
+  6. *Tuần Lễ Khổ Nạn & Phục Sinh 7 Ngày* (Palm Sunday đến Easter Sunday).
+  7. *Mùa Vọng 25 Ngày - Lời Tiên Tri Về Đấng Mê-si* (Từ Sáng-thế Ký 3:15 đến Bethlehem).
+  8. *30 Ngày Khám Phá Di Sản Cải Chánh Giáo Hội* (5 Solas và giáo lý ân điển).
 
 ### 5.5 Scripture Memorization Assistant with Word Occlusion (§3, §4)
 - **Endpoint**: `GET /api/learn/memorize-verses`

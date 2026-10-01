@@ -346,6 +346,23 @@ interface ConcordanceData {
   verses: ConcordanceVerse[];
 }
 
+interface MorphologyData {
+  strong_number: string;
+  language: string;
+  lemma: string;
+  transliteration: string;
+  pronunciation?: string;
+  part_of_speech: string;
+  grammatical_category?: string;
+  morphological_parsing?: Record<string, any>;
+  definition: string;
+  theological_significance?: string;
+  exegetical_insight?: string;
+  occurrences_count: number;
+  key_scriptures: Array<{ reference: string; text?: string }>;
+  related_lemmas: Array<{ strong_number: string; lemma: string; transliteration?: string; gloss?: string }>;
+}
+
 // Sample presets
 const PRESET_AGENT_QUERIES = [
   "So sánh quan điểm về Sự Công Bình và Đức Tin giữa Sứ đồ Phao-lô trong Rô-ma và Gia-cơ trong Thư tín Gia-cơ",
@@ -400,6 +417,9 @@ export default function ResearchPage() {
   const [lexiconSearch, setLexiconSearch] = useState("");
   const [lexiconLoading, setLexiconLoading] = useState(false);
   const [selectedLexiconItem, setSelectedLexiconItem] = useState<LexiconItem | null>(null);
+  const [lexiconModalTab, setLexiconModalTab] = useState<"morphology" | "concordance">("morphology");
+  const [morphologyData, setMorphologyData] = useState<MorphologyData | null>(null);
+  const [morphologyLoading, setMorphologyLoading] = useState(false);
   const [concordanceLoading, setConcordanceLoading] = useState(false);
   const [concordanceData, setConcordanceData] = useState<ConcordanceData | null>(null);
 
@@ -577,23 +597,40 @@ export default function ResearchPage() {
     }
   }
 
-  // Fetch Concordance for a specific strong number or keyword
-  async function handleOpenConcordance(strongNumber: string, item: LexiconItem) {
+  // Fetch Lexicon Details (Morphology & Concordance)
+  async function handleOpenLexiconDetail(item: LexiconItem, defaultTab: "morphology" | "concordance" = "morphology") {
     setSelectedLexiconItem(item);
+    setLexiconModalTab(defaultTab);
+    setMorphologyLoading(true);
+    setMorphologyData(null);
     setConcordanceLoading(true);
     setConcordanceData(null);
 
     try {
-      const res = await fetch(`${apiUrl}/api/bible/concordance?strong_number=${encodeURIComponent(strongNumber)}&limit=25`);
-      if (res.ok) {
-        const data = await res.json();
-        setConcordanceData(data);
-      }
+      const mPromise = fetch(`${apiUrl}/api/rag/morphology?code=${encodeURIComponent(item.strong_number)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d) setMorphologyData(d);
+        })
+        .catch((e) => console.error("Morphology error:", e))
+        .finally(() => setMorphologyLoading(false));
+
+      const cPromise = fetch(`${apiUrl}/api/bible/concordance?strong_number=${encodeURIComponent(item.strong_number)}&limit=25`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d) setConcordanceData(d);
+        })
+        .catch((e) => console.error("Concordance error:", e))
+        .finally(() => setConcordanceLoading(false));
+
+      await Promise.allSettled([mPromise, cPromise]);
     } catch (e) {
-      console.error("Failed to fetch concordance:", e);
-    } finally {
-      setConcordanceLoading(false);
+      console.error("Lexicon detail error:", e);
     }
+  }
+
+  function handleOpenConcordance(strongNumber: string, item: LexiconItem) {
+    handleOpenLexiconDetail(item, "concordance");
   }
 
   // Tab 1: AI Agent Research Handler (§51)
@@ -2066,27 +2103,39 @@ export default function ResearchPage() {
                     )}
                   </div>
 
-                  {/* Card Bottom: Occurrences & Concordance Button */}
+                  {/* Card Bottom: Occurrences & Action Buttons */}
                   <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
                     <span className="text-[11px] text-slate-400 flex items-center gap-1">
                       <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                       Xuất hiện: <strong className="text-white">{item.occurrences_count.toLocaleString()}</strong> lần
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenConcordance(item.strong_number, item)}
-                      className="px-3 py-1 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-600/30 text-xs font-bold text-cyan-300 flex items-center gap-1 transition-colors"
-                    >
-                      <BookA className="w-3.5 h-3.5" />
-                      <span>Concordance</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLexiconDetail(item, "morphology")}
+                        className="px-2.5 py-1 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-600/30 text-xs font-bold text-purple-300 flex items-center gap-1 transition-colors"
+                        title="Phân tích ngữ pháp & biến cách"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Ngữ Pháp</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLexiconDetail(item, "concordance")}
+                        className="px-2.5 py-1 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-600/30 text-xs font-bold text-cyan-300 flex items-center gap-1 transition-colors"
+                        title="Đối chiếu các câu xuất hiện"
+                      >
+                        <BookA className="w-3.5 h-3.5" />
+                        <span>Concordance</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Concordance Modal / Flyout */}
+          {/* Lexicon Detail Modal (Morphology & Concordance) */}
           {selectedLexiconItem && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-[#0b101c] border border-cyan-500/40 rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
@@ -2109,6 +2158,7 @@ export default function ResearchPage() {
                     onClick={() => {
                       setSelectedLexiconItem(null);
                       setConcordanceData(null);
+                      setMorphologyData(null);
                     }}
                     className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
                   >
@@ -2116,139 +2166,358 @@ export default function ResearchPage() {
                   </button>
                 </div>
 
+                {/* Modal Subnav Tabs */}
+                <div className="flex border-b border-slate-800 bg-slate-950/70 px-6 pt-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLexiconModalTab("morphology")}
+                    className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+                      lexiconModalTab === "morphology"
+                        ? "border-purple-500 text-purple-300"
+                        : "border-transparent text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Phân Tích Ngữ Pháp & Căn Tự (Morphology)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLexiconModalTab("concordance")}
+                    className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+                      lexiconModalTab === "concordance"
+                        ? "border-cyan-500 text-cyan-300"
+                        : "border-transparent text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <BookA className="w-3.5 h-3.5" />
+                    <span>Đối Chiếu Xuất Hiện (Concordance)</span>
+                    {concordanceData?.distribution?.total_matches ? (
+                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 font-mono">
+                        {concordanceData.distribution.total_matches}
+                      </span>
+                    ) : null}
+                  </button>
+                </div>
+
                 {/* Modal Body */}
                 <div className="p-6 overflow-y-auto flex flex-col gap-6">
-                  {concordanceLoading ? (
-                    <div className="py-12 flex flex-col items-center justify-center gap-3">
-                      <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
-                      <p className="text-xs text-slate-400">Đang truy xuất 31,081 câu Kinh Thánh để đối chiếu Concordance...</p>
-                    </div>
-                  ) : concordanceData ? (
+                  {/* TAB A: MORPHOLOGICAL EXEGESIS */}
+                  {lexiconModalTab === "morphology" && (
                     <div className="flex flex-col gap-6">
-                      {/* Theological Semantic Summary (§14) */}
-                      {concordanceData.theological_summary && (
-                        <div className="p-5 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 flex flex-col gap-2 shadow-md">
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-cyan-400" />
-                            <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                              Ý Nghĩa Thần Học Toàn Cảnh (Theological Semantic Range §14)
-                            </span>
-                          </div>
-                          <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
-                            {concordanceData.theological_summary}
-                          </p>
+                      {morphologyLoading ? (
+                        <div className="py-12 flex flex-col items-center justify-center gap-3">
+                          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                          <p className="text-xs text-slate-400">Đang truy vấn mô hình hình thái học & biến cách nguyên ngữ...</p>
                         </div>
-                      )}
-
-                      {/* Related Strong Roots Cluster (§14) */}
-                      {concordanceData.related_words && concordanceData.related_words.length > 0 && (
-                        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2.5">
-                          <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5" /> Các Căn Ngữ Liên Hệ Trọng Yếu (Related Roots):
-                          </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            {concordanceData.related_words.map((rw) => (
-                              <button
-                                key={rw.strong_number}
-                                type="button"
-                                onClick={() => {
-                                  handleLookupConcordance(rw.strong_number, rw.lemma, rw.definition);
-                                }}
-                                className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/40 text-left transition-all flex flex-col gap-0.5 group"
-                              >
-                                <div className="flex items-center justify-between text-[10px]">
-                                  <span className="font-mono font-bold text-cyan-400 group-hover:text-cyan-300">
-                                    {rw.strong_number}
-                                  </span>
-                                  <span className="text-slate-500 italic">{rw.transliteration}</span>
-                                </div>
-                                <span className="font-serif text-sm font-bold text-white group-hover:text-cyan-200">
-                                  {rw.lemma}
+                      ) : morphologyData ? (
+                        <div className="flex flex-col gap-6">
+                          {/* Overview Badges */}
+                          <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="px-2.5 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">
+                                {morphologyData.part_of_speech}
+                              </span>
+                              {morphologyData.grammatical_category && (
+                                <span className="px-2.5 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
+                                  {morphologyData.grammatical_category}
                                 </span>
-                                <span className="text-[10px] text-slate-400 line-clamp-1">{rw.definition}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Distribution Stat & Book Breakdown */}
-                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <BarChart3 className="w-5 h-5 text-cyan-400" />
-                            <div>
-                              <span className="text-xs font-bold text-slate-200">Phân Phối Toàn Cảnh Trong Kinh Thánh</span>
-                              <p className="text-[11px] text-slate-400">Từ khóa đối chiếu: &ldquo;{concordanceData.clean_keyword}&rdquo;</p>
+                              )}
+                              <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                                {morphologyData.occurrences_count} lần xuất hiện
+                              </span>
                             </div>
+                            {morphologyData.pronunciation && (
+                              <button
+                                type="button"
+                                onClick={() => playPronunciation(morphologyData.lemma, morphologyData.language)}
+                                className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 flex items-center gap-1.5 transition-colors"
+                              >
+                                <Volume2 className="w-3.5 h-3.5 text-purple-400" />
+                                <span>Phát âm: &ldquo;{morphologyData.pronunciation}&rdquo;</span>
+                              </button>
+                            )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-                            <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              Cựu Ước (OT): {concordanceData.distribution.old_testament} câu
-                            </span>
-                            <span className="px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                              Tân Ước (NT): {concordanceData.distribution.new_testament} câu
-                            </span>
-                            <span className="px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                              Tổng cộng: {concordanceData.distribution.total_matches}
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Top Books Distribution */}
-                        {concordanceData.book_distribution && concordanceData.book_distribution.length > 0 && (
-                          <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
-                            <span className="text-[11px] text-slate-400 font-medium">Xuất hiện nhiều nhất trong các sách:</span>
-                            <div className="flex flex-wrap gap-2">
-                              {concordanceData.book_distribution.map((b, bIdx) => (
-                                <span
-                                  key={bIdx}
-                                  className="px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-center gap-1.5"
-                                >
-                                  <span className="text-cyan-400 font-bold">•</span>
-                                  <span>{b.book}:</span>
-                                  <span className="font-mono text-cyan-300 font-bold">{b.count} câu</span>
+                          {/* Morphological Parsing Card / Table */}
+                          {morphologyData.morphological_parsing && (
+                            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
+                              <h4 className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                                <Languages className="w-4 h-4 text-purple-400" />
+                                <span>Hình Thái Học & Hệ Thống Biến Cách (Morphological Paradigms)</span>
+                              </h4>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {Object.entries(morphologyData.morphological_parsing).map(([k, v]) => {
+                                  if (k === 'case_paradigm' || k === 'binyan_stems') return null;
+                                  return (
+                                    <div key={k} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex flex-col gap-1">
+                                      <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {k.replace(/_/g, ' ')}
+                                      </span>
+                                      <span className="text-xs text-slate-200 font-medium">
+                                        {typeof v === 'string' ? v : JSON.stringify(v)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Case Paradigm if Greek */}
+                              {morphologyData.morphological_parsing.case_paradigm && (
+                                <div className="mt-2 pt-3 border-t border-slate-800 flex flex-col gap-2">
+                                  <span className="text-[11px] font-bold text-cyan-300">Biến Cách Danh Từ (Case Inflections):</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {Object.entries(morphologyData.morphological_parsing.case_paradigm).map(([cKey, cVal]) => (
+                                      <div key={cKey} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs flex flex-col gap-0.5">
+                                        <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">{cKey.replace(/_/g, ' ')}</span>
+                                        <span className="font-serif text-slate-200">{String(cVal)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Binyan Stems if Hebrew */}
+                              {morphologyData.morphological_parsing.binyan_stems && (
+                                <div className="mt-2 pt-3 border-t border-slate-800 flex flex-col gap-2">
+                                  <span className="text-[11px] font-bold text-amber-300">Các Thể Động Từ Tiếng Hê-bơ-rơ (Binyanim):</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {Object.entries(morphologyData.morphological_parsing.binyan_stems).map(([bKey, bVal]) => (
+                                      <div key={bKey} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs flex flex-col gap-0.5">
+                                        <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold">{bKey.replace(/_/g, ' ')}</span>
+                                        <span className="font-serif text-slate-200">{String(bVal)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Exegetical Insight & Theological Significance */}
+                          {(morphologyData.theological_significance || morphologyData.exegetical_insight) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {morphologyData.theological_significance && (
+                                <div className="p-5 rounded-2xl bg-purple-950/20 border border-purple-500/30 flex flex-col gap-2">
+                                  <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5" /> Tầm Quan Trọng Thần Học
+                                  </span>
+                                  <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                                    {morphologyData.theological_significance}
+                                  </p>
+                                </div>
+                              )}
+                              {morphologyData.exegetical_insight && (
+                                <div className="p-5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 flex flex-col gap-2">
+                                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                                    <FileText className="w-3.5 h-3.5" /> Góc Nhìn Giải Kinh (Exegesis)
+                                  </span>
+                                  <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                                    {morphologyData.exegetical_insight}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Key Anchor Scriptures */}
+                          {morphologyData.key_scriptures && morphologyData.key_scriptures.length > 0 && (
+                            <div className="flex flex-col gap-3">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                Các Phân Đoạn Nền Tảng (Key Scriptures)
+                              </h4>
+                              <div className="flex flex-col gap-2.5">
+                                {morphologyData.key_scriptures.map((ks, ksIdx) => (
+                                  <div key={ksIdx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex flex-col gap-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-blue-400">📖 {ks.reference}</span>
+                                      <Link
+                                        href={`/bible?book=${encodeURIComponent(ks.reference.split(" ")[0])}`}
+                                        className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Đọc trong ngữ cảnh</span>
+                                        <ChevronRight className="w-3 h-3" />
+                                      </Link>
+                                    </div>
+                                    {ks.text && (
+                                      <p className="text-xs font-serif text-slate-200 leading-relaxed italic">
+                                        &ldquo;{ks.text}&rdquo;
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Related Lemmas */}
+                          {morphologyData.related_lemmas && morphologyData.related_lemmas.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-2.5">
+                              <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5" /> Các Căn Ngữ Liên Quan Trọng Yếu:
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {morphologyData.related_lemmas.map((rl) => (
+                                  <div
+                                    key={rl.strong_number}
+                                    className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-0.5"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="font-mono font-bold text-purple-400">{rl.strong_number}</span>
+                                      <span className="text-slate-500 italic">{rl.transliteration}</span>
+                                    </div>
+                                    <span className="font-serif text-sm font-bold text-white">{rl.lemma}</span>
+                                    <span className="text-[10px] text-slate-400 line-clamp-1">{rl.gloss}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center text-slate-500 text-xs">
+                          Không có dữ liệu hình thái học cho mục này.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB B: CONCORDANCE OCCURRENCES */}
+                  {lexiconModalTab === "concordance" && (
+                    <>
+                      {concordanceLoading ? (
+                        <div className="py-12 flex flex-col items-center justify-center gap-3">
+                          <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                          <p className="text-xs text-slate-400">Đang truy xuất 31,081 câu Kinh Thánh để đối chiếu Concordance...</p>
+                        </div>
+                      ) : concordanceData ? (
+                        <div className="flex flex-col gap-6">
+                          {/* Theological Semantic Summary (§14) */}
+                          {concordanceData.theological_summary && (
+                            <div className="p-5 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 flex flex-col gap-2 shadow-md">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-cyan-400" />
+                                <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                                  Ý Nghĩa Thần Học Toàn Cảnh (Theological Semantic Range §14)
                                 </span>
+                              </div>
+                              <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                                {concordanceData.theological_summary}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Related Strong Roots Cluster (§14) */}
+                          {concordanceData.related_words && concordanceData.related_words.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2.5">
+                              <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5" /> Các Căn Ngữ Liên Hệ Trọng Yếu (Related Roots):
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                {concordanceData.related_words.map((rw) => (
+                                  <button
+                                    key={rw.strong_number}
+                                    type="button"
+                                    onClick={() => {
+                                      handleLookupConcordance(rw.strong_number, rw.lemma, rw.definition);
+                                    }}
+                                    className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/40 text-left transition-all flex flex-col gap-0.5 group"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="font-mono font-bold text-cyan-400 group-hover:text-cyan-300">
+                                        {rw.strong_number}
+                                      </span>
+                                      <span className="text-slate-500 italic">{rw.transliteration}</span>
+                                    </div>
+                                    <span className="font-serif text-sm font-bold text-white group-hover:text-cyan-200">
+                                      {rw.lemma}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 line-clamp-1">{rw.definition}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Distribution Stat & Book Breakdown */}
+                          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <BarChart3 className="w-5 h-5 text-cyan-400" />
+                                <div>
+                                  <span className="text-xs font-bold text-slate-200">Phân Phối Toàn Cảnh Trong Kinh Thánh</span>
+                                  <p className="text-[11px] text-slate-400">Từ khóa đối chiếu: &ldquo;{concordanceData.clean_keyword}&rdquo;</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                                <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  Cựu Ước (OT): {concordanceData.distribution.old_testament} câu
+                                </span>
+                                <span className="px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  Tân Ước (NT): {concordanceData.distribution.new_testament} câu
+                                </span>
+                                <span className="px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                  Tổng cộng: {concordanceData.distribution.total_matches}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Top Books Distribution */}
+                            {concordanceData.book_distribution && concordanceData.book_distribution.length > 0 && (
+                              <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
+                                <span className="text-[11px] text-slate-400 font-medium">Xuất hiện nhiều nhất trong các sách:</span>
+                                <div className="flex flex-wrap gap-2">
+                                  {concordanceData.book_distribution.map((b, bIdx) => (
+                                    <span
+                                      key={bIdx}
+                                      className="px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-center gap-1.5"
+                                    >
+                                      <span className="text-cyan-400 font-bold">•</span>
+                                      <span>{b.book}:</span>
+                                      <span className="font-mono text-cyan-300 font-bold">{b.count} câu</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Matching Verses List */}
+                          <div className="flex flex-col gap-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                              Các Câu Tiêu Biểu Trong Bản Dịch Truyền Thống 1925
+                            </h4>
+                            <div className="flex flex-col gap-2.5">
+                              {concordanceData.verses.map((cv) => (
+                                <div key={cv.global_id} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex flex-col gap-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-xs text-blue-400 flex items-center gap-1.5">
+                                      <span>📖 {cv.reference}</span>
+                                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        cv.testament === "OT" ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"
+                                      }`}>
+                                        {cv.testament}
+                                      </span>
+                                    </span>
+                                    <Link
+                                      href={`/bible?book=${encodeURIComponent(cv.reference.split(" ")[0])}`}
+                                      className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                                    >
+                                      <span>Xem trong ngữ cảnh</span>
+                                      <ChevronRight className="w-3 h-3" />
+                                    </Link>
+                                  </div>
+                                  <p className="text-xs font-serif text-slate-200 leading-relaxed italic">
+                                    &ldquo;{cv.text}&rdquo;
+                                  </p>
+                                </div>
                               ))}
                             </div>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Matching Verses List */}
-                      <div className="flex flex-col gap-3">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                          Các Câu Tiêu Biểu Trong Bản Dịch Truyền Thống 1925
-                        </h4>
-                        <div className="flex flex-col gap-2.5">
-                          {concordanceData.verses.map((cv) => (
-                            <div key={cv.global_id} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex flex-col gap-1.5">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-xs text-blue-400 flex items-center gap-1.5">
-                                  <span>📖 {cv.reference}</span>
-                                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
-                                    cv.testament === "OT" ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"
-                                  }`}>
-                                    {cv.testament}
-                                  </span>
-                                </span>
-                                <Link
-                                  href={`/bible?book=${encodeURIComponent(cv.reference.split(" ")[0])}`}
-                                  className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-                                >
-                                  <span>Xem trong ngữ cảnh</span>
-                                  <ChevronRight className="w-3 h-3" />
-                                </Link>
-                              </div>
-                              <p className="text-xs font-serif text-slate-200 leading-relaxed italic">
-                                &ldquo;{cv.text}&rdquo;
-                              </p>
-                            </div>
-                          ))}
                         </div>
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
