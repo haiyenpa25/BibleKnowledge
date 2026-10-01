@@ -19,7 +19,14 @@ import {
   Loader2,
   Calendar,
   Zap,
-  Repeat
+  Repeat,
+  ArrowUp,
+  ArrowDown,
+  Clock,
+  Shuffle,
+  Check,
+  Undo2,
+  Volume2
 } from "lucide-react";
 
 interface QuizQuestion {
@@ -54,8 +61,43 @@ interface UserProfile {
   mastery_by_topic: Record<string, number>;
 }
 
+interface FillInBlankWord {
+  text: string;
+  is_blank: boolean;
+  blank_index?: number;
+}
+
+interface FillInBlankItem {
+  id: string;
+  reference: string;
+  full_text: string;
+  display_segments: FillInBlankWord[];
+  blank_answers: string[];
+  word_bank: string[];
+  topic: string;
+  difficulty: number;
+}
+
+interface TimelineEventItem {
+  slug: string;
+  title: string;
+  correct_order: number;
+  period: string;
+  approximate_date: string;
+  scripture?: string;
+  description: string;
+}
+
+interface TimelineChallenge {
+  id: string;
+  era_title: string;
+  description: string;
+  events: TimelineEventItem[];
+  narrative_explanation: string;
+}
+
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "flashcards" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
 
   // User Profile Gamification State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -79,6 +121,22 @@ export default function LearnPage() {
   const [cardFilter, setCardFilter] = useState<string>("all");
   const [reviewCount, setReviewCount] = useState(0);
 
+  // Fill in the Blank State (§3)
+  const [fibList, setFibList] = useState<FillInBlankItem[]>([]);
+  const [fibIndex, setFibIndex] = useState(0);
+  const [fibAnswers, setFibAnswers] = useState<Record<number, string>>({});
+  const [fibLoading, setFibLoading] = useState(false);
+  const [fibChecked, setFibChecked] = useState(false);
+  const [fibIsCorrect, setFibIsCorrect] = useState(false);
+
+  // Timeline Order State (§3)
+  const [timelineChallenges, setTimelineChallenges] = useState<TimelineChallenge[]>([]);
+  const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0);
+  const [userEventOrder, setUserEventOrder] = useState<TimelineEventItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineChecked, setTimelineChecked] = useState(false);
+  const [timelineIsCorrect, setTimelineIsCorrect] = useState(false);
+
   // AI Generator State
   const [genTarget, setGenTarget] = useState("Giăng 3:1-16");
   const [genType, setGenType] = useState<"quiz" | "flashcards">("quiz");
@@ -89,6 +147,15 @@ export default function LearnPage() {
   const [genError, setGenError] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // Initial load
+  useEffect(() => {
+    fetchProfile();
+    fetchQuiz();
+    fetchFlashcards();
+    fetchFib();
+    fetchTimelineChallenges();
+  }, [apiUrl]);
 
   // Fetch Quiz Questions
   const fetchQuiz = async (type?: string) => {
@@ -138,6 +205,7 @@ export default function LearnPage() {
     }
   };
 
+  // Fetch User Profile
   const fetchProfile = async () => {
     try {
       const res = await fetch(`${apiUrl}/api/learn/profile`);
@@ -150,94 +218,241 @@ export default function LearnPage() {
     }
   };
 
-  useEffect(() => {
-    fetchQuiz();
-    fetchFlashcards();
-    fetchProfile();
-  }, [apiUrl]);
+  // Fetch Fill in the Blank challenges
+  const fetchFib = async () => {
+    setFibLoading(true);
+    setFibIndex(0);
+    setFibAnswers({});
+    setFibChecked(false);
+    setFibIsCorrect(false);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/fill-in-blank`);
+      if (res.ok) {
+        const data = await res.json();
+        setFibList(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch fill in blank:", err);
+    } finally {
+      setFibLoading(false);
+    }
+  };
 
-  // Quiz Handling
-  const handleSelectOption = (index: number) => {
+  // Fetch Timeline challenges
+  const fetchTimelineChallenges = async () => {
+    setTimelineLoading(true);
+    setCurrentTimelineIndex(0);
+    setTimelineChecked(false);
+    setTimelineIsCorrect(false);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/timeline-challenge`);
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineChallenges(data);
+        if (data.length > 0) {
+          setUserEventOrder(data[0].events);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch timeline challenges:", err);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  // Handle Quiz Option Selection
+  const handleSelectOption = (idx: number) => {
     if (isAnswered) return;
-    setSelectedOption(index);
+    setSelectedOption(idx);
     setIsAnswered(true);
 
-    const currentQ = quizList[currentIndex];
-    if (index === currentQ.correct_option) {
-      setScore((s) => s + 10);
-      setStreak((st) => st + 1);
+    const isCorrect = idx === quizList[currentIndex].correct_option;
+    if (isCorrect) {
+      setScore((prev) => prev + 20);
+      setStreak((prev) => prev + 1);
     } else {
       setStreak(0);
     }
   };
 
-  const handleNextQuestion = async () => {
+  // Handle Next Quiz Question
+  const handleNextQuiz = async () => {
     if (currentIndex + 1 < quizList.length) {
-      setCurrentIndex((i) => i + 1);
+      setCurrentIndex((prev) => prev + 1);
       setSelectedOption(null);
       setIsAnswered(false);
     } else {
       setQuizFinished(true);
-      // Auto submit quiz score to user profile
       try {
-        const res = await fetch(`${apiUrl}/api/learn/quiz/submit`, {
+        const correctCount = Math.round(score / 20);
+        await fetch(`${apiUrl}/api/learn/quiz/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            correct_count: Math.max(1, Math.round(score / 10)),
+            correct_count: correctCount,
             total_questions: quizList.length,
-            topic: filterType === "all" ? "Gospels" : "Pauline"
+            topic: "Gospels"
           })
         });
-        if (res.ok) {
-          const updatedProf = await res.json();
-          setUserProfile(updatedProf);
-        }
-      } catch (e) {
-        console.error("Failed to submit quiz score:", e);
+        fetchProfile();
+      } catch (err) {
+        console.error("Failed to submit score:", err);
       }
     }
   };
 
-  const handleRestartQuiz = () => {
-    setScore(0);
-    setStreak(0);
-    fetchQuiz(filterType);
-    fetchProfile();
-  };
-
-  // Flashcard Review Handling (SM-2)
-  const handleReviewRating = async (rating: number) => {
-    if (flashcards.length === 0) return;
-    const currentCard = flashcards[cardIndex];
+  // Handle Flashcard SM-2 Review
+  const handleReviewCard = async (rating: number) => {
+    if (!flashcards[cardIndex]) return;
+    const currentCardId = flashcards[cardIndex].id;
 
     try {
-      await fetch(`${apiUrl}/api/learn/flashcards/${currentCard.id}/review`, {
+      await fetch(`${apiUrl}/api/learn/flashcards/${currentCardId}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating })
       });
-      setReviewCount((c) => c + 1);
-
-      // Move to next card
-      if (cardIndex + 1 < flashcards.length) {
-        setCardIndex((i) => i + 1);
-        setIsFlipped(false);
-      } else {
-        // Refresh cards
-        fetchFlashcards(cardFilter);
-      }
+      setReviewCount((prev) => prev + 1);
+      fetchProfile();
     } catch (err) {
-      console.error("Failed to submit card review:", err);
+      console.error("Failed to submit review:", err);
+    }
+
+    if (cardIndex + 1 < flashcards.length) {
+      setCardIndex((prev) => prev + 1);
+      setIsFlipped(false);
+    } else {
+      fetchFlashcards(cardFilter);
     }
   };
 
-  // AI Generator Submit
-  const handleGenerateAI = async () => {
-    if (!genTarget.trim()) return;
+  // --- Fill in the Blank Handlers ---
+  const currentFib = fibList[fibIndex];
+
+  const handleTileClick = (word: string) => {
+    if (fibChecked || !currentFib) return;
+    const blankCount = currentFib.blank_answers.length;
+    for (let i = 0; i < blankCount; i++) {
+      if (!fibAnswers[i]) {
+        setFibAnswers((prev) => ({ ...prev, [i]: word }));
+        break;
+      }
+    }
+  };
+
+  const handleRemoveFilledWord = (blankIdx: number) => {
+    if (fibChecked) return;
+    setFibAnswers((prev) => {
+      const copy = { ...prev };
+      delete copy[blankIdx];
+      return copy;
+    });
+  };
+
+  const handleCheckFib = async () => {
+    if (!currentFib) return;
+    const isAllCorrect = currentFib.blank_answers.every(
+      (ans, idx) => (fibAnswers[idx] || "").trim().toLowerCase() === ans.trim().toLowerCase()
+    );
+
+    setFibIsCorrect(isAllCorrect);
+    setFibChecked(true);
+
+    if (isAllCorrect) {
+      setScore((prev) => prev + 30);
+      setStreak((prev) => prev + 1);
+      try {
+        await fetch(`${apiUrl}/api/learn/quiz/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correct_count: 1,
+            total_questions: 1,
+            topic: "MemoryVerses"
+          })
+        });
+        fetchProfile();
+      } catch (err) {
+        console.error("Failed to submit score:", err);
+      }
+    }
+  };
+
+  const handleNextFib = () => {
+    if (fibIndex + 1 < fibList.length) {
+      setFibIndex((prev) => prev + 1);
+      setFibAnswers({});
+      setFibChecked(false);
+      setFibIsCorrect(false);
+    } else {
+      fetchFib();
+    }
+  };
+
+  // --- Timeline Challenge Handlers ---
+  const currentTimeline = timelineChallenges[currentTimelineIndex];
+
+  const handleMoveEvent = (idx: number, direction: "up" | "down") => {
+    if (timelineChecked) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= userEventOrder.length) return;
+
+    const reordered = [...userEventOrder];
+    const temp = reordered[idx];
+    reordered[idx] = reordered[targetIdx];
+    reordered[targetIdx] = temp;
+    setUserEventOrder(reordered);
+  };
+
+  const handleCheckTimeline = async () => {
+    let inOrder = true;
+    for (let i = 0; i < userEventOrder.length - 1; i++) {
+      if (userEventOrder[i].correct_order > userEventOrder[i + 1].correct_order) {
+        inOrder = false;
+        break;
+      }
+    }
+    setTimelineIsCorrect(inOrder);
+    setTimelineChecked(true);
+
+    if (inOrder) {
+      setScore((prev) => prev + 50);
+      setStreak((prev) => prev + 1);
+      try {
+        await fetch(`${apiUrl}/api/learn/quiz/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correct_count: 1,
+            total_questions: 1,
+            topic: "History"
+          })
+        });
+        fetchProfile();
+      } catch (err) {
+        console.error("Failed to submit score:", err);
+      }
+    }
+  };
+
+  const handleNextTimeline = () => {
+    if (currentTimelineIndex + 1 < timelineChallenges.length) {
+      const nextIdx = currentTimelineIndex + 1;
+      setCurrentTimelineIndex(nextIdx);
+      setUserEventOrder(timelineChallenges[nextIdx].events);
+      setTimelineChecked(false);
+      setTimelineIsCorrect(false);
+    } else {
+      fetchTimelineChallenges();
+    }
+  };
+
+  // AI Generator Handler
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsGenerating(true);
-    setGenSuccessMsg(null);
     setGenError(null);
+    setGenSuccessMsg(null);
 
     try {
       if (genType === "quiz") {
@@ -300,10 +515,10 @@ export default function LearnPage() {
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
               <GraduationCap className="w-6 h-6 text-amber-400" />
-              Không Gian Học Tập (Learn Layer)
+              Không Gian Học Tập &amp; Rèn Luyện (Learn Layer)
             </h1>
             <p className="text-xs text-slate-400">
-              Trắc nghiệm tương tác • Đố vui nhân vật • Thẻ lặp lại ngắt quãng (SM-2) • AI Quiz Engine
+              Trắc nghiệm tương tác &bull; Flashcards SM-2 &bull; Điền khuyết câu gốc &bull; Xếp trật tự niên đại &bull; AI Generator
             </p>
           </div>
         </div>
@@ -325,7 +540,7 @@ export default function LearnPage() {
         </div>
       </header>
 
-      {/* User Mastery & Gamification Banner (ROADMAP1 Sections 5, 46) */}
+      {/* User Mastery & Gamification Banner */}
       <section className="p-4 md:p-5 rounded-3xl bg-gradient-to-r from-amber-950/40 via-slate-900/80 to-blue-950/40 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-bold text-2xl shadow-lg shadow-amber-500/20">
@@ -349,18 +564,18 @@ export default function LearnPage() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <Flame className="w-4 h-4 text-rose-500 fill-rose-500" />
             <span className="text-slate-400">Chuỗi: </span>
-            <span className="font-bold text-rose-400">{userProfile?.daily_streak || 1} ngày liên tục</span>
+            <span className="font-bold text-rose-400">{userProfile?.daily_streak || 1} ngày</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <Award className="w-4 h-4 text-amber-400" />
-            <span className="text-slate-400">Quiz đã giải: </span>
+            <span className="text-slate-400">Quiz: </span>
             <span className="font-bold text-white">{userProfile?.total_quizzes_completed || 0}</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <Repeat className="w-4 h-4 text-blue-400" />
-            <span className="text-slate-400">Thẻ đã ôn: </span>
+            <span className="text-slate-400">Thẻ: </span>
             <span className="font-bold text-white">{userProfile?.total_flashcards_reviewed || 0}</span>
           </div>
 
@@ -373,40 +588,71 @@ export default function LearnPage() {
             <span className="px-2 py-0.5 rounded-lg bg-purple-950/60 border border-purple-800/40 text-purple-300 font-semibold">
               Thư Tín {userProfile?.mastery_by_topic?.Pauline || 80}%
             </span>
-            <span className="px-2 py-0.5 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-semibold">
-              Ngũ Kinh {userProfile?.mastery_by_topic?.Pentateuch || 50}%
-            </span>
           </div>
         </div>
       </section>
 
-      {/* Mode Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      {/* Mode Navigation Tabs (5 Game Modes §3) */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs md:text-sm">
         <button
           onClick={() => setActiveTab("quiz")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
             activeTab === "quiz"
               ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
           }`}
         >
-          <HelpCircle className="w-4 h-4" /> Thử Thách Trắc Nghiệm
+          <HelpCircle className="w-4 h-4" /> Trắc Nghiệm ABCD
         </button>
+
         <button
           onClick={() => setActiveTab("flashcards")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
             activeTab === "flashcards"
               ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
           }`}
         >
-          <Layers className="w-4 h-4" /> Thẻ Ghi Nhớ (Flashcards)
+          <Layers className="w-4 h-4" /> Flashcards (SM-2)
         </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("fill_in_blank");
+            if (fibList.length === 0) fetchFib();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "fill_in_blank"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-emerald-200" />
+          <span>Điền Khuyết Câu Gốc</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400/20 text-emerald-300">Mới §3</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("timeline");
+            if (timelineChallenges.length === 0) fetchTimelineChallenges();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "timeline"
+              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Clock className="w-4 h-4 text-purple-200" />
+          <span>Sắp Xếp Niên Đại</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-400/20 text-purple-300">Mới §3</span>
+        </button>
+
         <button
           onClick={() => setActiveTab("generator")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
             activeTab === "generator"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
           }`}
         >
@@ -415,11 +661,10 @@ export default function LearnPage() {
       </div>
 
       {/* ===================================================================== */}
-      {/* 1. QUIZ MODE */}
+      {/* 1. QUIZ MODE                                                          */}
       {/* ===================================================================== */}
       {activeTab === "quiz" && (
         <div className="flex flex-col gap-6">
-          {/* Question Sub-Filter Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             <span className="text-slate-400 whitespace-nowrap">Chế độ đố:</span>
             {[
@@ -448,103 +693,66 @@ export default function LearnPage() {
 
           {loadingQuiz ? (
             <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-              <p className="text-sm">Đang nạp câu hỏi trắc nghiệm từ kho tàng Kinh Thánh...</p>
+              <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+              <p className="text-sm">Đang nạp câu hỏi trắc nghiệm...</p>
             </div>
           ) : quizFinished ? (
-            /* Quiz Results Finished Screen */
-            <div className="p-10 rounded-3xl glass-panel border border-slate-700/60 flex flex-col items-center text-center gap-6 max-w-lg mx-auto">
-              <div className="w-20 h-20 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center">
+            <div className="p-10 rounded-3xl glass-panel border border-slate-700 text-center flex flex-col items-center gap-5 max-w-lg mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
                 <Award className="w-10 h-10" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white">Hoàn Thành Thử Thách!</h3>
-                <p className="text-slate-300 text-sm mt-1">
-                  Bạn đã xuất sắc vượt qua toàn bộ {quizList.length} câu hỏi trắc nghiệm.
+                <h3 className="text-2xl font-bold text-white">Hoàn Thành Bài Thi!</h3>
+                <p className="text-slate-400 text-sm mt-1">
+                  Bạn đã xuất sắc ghi được <span className="text-amber-400 font-bold">{score} điểm</span>.
                 </p>
               </div>
-              <div className="flex items-center gap-6 py-4 px-8 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <div className="flex flex-col items-center">
-                  <span className="text-2xl font-black text-amber-400">{score}</span>
-                  <span className="text-xs text-slate-400 uppercase">Tổng Điểm</span>
-                </div>
-                <div className="w-px h-8 bg-slate-800"></div>
-                <div className="flex flex-col items-center">
-                  <span className="text-2xl font-black text-rose-400">{streak}</span>
-                  <span className="text-xs text-slate-400 uppercase">Chuỗi Kỷ Lục</span>
-                </div>
-              </div>
               <button
-                onClick={handleRestartQuiz}
-                className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-lg shadow-amber-600/30 flex items-center gap-2"
+                onClick={() => fetchQuiz(filterType)}
+                className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all"
               >
-                <RotateCw className="w-4 h-4" /> Bắt Đầu Lượt Mới
+                Làm Lại Bộ Đề Khác
               </button>
             </div>
           ) : currentQ ? (
-            /* Active Question Card */
-            <div className="p-6 md:p-8 rounded-3xl glass-panel border border-slate-700/60 flex flex-col gap-6 relative overflow-hidden">
-              {/* Question Meta Bar */}
-              <div className="flex justify-between items-center text-xs text-slate-400 border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider">
-                    {currentQ.question_type === "who_am_i" ? "🕵️ Đố Nhân Vật" : currentQ.question_type === "verse_challenge" ? "📜 Thuộc Câu Gốc" : "Trắc Nghiệm"}
-                  </span>
-                  <span>Câu {currentIndex + 1} / {quizList.length}</span>
-                </div>
-                {currentQ.scripture_reference && (
-                  <Link 
-                    href={`/bible?ref=${encodeURIComponent(currentQ.scripture_reference)}`}
-                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-medium"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>{currentQ.scripture_reference}</span>
-                  </Link>
-                )}
+            <div className="glass-panel p-6 md:p-8 rounded-3xl border border-slate-700/60 flex flex-col gap-6">
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span className="uppercase tracking-wider font-semibold text-amber-400">
+                  Câu hỏi {currentIndex + 1} / {quizList.length}
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                  {currentQ.question_type === "who_am_i" ? "👤 Tôi Là Ai?" : currentQ.question_type === "true_false" ? "⚖️ Đúng / Sai" : "📖 Trắc Nghiệm"}
+                </span>
               </div>
 
-              {/* Question Text */}
-              <div className="flex flex-col gap-2">
-                {currentQ.question_type === "who_am_i" && (
-                  <div className="text-xs font-semibold text-amber-300/80 uppercase tracking-widest flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Manh mối nhân vật
-                  </div>
-                )}
-                <h2 className="text-lg md:text-xl font-bold text-white leading-relaxed">
-                  {currentQ.question_text}
-                </h2>
-              </div>
+              <h2 className="text-lg md:text-xl font-bold text-white leading-relaxed">
+                {currentQ.question_text}
+              </h2>
 
-              {/* Options Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                {currentQ.options.map((opt, optIdx) => {
-                  let btnStyle = "bg-slate-900/60 border-slate-700/80 hover:bg-slate-800/80 hover:border-slate-600 text-slate-200";
-
+                {currentQ.options.map((opt, idx) => {
+                  let btnStyle = "bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-200";
                   if (isAnswered) {
-                    if (optIdx === currentQ.correct_option) {
-                      btnStyle = "bg-emerald-950/70 border-emerald-500/80 text-emerald-200 shadow-md shadow-emerald-900/20";
-                    } else if (selectedOption === optIdx) {
-                      btnStyle = "bg-rose-950/70 border-rose-500/80 text-rose-200";
+                    if (idx === currentQ.correct_option) {
+                      btnStyle = "bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold";
+                    } else if (idx === selectedOption) {
+                      btnStyle = "bg-rose-950/80 border-rose-500 text-rose-200 line-through";
                     } else {
-                      btnStyle = "opacity-40 bg-slate-900/40 border-slate-800 text-slate-400";
+                      btnStyle = "bg-slate-900/40 border-slate-800 text-slate-500 opacity-60";
                     }
                   }
-
                   return (
                     <button
-                      key={optIdx}
+                      key={idx}
+                      onClick={() => handleSelectOption(idx)}
                       disabled={isAnswered}
-                      onClick={() => handleSelectOption(optIdx)}
-                      className={`p-4 rounded-2xl border text-left text-sm md:text-base font-medium transition-all flex items-start gap-3 ${btnStyle}`}
+                      className={`p-4 rounded-2xl border text-left text-sm flex items-center justify-between transition-all ${btnStyle}`}
                     >
-                      <span className="w-6 h-6 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0 mt-0.5">
-                        {String.fromCharCode(65 + optIdx)}
-                      </span>
-                      <span className="flex-1 leading-snug">{opt}</span>
-                      {isAnswered && optIdx === currentQ.correct_option && (
+                      <span>{opt}</span>
+                      {isAnswered && idx === currentQ.correct_option && (
                         <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                       )}
-                      {isAnswered && selectedOption === optIdx && optIdx !== currentQ.correct_option && (
+                      {isAnswered && idx === selectedOption && idx !== currentQ.correct_option && (
                         <XCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
                       )}
                     </button>
@@ -552,66 +760,49 @@ export default function LearnPage() {
                 })}
               </div>
 
-              {/* Answer Explanation & Next Action */}
               {isAnswered && (
-                <div className="pt-4 border-t border-slate-800/80 flex flex-col gap-4">
-                  <div className={`p-4 rounded-2xl border text-xs md:text-sm flex flex-col gap-1.5 ${
-                    selectedOption === currentQ.correct_option
-                      ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-200"
-                      : "bg-amber-950/30 border-amber-800/50 text-amber-200"
-                  }`}>
-                    <div className="font-bold flex items-center gap-1.5">
-                      {selectedOption === currentQ.correct_option ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>Chính Xác! +10 Điểm</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-4 h-4 text-rose-400" />
-                          <span>Chưa Đúng! Đáp án đúng là {String.fromCharCode(65 + currentQ.correct_option)}</span>
-                        </>
-                      )}
-                    </div>
-                    {currentQ.explanation && (
-                      <p className="text-slate-300 leading-relaxed pt-1">
-                        {currentQ.explanation}
-                      </p>
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-700/80 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Giải thích lời Chúa:
+                    </span>
+                    {currentQ.scripture_reference && (
+                      <span className="text-[11px] font-medium text-blue-400">
+                        📖 {currentQ.scripture_reference}
+                      </span>
                     )}
                   </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleNextQuestion}
-                      className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-lg shadow-amber-600/30 flex items-center gap-2"
-                    >
-                      <span>Câu Tiếp Theo</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                    {currentQ.explanation || "Đáp án đã được đối chiếu theo văn bản Kinh Thánh chuẩn mực."}
+                  </p>
+                  <button
+                    onClick={handleNextQuiz}
+                    className="self-end mt-2 px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>{currentIndex + 1 < quizList.length ? "Câu Kế Tiếp" : "Xem Kết Quả"}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
           ) : (
-            <div className="p-12 text-center text-slate-400">Không có câu hỏi nào trong danh mục này.</div>
+            <div className="p-12 text-center text-slate-500">Chưa có câu hỏi nào.</div>
           )}
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* 2. FLASHCARDS MODE (SM-2 Spaced Repetition) */}
+      {/* 2. FLASHCARDS MODE (SM-2 Spaced Repetition)                          */}
       {/* ===================================================================== */}
       {activeTab === "flashcards" && (
-        <div className="flex flex-col gap-6">
-          {/* Category Filter Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-            <span className="text-slate-400 whitespace-nowrap">Danh mục thẻ:</span>
+        <div className="flex flex-col gap-6 items-center">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs self-start">
+            <span className="text-slate-400 whitespace-nowrap">Lọc loại thẻ:</span>
             {[
               { id: "all", label: "Tất cả" },
-              { id: "person", label: "Nhân vật (Person)" },
-              { id: "verse", label: "Câu gốc (Verse)" },
-              { id: "event", label: "Biến cố (Event)" },
-              { id: "word", label: "Giáo lý / Từ ngữ (Doctrine)" }
+              { id: "person", label: "Nhân vật" },
+              { id: "verse", label: "Câu gốc" },
+              { id: "word", label: "Từ ngữ gốc" }
             ].map((f) => (
               <button
                 key={f.id}
@@ -619,7 +810,7 @@ export default function LearnPage() {
                   setCardFilter(f.id);
                   fetchFlashcards(f.id);
                 }}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                className={`px-3 py-1.5 rounded-lg transition-colors ${
                   cardFilter === f.id
                     ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium"
                     : "bg-slate-800/80 text-slate-400 hover:text-white"
@@ -631,255 +822,552 @@ export default function LearnPage() {
           </div>
 
           {loadingCards ? (
-            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-              <p className="text-sm">Đang tải thẻ ghi nhớ và lịch lặp lại ngắt quãng...</p>
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400 w-full">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+              <p className="text-sm">Đang tải thẻ học lặp lại ngắt quãng...</p>
             </div>
           ) : currentCard ? (
-            <div className="flex flex-col items-center gap-6">
-              {/* Card Meta Indicator */}
-              <div className="w-full flex justify-between items-center text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold uppercase">
-                    {currentCard.card_type}
-                  </span>
-                  <span>Thẻ {cardIndex + 1} / {flashcards.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Chu kỳ: {currentCard.interval_days} ngày • Đã ôn: {currentCard.repetition_count} lần</span>
-                </div>
+            <div className="w-full max-w-xl flex flex-col gap-5">
+              <div className="flex justify-between items-center text-xs text-slate-400 px-1">
+                <span>Thẻ {cardIndex + 1} / {flashcards.length}</span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-blue-400 font-mono text-[11px]">
+                  Khoảng cách: {currentCard.interval_days} ngày
+                </span>
               </div>
 
-              {/* 3D Flip Card Container */}
-              <div 
+              {/* Flashcard container */}
+              <div
                 onClick={() => setIsFlipped(!isFlipped)}
-                className="w-full max-w-xl h-80 perspective-1000 cursor-pointer select-none group"
+                className={`min-h-[260px] p-8 rounded-3xl cursor-pointer select-none transition-all duration-300 flex flex-col justify-between items-center text-center shadow-xl border ${
+                  isFlipped
+                    ? "bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 border-blue-500/50"
+                    : "bg-slate-900/90 border-slate-700/80 hover:border-slate-600"
+                }`}
               >
-                <div 
-                  className={`relative w-full h-full duration-500 transform-style-preserve-3d transition-transform ${
-                    isFlipped ? "rotate-y-180" : ""
-                  }`}
-                >
-                  {/* FRONT SIDE */}
-                  <div className="absolute inset-0 backface-hidden p-8 rounded-3xl glass-panel border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/40 flex flex-col justify-between items-center text-center shadow-xl">
-                    <div className="w-full flex justify-end">
-                      <span className="text-[11px] text-blue-400/80 font-mono tracking-wider uppercase">
-                        Mặt Trước (Front)
-                      </span>
-                    </div>
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
+                  {isFlipped ? "✨ Mặt Sau • Lời Giải & Câu Gốc" : "❓ Mặt Trước • Câu Hỏi / Khái Niệm"}
+                </div>
 
-                    <div className="flex flex-col gap-3 my-auto">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
-                        <Layers className="w-6 h-6" />
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-extrabold text-white leading-snug">
-                        {currentCard.front_text}
-                      </h3>
-                    </div>
+                <div className="my-auto py-4">
+                  <p className="text-base md:text-lg font-bold text-white leading-relaxed font-sans">
+                    {isFlipped ? currentCard.back_text : currentCard.front_text}
+                  </p>
+                </div>
 
-                    <div className="text-xs text-slate-400 group-hover:text-blue-300 transition-colors flex items-center gap-1.5">
-                      <RotateCw className="w-3.5 h-3.5" />
-                      Nhấp thẻ để xem lời giải
-                    </div>
-                  </div>
-
-                  {/* BACK SIDE */}
-                  <div className="absolute inset-0 backface-hidden rotate-y-180 p-8 rounded-3xl glass-panel border border-blue-500/40 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 flex flex-col justify-between shadow-xl overflow-y-auto">
-                    <div className="w-full flex justify-between items-center pb-2 border-b border-slate-800">
-                      <span className="text-[11px] text-emerald-400/90 font-mono tracking-wider uppercase">
-                        Mặt Sau (Đáp Án Chi Tiết)
-                      </span>
-                      <span className="text-xs text-slate-500">Nhấp để lật lại</span>
-                    </div>
-
-                    <div className="my-auto py-2">
-                      <p className="text-slate-200 text-sm md:text-base leading-relaxed whitespace-pre-line font-serif">
-                        {currentCard.back_text}
-                      </p>
-                    </div>
-
-                    <div className="text-xs text-slate-400 pt-2 border-t border-slate-800 flex justify-between items-center">
-                      <span>Độ khó ban đầu: Cấp {currentCard.difficulty_level}</span>
-                      <span className="text-blue-400">Thuật toán SM-2</span>
-                    </div>
-                  </div>
+                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                  <RotateCw className="w-3 h-3" /> Nhấn để lật thẻ
                 </div>
               </div>
 
-              {/* SM-2 Spaced Repetition Rating Buttons */}
-              <div className="flex flex-col items-center gap-2 pt-2">
-                <span className="text-xs text-slate-400">Đánh giá khả năng ghi nhớ của bạn:</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-xl">
-                  <button
-                    onClick={() => handleReviewRating(1)}
-                    className="px-4 py-2.5 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 text-xs font-semibold flex flex-col items-center gap-1 transition-all"
-                  >
-                    <span>🔴 Quên Hết (Again)</span>
-                    <span className="text-[10px] text-rose-400/70 font-normal">Ôn lại: 1 ngày</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleReviewRating(2)}
-                    className="px-4 py-2.5 rounded-xl bg-amber-950/50 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 text-xs font-semibold flex flex-col items-center gap-1 transition-all"
-                  >
-                    <span>🟠 Khá Khó (Hard)</span>
-                    <span className="text-[10px] text-amber-400/70 font-normal">Giãn kỳ chậm</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleReviewRating(3)}
-                    className="px-4 py-2.5 rounded-xl bg-blue-950/50 hover:bg-blue-900/60 border border-blue-800/60 text-blue-300 text-xs font-semibold flex flex-col items-center gap-1 transition-all"
-                  >
-                    <span>🔵 Tốt (Good)</span>
-                    <span className="text-[10px] text-blue-400/70 font-normal">Chu kỳ chuẩn</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleReviewRating(4)}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-800/60 text-emerald-300 text-xs font-semibold flex flex-col items-center gap-1 transition-all"
-                  >
-                    <span>🟢 Rất Dễ (Easy)</span>
-                    <span className="text-[10px] text-emerald-400/70 font-normal">Tăng vọt thời gian</span>
-                  </button>
+              {/* SM-2 Review Quality Rating Buttons */}
+              {isFlipped && (
+                <div className="flex flex-col gap-2 pt-2 animate-in fade-in">
+                  <span className="text-center text-xs text-slate-400 font-medium">Bạn nhớ nội dung này thế nào?</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      onClick={() => handleReviewCard(1)}
+                      className="py-2.5 px-2 rounded-xl bg-rose-950/80 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs font-bold transition-all"
+                    >
+                      Lại (1 ngày)
+                    </button>
+                    <button
+                      onClick={() => handleReviewCard(2)}
+                      className="py-2.5 px-2 rounded-xl bg-amber-950/80 hover:bg-amber-900/80 border border-amber-800/60 text-amber-300 text-xs font-bold transition-all"
+                    >
+                      Khó (2 ngày)
+                    </button>
+                    <button
+                      onClick={() => handleReviewCard(3)}
+                      className="py-2.5 px-2 rounded-xl bg-blue-950/80 hover:bg-blue-900/80 border border-blue-800/60 text-blue-300 text-xs font-bold transition-all"
+                    >
+                      Tốt (4 ngày)
+                    </button>
+                    <button
+                      onClick={() => handleReviewCard(4)}
+                      className="py-2.5 px-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-bold transition-all"
+                    >
+                      Dễ (7 ngày)
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="p-12 text-center text-slate-400">Bạn đã hoàn thành toàn bộ thẻ cần ôn tập hôm nay!</div>
+            <div className="p-12 text-center text-slate-500">Đã ôn xong tất cả các thẻ!</div>
           )}
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* 3. AI GENERATOR MODE */}
+      {/* 3. FILL IN THE BLANK MODE (Điền Khuyết Câu Gốc - §3)                  */}
+      {/* ===================================================================== */}
+      {activeTab === "fill_in_blank" && (
+        <div className="flex flex-col gap-6">
+          <div className="p-6 rounded-3xl bg-slate-900/80 border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                <BookOpen className="w-4 h-4" /> Scripture Memory &bull; Điền Khuyết Câu Gốc (§3)
+              </div>
+              <h2 className="text-xl font-bold text-white mt-1">
+                Thử Thách Thuộc Lòng Câu Kinh Thánh Trọng Tâm
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Nhấn chọn các từ trong ngân hàng từ vựng để điền vào các vị trí còn trống
+              </p>
+            </div>
+            {currentFib && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-3 py-1 rounded-xl bg-slate-800 text-emerald-300 border border-slate-700">
+                  Câu {fibIndex + 1} / {fibList.length}
+                </span>
+                <span className="text-xs font-bold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  {currentFib.topic}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {fibLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+              <p className="text-xs text-slate-400">Đang nạp thử thách câu gốc...</p>
+            </div>
+          ) : currentFib ? (
+            <div className="p-6 md:p-8 rounded-3xl bg-slate-900/90 border border-slate-700 flex flex-col gap-6 shadow-2xl">
+              {/* Scripture Reference Title */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span className="text-base font-bold text-blue-400 flex items-center gap-1.5">
+                  📖 {currentFib.reference}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFibAnswers({})}
+                  disabled={fibChecked}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  <span>Xóa hết để điền lại</span>
+                </button>
+              </div>
+
+              {/* Segmented Verse Container with Blanks */}
+              <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 leading-loose text-base md:text-lg font-serif text-slate-200">
+                {currentFib.display_segments.map((seg, idx) => {
+                  if (!seg.is_blank) {
+                    return <span key={idx}>{seg.text}</span>;
+                  }
+                  const bIdx = seg.blank_index ?? 0;
+                  const filledWord = fibAnswers[bIdx];
+                  const isWrong = fibChecked && filledWord?.trim().toLowerCase() !== currentFib.blank_answers[bIdx]?.trim().toLowerCase();
+                  const isRight = fibChecked && filledWord?.trim().toLowerCase() === currentFib.blank_answers[bIdx]?.trim().toLowerCase();
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleRemoveFilledWord(bIdx)}
+                      className={`inline-flex items-center justify-center mx-1 px-3 py-0.5 rounded-xl border text-sm font-sans font-bold transition-all ${
+                        isRight
+                          ? "bg-emerald-950/80 border-emerald-500 text-emerald-200"
+                          : isWrong
+                          ? "bg-rose-950/80 border-rose-500 text-rose-200"
+                          : filledWord
+                          ? "bg-slate-800 border-amber-500/60 text-amber-300 shadow-md"
+                          : "bg-slate-900/60 border-dashed border-slate-600 text-slate-500 min-w-[90px]"
+                      }`}
+                    >
+                      {filledWord || `[ Ô ${bIdx + 1} ]`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Scrambled Word Bank */}
+              <div className="flex flex-col gap-2 pt-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Ngân hàng từ ngữ (Nhấn để điền):
+                </span>
+                <div className="flex flex-wrap gap-2.5">
+                  {currentFib.word_bank.map((wbWord, idx) => {
+                    const isUsed = Object.values(fibAnswers).includes(wbWord);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleTileClick(wbWord)}
+                        disabled={isUsed || fibChecked}
+                        className={`px-4 py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-md ${
+                          isUsed
+                            ? "bg-slate-900 border border-slate-800 text-slate-600 opacity-40 cursor-not-allowed"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 hover:border-amber-400 hover:scale-105"
+                        }`}
+                      >
+                        {wbWord}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Validation & Feedback */}
+              <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                {fibChecked ? (
+                  <div className="flex items-center gap-2">
+                    {fibIsCorrect ? (
+                      <span className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        Chính xác tuyệt đối! (+30 XP)
+                      </span>
+                    ) : (
+                      <span className="text-sm font-bold text-rose-400 flex items-center gap-1.5">
+                        <XCircle className="w-5 h-5 text-rose-400" />
+                        Chưa hoàn toàn chính xác, hãy xem lại các ô đỏ!
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">
+                    Điền hết các ô trống rồi nhấn kiểm tra
+                  </span>
+                )}
+
+                <div className="flex items-center gap-3">
+                  {!fibChecked ? (
+                    <button
+                      type="button"
+                      onClick={handleCheckFib}
+                      disabled={Object.keys(fibAnswers).length < currentFib.blank_answers.length}
+                      className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all"
+                    >
+                      Kiểm Tra Đáp Án
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleNextFib}
+                      className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs md:text-sm flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition-all"
+                    >
+                      <span>{fibIndex + 1 < fibList.length ? "Câu Kế Tiếp" : "Lặp Lại Bộ Đề"}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-slate-500">Chưa có dữ liệu câu gốc.</div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 4. TIMELINE ORDER MODE (Sắp Xếp Niên Đại - §3)                        */}
+      {/* ===================================================================== */}
+      {activeTab === "timeline" && (
+        <div className="flex flex-col gap-6">
+          <div className="p-6 rounded-3xl bg-slate-900/80 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div>
+              <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
+                <Clock className="w-4 h-4" /> Chronological Timeline &bull; Sắp Xếp Niên Đại (§3)
+              </div>
+              <h2 className="text-xl font-bold text-white mt-1">
+                Thử Thách Sắp Xếp Trật Tự Thời Gian Biến Cố
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Dùng các phím mũi tên Lên / Xuống để sắp xếp các biến cố từ xa xưa nhất đến gần nhất
+              </p>
+            </div>
+            {currentTimeline && (
+              <span className="text-xs font-bold px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                Màn {currentTimelineIndex + 1} / {timelineChallenges.length}
+              </span>
+            )}
+          </div>
+
+          {timelineLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+              <p className="text-xs text-slate-400">Đang nạp dữ liệu biến cố lịch sử...</p>
+            </div>
+          ) : currentTimeline ? (
+            <div className="flex flex-col gap-6">
+              {/* Challenge Title */}
+              <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-1">
+                <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Chủ đề thời đại</span>
+                <h3 className="text-lg font-bold text-white">{currentTimeline.era_title}</h3>
+                <p className="text-xs text-slate-300">{currentTimeline.description}</p>
+              </div>
+
+              {/* Reorderable Events List */}
+              <div className="flex flex-col gap-3">
+                {userEventOrder.map((ev, idx) => {
+                  return (
+                    <div
+                      key={ev.slug}
+                      className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 shadow-md ${
+                        timelineChecked
+                          ? timelineIsCorrect
+                            ? "bg-emerald-950/40 border-emerald-500"
+                            : "bg-slate-900/80 border-slate-700"
+                          : "bg-slate-900/80 border-slate-700 hover:border-slate-600"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 font-bold text-xs flex-shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="flex flex-col">
+                          <h4 className="text-sm font-bold text-white">{ev.title}</h4>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <span className="text-amber-400 font-medium">{ev.period}</span>
+                            {ev.scripture && (
+                              <>
+                                <span>&bull;</span>
+                                <span className="text-blue-300 font-medium">📖 {ev.scripture}</span>
+                              </>
+                            )}
+                            {timelineChecked && (
+                              <>
+                                <span>&bull;</span>
+                                <span className="font-mono text-cyan-300 font-bold">
+                                  Niên đại: {ev.approximate_date}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {ev.description && (
+                            <p className="text-[11px] text-slate-300 mt-1 line-clamp-1">{ev.description}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Up/Down buttons */}
+                      {!timelineChecked && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveEvent(idx, "up")}
+                            disabled={idx === 0}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 hover:text-white transition-colors"
+                            title="Di chuyển lên trước"
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveEvent(idx, "down")}
+                            disabled={idx === userEventOrder.length - 1}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 hover:text-white transition-colors"
+                            title="Di chuyển xuống sau"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action Controls & Narrative Explanation */}
+              <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {timelineChecked ? (
+                    <div className="flex items-center gap-2">
+                      {timelineIsCorrect ? (
+                        <span className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                          Chính xác hoàn hảo theo lịch sử Kinh Thánh! (+50 XP)
+                        </span>
+                      ) : (
+                        <span className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                          <AlertCircle className="w-5 h-5 text-amber-400" />
+                          Thứ tự chưa hoàn toàn chuẩn xác, hãy quan sát niên đại và điều chỉnh lại!
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">
+                      Sắp xếp hoàn tất rồi bấm kiểm tra niên đại
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    {!timelineChecked ? (
+                      <button
+                        type="button"
+                        onClick={handleCheckTimeline}
+                        className="px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs md:text-sm shadow-lg shadow-purple-600/30 transition-all"
+                      >
+                        Kiểm Tra Niên Đại
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleNextTimeline}
+                        className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs md:text-sm flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition-all"
+                      >
+                        <span>{currentTimelineIndex + 1 < timelineChallenges.length ? "Màn Tiếp Theo" : "Chơi Lại Từ Đầu"}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Narrative Explanation */}
+                {timelineChecked && (
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col gap-1.5 mt-2 animate-in fade-in">
+                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1">
+                      📜 Dòng Chảy Lịch Sử Cứu Rỗi:
+                    </span>
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                      {currentTimeline.narrative_explanation}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-slate-500">Chưa có dữ liệu niên đại.</div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 5. AI GENERATOR MODE                                                  */}
       {/* ===================================================================== */}
       {activeTab === "generator" && (
-        <div className="p-6 md:p-8 rounded-3xl glass-panel border border-slate-700/60 flex flex-col gap-6 max-w-2xl mx-auto w-full">
+        <div className="glass-panel p-6 md:p-8 rounded-3xl border border-slate-700/60 flex flex-col gap-6 max-w-2xl mx-auto w-full">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <BrainCircuit className="w-5 h-5 text-emerald-400" />
-              Công Cụ Sinh Câu Hỏi & Thẻ Học Tự Động Bằng AI
-            </h2>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <BrainCircuit className="w-5 h-5 text-indigo-400" />
+              Khởi Tạo Bài Học &amp; Câu Hỏi Bằng AI
+            </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Sử dụng mô hình Qwen chạy trên GPU local để đọc phân đoạn Kinh Thánh và tạo bộ đề chuẩn xác.
+              Sử dụng mô hình ngôn ngữ lớn Qwen 3B chạy cục bộ để tạo câu hỏi trắc nghiệm hoặc Flashcards từ bất kỳ phân đoạn Kinh Thánh nào.
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
-            {/* Target Input */}
+          <form onSubmit={handleGenerate} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-300">
-                Nhập phân đoạn Kinh Thánh hoặc chủ đề:
+              <label className="text-xs font-semibold text-slate-300">Loại tài liệu cần tạo:</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGenType("quiz");
+                    setGenSubtype("multiple_choice");
+                  }}
+                  className={`py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    genType === "quiz"
+                      ? "bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-600/30"
+                      : "bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <HelpCircle className="w-4 h-4" /> Câu Hỏi Trắc Nghiệm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGenType("flashcards");
+                    setGenSubtype("verse");
+                  }}
+                  className={`py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    genType === "flashcards"
+                      ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/30"
+                      : "bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Layers className="w-4 h-4" /> Thẻ Ghi Nhớ (Flashcard)
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                {genType === "quiz" ? "Phân đoạn Kinh Thánh:" : "Chủ đề / Nhân vật / Giáo lý:"}
               </label>
               <input
                 type="text"
                 value={genTarget}
                 onChange={(e) => setGenTarget(e.target.value)}
-                placeholder="Ví dụ: Giăng 3:1-16, Sáng-thế Ký 1, hoặc Sứ đồ Phi-e-rơ"
-                className="bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                placeholder={genType === "quiz" ? "Ví dụ: Giăng 3:1-16 hoặc Sáng-thế Ký 1" : "Ví dụ: Sứ đồ Phi-e-rơ hoặc Ân Điển"}
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               />
             </div>
 
-            {/* Type Selector */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-300">Mục đích tạo:</label>
-                <select
-                  value={genType}
-                  onChange={(e) => {
-                    const val = e.target.value as "quiz" | "flashcards";
-                    setGenType(val);
-                    setGenSubtype(val === "quiz" ? "multiple_choice" : "person");
-                  }}
-                  className="bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="quiz">Trắc Nghiệm (Quiz)</option>
-                  <option value="flashcards">Thẻ Ghi Nhớ (Flashcards)</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-300">Phân loại cụ thể:</label>
+                <label className="text-xs font-semibold text-slate-300">Thể loại con:</label>
                 {genType === "quiz" ? (
                   <select
                     value={genSubtype}
                     onChange={(e) => setGenSubtype(e.target.value)}
-                    className="bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none"
                   >
-                    <option value="multiple_choice">Trắc nghiệm 4 lựa chọn (ABCD)</option>
-                    <option value="who_am_i">Đố nhân vật (Who Am I?)</option>
+                    <option value="multiple_choice">Trắc nghiệm ABCD</option>
+                    <option value="who_am_i">Tôi Là Ai? (Who Am I)</option>
                     <option value="true_false">Đúng / Sai</option>
                   </select>
                 ) : (
                   <select
                     value={genSubtype}
                     onChange={(e) => setGenSubtype(e.target.value)}
-                    className="bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none"
                   >
-                    <option value="person">Thẻ Nhân Vật (Person)</option>
-                    <option value="verse">Thẻ Câu Gốc (Verse)</option>
-                    <option value="event">Thẻ Biến Cố (Event)</option>
-                    <option value="word">Thẻ Giáo Lý / Từ Ngữ</option>
+                    <option value="verse">Câu gốc (Verse)</option>
+                    <option value="person">Nhân vật (Person)</option>
+                    <option value="word">Từ ngữ gốc (Word)</option>
                   </select>
                 )}
               </div>
-            </div>
 
-            {/* Count Selector */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-300">Số lượng tạo (1-5 câu):</label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 5].map((cnt) => (
-                  <button
-                    key={cnt}
-                    type="button"
-                    onClick={() => setGenCount(cnt)}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
-                      genCount === cnt
-                        ? "bg-emerald-600 text-white font-bold"
-                        : "bg-slate-800 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {cnt} câu
-                  </button>
-                ))}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-300">Số lượng tạo (1-5):</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={genCount}
+                  onChange={(e) => setGenCount(parseInt(e.target.value) || 3)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none"
+                />
               </div>
             </div>
 
-            {/* Submit Action */}
             <button
-              onClick={handleGenerateAI}
-              disabled={isGenerating}
-              className="mt-2 py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+              type="submit"
+              disabled={isGenerating || !genTarget.trim()}
+              className="mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Qwen AI đang biên soạn dữ liệu thần học...</span>
+                  <span>Qwen 3B Đang Suy Nghĩ &amp; Khởi Tạo...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Tạo Ngay Bằng AI →</span>
+                  <span>Bắt Đầu Khởi Tạo Với AI</span>
                 </>
               )}
             </button>
+          </form>
 
-            {/* Feedback Banners */}
-            {genSuccessMsg && (
-              <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                <span>{genSuccessMsg} Bạn có thể chuyển sang tab tương ứng để làm bài ngay!</span>
-              </div>
-            )}
-            {genError && (
-              <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
-                <XCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{genError}</span>
-              </div>
-            )}
-          </div>
+          {genSuccessMsg && (
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span>{genSuccessMsg}</span>
+            </div>
+          )}
+
+          {genError && (
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <XCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{genError}</span>
+            </div>
+          )}
         </div>
       )}
     </main>

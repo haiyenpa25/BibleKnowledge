@@ -585,3 +585,270 @@ def submit_quiz_score(req: QuizSubmitRequest, db: Session = Depends(get_db)):
         db.commit()
         return get_user_profile(db=db)
 
+
+# ==============================================================================
+# Interactive Game Modes (§3 ROADMAP1.md): Fill in Blank & Timeline Order
+# ==============================================================================
+
+class FillInBlankWord(BaseModel):
+    text: str
+    is_blank: bool
+    blank_index: Optional[int] = None
+
+
+class FillInBlankItem(BaseModel):
+    id: str
+    reference: str
+    full_text: str
+    display_segments: List[FillInBlankWord]
+    blank_answers: List[str]
+    word_bank: List[str]
+    topic: str
+    difficulty: int
+
+
+class TimelineEventItem(BaseModel):
+    slug: str
+    title: str
+    correct_order: int
+    period: str
+    approximate_date: str
+    scripture: Optional[str]
+    description: str
+
+
+class TimelineChallenge(BaseModel):
+    id: str
+    era_title: str
+    description: str
+    events: List[TimelineEventItem]
+    narrative_explanation: str
+
+
+@router.get("/fill-in-blank", response_model=List[FillInBlankItem])
+def get_fill_in_blank_challenges():
+    """Retrieve scripture memory verse challenges with missing blanks and scrambled word bank (§3)."""
+    raw_challenges = [
+        {
+            "id": "fib-1",
+            "reference": "Giăng 3:16",
+            "full_text": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
+            "topic": "Tình Yêu Cứu Rỗi",
+            "difficulty": 1,
+            "segments": [
+                {"text": "Vì Đức Chúa Trời ", "is_blank": False},
+                {"text": "yêu thương", "is_blank": True, "blank_index": 0},
+                {"text": " thế gian, đến nỗi đã ban ", "is_blank": False},
+                {"text": "Con một", "is_blank": True, "blank_index": 1},
+                {"text": " của Ngài, hầu cho hễ ai ", "is_blank": False},
+                {"text": "tin", "is_blank": True, "blank_index": 2},
+                {"text": " Con ấy không bị hư mất mà được ", "is_blank": False},
+                {"text": "sự sống đời đời", "is_blank": True, "blank_index": 3},
+                {"text": ".", "is_blank": False}
+            ],
+            "answers": ["yêu thương", "Con một", "tin", "sự sống đời đời"],
+            "distractors": ["hận thù", "công đức", "thiên sứ"]
+        },
+        {
+            "id": "fib-2",
+            "reference": "Phi-líp 4:13",
+            "full_text": "Tôi làm được mọi sự nhờ Đấng ban thêm sức cho tôi.",
+            "topic": "Năng Lực Thuộc Linh",
+            "difficulty": 1,
+            "segments": [
+                {"text": "Tôi làm được ", "is_blank": False},
+                {"text": "mọi sự", "is_blank": True, "blank_index": 0},
+                {"text": " nhờ ", "is_blank": False},
+                {"text": "Đấng", "is_blank": True, "blank_index": 1},
+                {"text": " ban ", "is_blank": False},
+                {"text": "thêm sức", "is_blank": True, "blank_index": 2},
+                {"text": " cho tôi.", "is_blank": False}
+            ],
+            "answers": ["mọi sự", "Đấng", "thêm sức"],
+            "distractors": ["tiền bạc", "tự mình", "sự giàu có"]
+        },
+        {
+            "id": "fib-3",
+            "reference": "Rô-ma 8:28",
+            "full_text": "Vả, chúng ta biết rằng mọi sự hiệp lại làm ích cho kẻ yêu mến Đức Chúa Trời, tức là cho kẻ được gọi theo ý muốn Ngài đã định.",
+            "topic": "Sự Tể Trị Của Chúa",
+            "difficulty": 2,
+            "segments": [
+                {"text": "Vả, chúng ta biết rằng mọi sự ", "is_blank": False},
+                {"text": "hiệp lại", "is_blank": True, "blank_index": 0},
+                {"text": " làm ", "is_blank": False},
+                {"text": "ích", "is_blank": True, "blank_index": 1},
+                {"text": " cho kẻ ", "is_blank": False},
+                {"text": "yêu mến", "is_blank": True, "blank_index": 2},
+                {"text": " Đức Chúa Trời, tức là cho kẻ được gọi theo ", "is_blank": False},
+                {"text": "ý muốn", "is_blank": True, "blank_index": 3},
+                {"text": " Ngài đã định.", "is_blank": False}
+            ],
+            "answers": ["hiệp lại", "ích", "yêu mến", "ý muốn"],
+            "distractors": ["hại", "ngẫu nhiên", "chối từ"]
+        },
+        {
+            "id": "fib-4",
+            "reference": "Thi-thiên 23:1",
+            "full_text": "Đức Giê-hô-va là Đấng chăn giữ tôi; tôi sẽ chẳng thiếu thốn gì.",
+            "topic": "Sự Chu Cấp Bình An",
+            "difficulty": 1,
+            "segments": [
+                {"text": "Đức Giê-hô-va là Đấng ", "is_blank": False},
+                {"text": "chăn giữ", "is_blank": True, "blank_index": 0},
+                {"text": " tôi; tôi sẽ chẳng ", "is_blank": False},
+                {"text": "thiếu thốn", "is_blank": True, "blank_index": 1},
+                {"text": " gì.", "is_blank": False}
+            ],
+            "answers": ["chăn giữ", "thiếu thốn"],
+            "distractors": ["bỏ rơi", "dư giả"]
+        },
+        {
+            "id": "fib-5",
+            "reference": "Châm-ngôn 3:5-6",
+            "full_text": "Hãy hết lòng tin cậy Đức Giê-hô-va, chớ nương cậy nơi sự thông sáng của con. Phàm trong các việc làm của con, khá nhận biết Ngài, thì Ngài sẽ chỉ dẫn các nẻo của con.",
+            "topic": "Sự Dẫn Dắt Thiêng Liêng",
+            "difficulty": 2,
+            "segments": [
+                {"text": "Hãy ", "is_blank": False},
+                {"text": "hết lòng", "is_blank": True, "blank_index": 0},
+                {"text": " ", "is_blank": False},
+                {"text": "tin cậy", "is_blank": True, "blank_index": 1},
+                {"text": " Đức Giê-hô-va, chớ nương cậy nơi sự ", "is_blank": False},
+                {"text": "thông sáng", "is_blank": True, "blank_index": 2},
+                {"text": " của con. Phàm trong các việc làm của con, khá ", "is_blank": False},
+                {"text": "nhận biết", "is_blank": True, "blank_index": 3},
+                {"text": " Ngài, thì Ngài sẽ ", "is_blank": False},
+                {"text": "chỉ dẫn", "is_blank": True, "blank_index": 4},
+                {"text": " các nẻo của con.", "is_blank": False}
+            ],
+            "answers": ["hết lòng", "tin cậy", "thông sáng", "nhận biết", "chỉ dẫn"],
+            "distractors": ["nghi ngờ", "khoe khoang", "sức mình"]
+        },
+        {
+            "id": "fib-6",
+            "reference": "Giô-suê 1:9",
+            "full_text": "Hãy vững lòng bền chí, chớ run sợ, chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ở cùng ngươi trong mọi nơi ngươi đi.",
+            "topic": "Lòng Can Đảm & Đức Tin",
+            "difficulty": 2,
+            "segments": [
+                {"text": "Hãy ", "is_blank": False},
+                {"text": "vững lòng bền chí", "is_blank": True, "blank_index": 0},
+                {"text": ", chớ ", "is_blank": False},
+                {"text": "run sợ", "is_blank": True, "blank_index": 1},
+                {"text": ", chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ", "is_blank": False},
+                {"text": "ở cùng ngươi", "is_blank": True, "blank_index": 2},
+                {"text": " trong mọi nơi ngươi đi.", "is_blank": False}
+            ],
+            "answers": ["vững lòng bền chí", "run sợ", "ở cùng ngươi"],
+            "distractors": ["sợ hãi", "bỏ cuộc", "cô đơn"]
+        }
+    ]
+
+    import random
+    results = []
+    for c in raw_challenges:
+        all_words = list(c["answers"]) + list(c["distractors"])
+        random.shuffle(all_words)
+        results.append(FillInBlankItem(
+            id=c["id"],
+            reference=c["reference"],
+            full_text=c["full_text"],
+            display_segments=[FillInBlankWord(**seg) for seg in c["segments"]],
+            blank_answers=c["answers"],
+            word_bank=all_words,
+            topic=c["topic"],
+            difficulty=c["difficulty"]
+        ))
+    return results
+
+
+@router.get("/timeline-challenge", response_model=List[TimelineChallenge])
+def get_timeline_challenges(db: Session = Depends(get_db)):
+    """Retrieve Biblical chronological timeline sorting challenges (§3)."""
+    import random
+
+    challenges_config = [
+        {
+            "id": "tl-1",
+            "era_title": "Toàn Cảnh Lịch Sử Cứu Rỗi (Từ Sáng Thế Đến Hội Thánh)",
+            "description": "Sắp xếp theo thứ tự thời gian các biến cố định hình lịch sử đức tin từ lúc ban đầu đến khi Hội Thánh lan rộng.",
+            "event_slugs": [
+                "su-sang-tao",
+                "giao-uoc-ap-ra-ham",
+                "xuat-ai-cap-vuot-bien-do",
+                "xay-den-tho-sa-lo-mon",
+                "su-giang-sinh-chua-gie-xu",
+                "bien-co-le-ngu-tuan"
+            ],
+            "explanation": "Dòng thời gian bắt đầu từ Sáng Tạo Vũ Trụ -> Giao ước Áp-ra-ham (2091 TCN) -> Xuất Ai Cập (1446 TCN) -> Đền thờ Sa-lô-môn (966 TCN) -> Chúa Giê-xu Giáng sinh (5 TCN) -> Đức Thánh Linh giáng lâm (30 SCN)."
+        },
+        {
+            "id": "tl-2",
+            "era_title": "Cuộc Đời & Chức Vụ Của Chúa Cứu Thế Giê-xu",
+            "description": "Sắp xếp các cột mốc then chốt trong chức vụ trên đất của Đức Chúa Giê-xu Christ.",
+            "event_slugs": [
+                "su-giang-sinh-chua-gie-xu",
+                "phep-la-ca-na",
+                "di-bo-tren-mat-bien",
+                "su-dong-dinh-thap-tu-gia",
+                "su-phuc-sinh-vinh-hien"
+            ],
+            "explanation": "Chúa Giê-xu giáng sinh tại Bết-lê-hem -> Phép lạ đầu tiên tại tiệc cưới Ca-na (27 SCN) -> Đi bộ trên Biển Ga-li-lê (29 SCN) -> Chịu đóng đinh đền tội (30 SCN) -> Phục sinh khải hoàn sau 3 ngày."
+        },
+        {
+            "id": "tl-3",
+            "era_title": "Hội Thánh Đầu Tiên & Chức Vụ Sứ Đồ",
+            "description": "Sắp xếp các biến cố từ sự giáng lâm của Đức Thánh Linh đến sự biến cải của Sứ đồ Phao-lô.",
+            "event_slugs": [
+                "su-phuc-sinh-vinh-hien",
+                "bien-co-le-ngu-tuan",
+                "su-bien-cai-cua-phao-lo"
+            ],
+            "explanation": "Sau sự Phục sinh của Chúa Giê-xu, Đức Thánh Linh giáng lâm vào Lễ Ngũ Tuần làm bùng cháy Hội Thánh Giê-ru-sa-lem, sau đó Sau-lơ được biến cải trên đường Đa-mách để trở thành Sứ đồ Phao-lô cho Dân Ngoại."
+        }
+    ]
+
+    results = []
+    for cfg in challenges_config:
+        slug_order_map = {slug: idx + 1 for idx, slug in enumerate(cfg["event_slugs"])}
+        slugs_tuple = tuple(cfg["event_slugs"])
+
+        rows = db.execute(
+            text("""
+            SELECT slug, title, period, approximate_date, description, metadata
+            FROM events
+            WHERE slug IN :slugs
+            """),
+            {"slugs": slugs_tuple}
+        ).fetchall()
+
+        events_list = []
+        for r in rows:
+            meta = r.metadata if isinstance(r.metadata, dict) else {}
+            events_list.append(TimelineEventItem(
+                slug=r.slug,
+                title=r.title,
+                correct_order=slug_order_map.get(r.slug, 99),
+                period=r.period or "",
+                approximate_date=r.approximate_date or "",
+                scripture=meta.get("scripture", "") if meta else "",
+                description=r.description or ""
+            ))
+
+        # Sort initially by correct_order then scramble order for the challenge
+        events_list.sort(key=lambda x: x.correct_order)
+        shuffled = list(events_list)
+        random.shuffle(shuffled)
+
+        results.append(TimelineChallenge(
+            id=cfg["id"],
+            era_title=cfg["era_title"],
+            description=cfg["description"],
+            events=shuffled,
+            narrative_explanation=cfg["explanation"]
+        ))
+
+    return results
+
+
