@@ -131,6 +131,19 @@ async function main() {
   const rCompareVerse = await testEndpoint('/api/bible/compare-verse?book=sa&chapter=1&verse=1', d => (!d.translations || d.translations.length < 4) && 'Invalid comparison translations');
   report('GET /api/bible/compare-verse (Multi-translation alignment across 4 versions)', rCompareVerse.ok, rCompareVerse.error);
 
+  // Daily Insight & Audio Devotionals (§53)
+  const rDailyInsight = await testEndpoint('/api/bible/daily-insight', d => (!d.verse_of_the_day || !d.devotional_meditation || !d.metrics?.total_devotionals) && 'Invalid daily insight data');
+  report('GET /api/bible/daily-insight (Daily verse, person, event, quiz & devotionals count)', rDailyInsight.ok, rDailyInsight.error);
+
+  const rDevotionals = await testEndpoint('/api/bible/devotionals', d => (!Array.isArray(d.devotionals) || d.total < 16 || !Array.isArray(d.themes)) && 'Invalid devotionals catalogue');
+  report(`GET /api/bible/devotionals (${rDevotionals.data?.total || 0} Curated theological audio meditations)`, rDevotionals.ok, rDevotionals.error);
+
+  const rDevSearch = await testEndpoint(`/api/bible/devotionals/search?q=${encodeURIComponent('an dien')}`, d => (!Array.isArray(d.devotionals) || d.total === 0) && 'No search results for devotionals');
+  report('GET /api/bible/devotionals/search (Accent-insensitive audio devotional discovery)', rDevSearch.ok, rDevSearch.error);
+
+  const rDevDetail = await testEndpoint('/api/bible/devotionals/dev-john-3-16', d => (d.id !== 'dev-john-3-16' || !d.prayer || !d.next_id) && 'Invalid devotional detail');
+  report('GET /api/bible/devotionals/{id} (Single devotional exegesis & audio cues)', rDevDetail.ok, rDevDetail.error);
+
   // RAG & Exegesis Module
   const rCtxPresets = await testEndpoint('/api/rag/context-presets', d => (!Array.isArray(d) || d.length === 0) && 'No context presets');
   report('GET /api/rag/context-presets (6-Dimension context presets)', rCtxPresets.ok, rCtxPresets.error);

@@ -8,6 +8,7 @@ import re
 import json
 import urllib.request
 import urllib.parse
+import unicodedata
 from app.db.session import get_db
 
 router = APIRouter(prefix="/bible", tags=["Bible Core"])
@@ -422,6 +423,346 @@ def search_bible(
     }
 
 
+def _normalize_vietnamese(s: str) -> str:
+    """Normalize Vietnamese text for accent-insensitive and case-insensitive comparison."""
+    if not s:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', s)
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().replace('đ', 'd').replace('Đ', 'd').strip()
+
+
+# Curated Theological Meditations & Audio Devotionals (§53)
+DEVOTIONALS_CATALOGUE: List[Dict[str, Any]] = [
+    {
+        "id": "dev-john-3-16",
+        "reference": "Giăng 3:16",
+        "book": "Giăng",
+        "chapter": 3,
+        "verse": 16,
+        "title": "Tình Yêu Đời Đời Của Cha Thiên Thượng",
+        "theme": "Ân Điển & Cứu Chuộc",
+        "golden_verse": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
+        "reflection": "Giăng 3:16 là tâm điểm của Phúc Âm và đỉnh cao của kế hoạch cứu rỗi muôn đời. Đức Chúa Trời không chỉ bày tỏ tình yêu bằng lời phán mà bằng hành động dâng hiến tột bậc: Ngài đã ban Con Một là Chúa Cứu Thế Giê-xu để gánh tội thay cho nhân loại. Khi chúng ta đặt trọn đức tin nơi Đấng Christ, chúng ta không còn bị đoán phạt mà nhận lãnh sự sống vĩnh cửu ngay trong hiện tại.",
+        "prayer": "Lạy Cha từ ái, con tạ ơn Chúa vì tình yêu thương vô đối đã cứu chuộc cuộc đời con. Xin giúp con sống xứng đáng với ơn cứu rỗi và trở nên ngọn đèn chiếu tỏa tình yêu Ngài cho những người xung quanh hôm nay. Trong danh Chúa Giê-xu Christ. Amen.",
+        "tradition": "Giải Kinh Phúc Âm & Ân Điển Cứu Chuộc",
+        "audio_duration_seconds": 68,
+        "tags": ["tinh_yeu", "cuu_chuoc", "an_dien", "giang_3_16", "su_song_doi_doi"]
+    },
+    {
+        "id": "dev-psalm-23-1",
+        "reference": "Thi-thiên 23:1",
+        "book": "Thi-thiên",
+        "chapter": 23,
+        "verse": 1,
+        "title": "Đấng Chăn Chiên Nhân Lành Vẹn Toàn",
+        "theme": "Bình An & Che Chở",
+        "golden_verse": "Đức Giê-hô-va là Đấng chăn giữ tôi; tôi sẽ chẳng thiếu thốn gì.",
+        "reflection": "Khi Đức Giê-hô-va là Đấng Chăn giữ cuộc đời mình, chúng ta sẽ chẳng thiếu thốn gì về nhu cầu tâm linh lẫn thể xác. Ngài dẫn chúng ta đến mé nước bình tịnh, bổ lại linh hồn và dắt lối công bình vì cớ danh Ngài. Dù đi qua trũng bóng chết, ta không sợ tai họa nào vì Ngài ở cùng và cây trượng cây gậy của Ngài an ủi chúng ta.",
+        "prayer": "Lạy Chúa là Đấng Chăn giữ con, con xin trao phó mọi lo toan, dự định hôm nay vào bàn tay dịu dàng của Ngài. Xin ban cho con sự bình an sâu nhiệm giữa mọi biến động cuộc sống. Amen.",
+        "tradition": "Thánh Vịnh David & Sự Nuôi Dưỡng Tâm Linh",
+        "audio_duration_seconds": 60,
+        "tags": ["binh_an", "dang_chan_chien", "thi_thien", "thieu_thon", "nuoi_duong"]
+    },
+    {
+        "id": "dev-rom-8-28",
+        "reference": "Rô-ma 8:28",
+        "book": "Rô-ma",
+        "chapter": 8,
+        "verse": 28,
+        "title": "Mọi Sự Hiệp Lại Làm Ích Cho Kẻ Yêu Mến Chúa",
+        "theme": "Chủ Quyền Tối Thượng",
+        "golden_verse": "Vả, chúng ta biết rằng mọi sự hiệp lại làm ích cho kẻ yêu mến Đức Chúa Trời, tức là cho kẻ được gọi theo ý muốn Ngài đã định.",
+        "reflection": "Dù hoàn cảnh hiện tại có thể đầy thách thức hay khó hiểu, Lời Chúa bảo chứng rằng muôn sự đều đang vận hành dưới sự tể trị của Đấng Thành Tín để đem lại ích lợi tối hậu cho những kẻ yêu mến Ngài và được gọi theo ý định Ngài. Không một nghịch cảnh nào có thể vượt ra ngoài cánh tay tể trị của Chúa.",
+        "prayer": "Lạy Chúa, ngay cả trong những điều con chưa hiểu thấu, con xin hết lòng nương cậy vào sự khôn ngoan và lòng nhân từ của Ngài. Xin biến đổi thử thách hôm nay thành cơ hội để đức tin con thêm vững vàng. Amen.",
+        "tradition": "Thần Học Phao-lô & Chủ Quyền Tối Cao",
+        "audio_duration_seconds": 65,
+        "tags": ["chu_quyen", "y_muon_chua", "ro_ma", "hiep_lai_lam_ich", "duc_tin"]
+    },
+    {
+        "id": "dev-phil-4-13",
+        "reference": "Phi-líp 4:13",
+        "book": "Phi-líp",
+        "chapter": 4,
+        "verse": 13,
+        "title": "Năng Lực Đắc Thắng Trong Đấng Christ",
+        "theme": "Đức Tin & Đắc Thắng",
+        "golden_verse": "Tôi làm được mọi sự nhờ Đấng ban thêm sức cho tôi.",
+        "reflection": "Sứ đồ Phao-lô không tự hào về sức riêng, mà kinh nghiệm năng lực siêu nhiên của Đấng Christ tuôn tràn khi ông ở trong Ngài. Bất kể khi dư dật hay thiếu thốn, người theo Chúa luôn có thể vượt qua mọi thử thách nhờ nguồn ân điển và năng quyền thiên thượng tiếp trợ không ngừng.",
+        "prayer": "Lạy Đấng Cứu Thế Giê-xu, con cầu xin Ngài đổ đầy Thánh Linh và sức lực tươi mới trên con trong ngày hôm nay, để con hoàn tất mọi trách nhiệm với lòng trung tín và vinh hiển Danh Ngài. Amen.",
+        "tradition": "Đời Sống Tận Hiến & Sức Mạnh Thuộc Linh",
+        "audio_duration_seconds": 58,
+        "tags": ["dac_thang", "suc_manh", "phi_lip", "dang_christ", "nang_quyen"]
+    },
+    {
+        "id": "dev-prov-3-5",
+        "reference": "Châm-ngôn 3:5-6",
+        "book": "Châm-ngôn",
+        "chapter": 3,
+        "verse": 5,
+        "title": "Hết Lòng Tin Cậy Đấng Dẫn Đường",
+        "theme": "Sự Khôn Ngoan & Dẫn Dắt",
+        "golden_verse": "Hãy hết lòng tin cậy Đức Giê-hô-va, Chớ nương cậy nơi sự thông sáng của con; Phàm trong các việc làm của con, khá nhận biết Ngài, Thì Ngài sẽ chỉ dẫn các nẻo của con.",
+        "reflection": "Khôn ngoan của con người là hữu hạn, nhưng sự chỉ dẫn của Chúa là hoàn hảo. Khi chúng ta từ bỏ sự tự phụ, nhận biết Chúa trong mọi bước đường và quyết định, chính Ngài sẽ san bằng các nẻo chông gai phía trước và dẫn dắt chân ta đi trong sự công bình.",
+        "prayer": "Lạy Chúa, xin dẫn dắt từng quyết định, lời nói và hành vi của con hôm nay. Con xin hạ mình đầu phục trước ý chỉ thánh khiết và sự khôn ngoan vô đối của Ngài. Amen.",
+        "tradition": "Văn Thơ Khôn Ngoan & Định Hướng Đời Sống",
+        "audio_duration_seconds": 62,
+        "tags": ["khon_ngoan", "dan_dat", "cham_ngon", "tin_cay", "thong_sang"]
+    },
+    {
+        "id": "dev-isa-40-31",
+        "reference": "Ê-sai 40:31",
+        "book": "Ê-sai",
+        "chapter": 40,
+        "verse": 31,
+        "title": "Cất Cánh Bay Cao Như Chim Ưng",
+        "theme": "Trông Đợi & Sức Mới",
+        "golden_verse": "Nhưng ai trông đợi Đức Giê-hô-va thì chắc được sức mới, cất cánh bay cao như chim ưng; chạy mà không mệt nhọc, đi mà không mòn mỏi.",
+        "reflection": "Kẻ trông đợi Đức Giê-hô-va sẽ được đổi mới sức lực. Như chim ưng giương cánh lướt trên bão gió, đức tin trông cậy nơi Chúa nâng đỡ tâm hồn vượt lên trên những mệt mỏi và kiệt quệ của trần gian. Sức mạnh của Chúa bù đắp trọn vẹn cho sự yếu đuối của con người.",
+        "prayer": "Lạy Chúa, khi con cảm thấy kiệt sức trước gánh nặng đời thường, xin phục hồi linh lực cho con. Xin nhắc nhở con rằng nguồn năng lực đời đời và đắc thắng thuộc về Ngài. Amen.",
+        "tradition": "Tiên Tri Ê-sai & Sự Đổi Mới Tâm Hồn",
+        "audio_duration_seconds": 60,
+        "tags": ["trong_doi", "suc_moi", "e_sai", "chim_ung", "nang_luc"]
+    },
+    {
+        "id": "dev-jer-29-11",
+        "reference": "Giê-rê-mi 29:11",
+        "book": "Giê-rê-mi",
+        "chapter": 29,
+        "verse": 11,
+        "title": "Ý Tưởng Bình An & Hy Vọng Tương Lai",
+        "theme": "Hy Vọng & Tương Lai Phước Hạnh",
+        "golden_verse": "Đức Giê-hô-va phán: Vì ta biết ý tưởng ta nghĩ đối cùng các ngươi, là ý tưởng bình an, không phải tai họa, để cho các ngươi được sự trông cậy trong lúc cuối cùng của mình.",
+        "reflection": "Đức Giê-hô-va có chương trình tốt lành định sẵn cho đời sống chúng ta: ý tưởng bình an chứ không phải tai họa, để ban cho chúng ta một sự trông cậy sống động và một kết cục phước hạnh. Ngay giữa thời kỳ lưu đày hay thử thách cam go nhất, lời hứa của Chúa vẫn đứng vững muôn đời.",
+        "prayer": "Lạy Chúa, con an nghỉ trong lời hứa thành tín của Ngài. Xin gìn giữ lòng con hướng về hy vọng sống động và tương lai phước hạnh mà Chúa đã sắm sẵn cho con. Amen.",
+        "tradition": "Lời Hứa Tiên Tri & Bình An Giữa Hoạn Nạn",
+        "audio_duration_seconds": 65,
+        "tags": ["hy_vong", "tuong_lai", "gie_re_mi", "binh_an", "thanh_tin"]
+    },
+    {
+        "id": "dev-matt-6-33",
+        "reference": "Ma-thi-ơ 6:33",
+        "book": "Ma-thi-ơ",
+        "chapter": 6,
+        "verse": 33,
+        "title": "Tìm Kiếm Nước Đức Chúa Trời Trước Hết",
+        "theme": "Tận Hiến & Tìm Kiếm Nước Chúa",
+        "golden_verse": "Nhưng trước hết, hãy tìm kiếm nước Đức Chúa Trời và sự công bình của Ngài, thì Ngài sẽ cho thêm các ngươi mọi điều ấy nữa.",
+        "reflection": "Chúa Giê-xu kêu gọi môn đồ tái định hình toàn bộ thứ tự ưu tiên của đời sống. Khi chúng ta đặt Vương quốc Đức Chúa Trời và sự công bình của Ngài lên hàng đầu, Cha trên trời - Đấng nuôi chim trời và mặc đẹp cho hoa huệ ngoài đồng - sẽ chu cấp đầy đủ mọi nhu cầu của chúng ta.",
+        "prayer": "Lạy Chúa Cứu Thế Giê-xu, xin thanh tẩy tấm lòng con khỏi những lo âu trần thế. Xin ban cho con tấm lòng khao khát Nước Trời và dâng hiến cuộc đời để làm rạng danh Cha trước hết. Amen.",
+        "tradition": "Bài Giảng Trên Núi & Vương Quốc Thiên Đàng",
+        "audio_duration_seconds": 66,
+        "tags": ["nuoc_duc_chua_troi", "uu_tien", "ma_thi_o", "chu_cap", "tan_hien"]
+    },
+    {
+        "id": "dev-2cor-12-9",
+        "reference": "II Cô-rinh-tô 12:9",
+        "book": "II Cô-rinh-tô",
+        "chapter": 12,
+        "verse": 9,
+        "title": "Ân Điển Chúa Đủ Đầy Trong Sự Yếu Đuối",
+        "theme": "Ân Điển & Cứu Chuộc",
+        "golden_verse": "Nhưng Chúa phán rằng: Ân điển ta đủ cho ngươi rồi, vì sức mạnh của ta nên trọn vẹn trong sự yếu đuối. Vậy tôi sẽ rất vui lòng khoe mình về sự yếu đuối tôi, hầu cho sức mạnh của Đấng Christ ở trong tôi.",
+        "reflection": "Sự yếu đuối của con người không phải là rào cản, mà chính là chiếc bình đất để quyền năng vô hạn của Chúa tỏa sáng. Ân điển của Chúa không chỉ xoa dịu nỗi đau mà còn biến đổi sự bất toàn của chúng ta thành khí cụ quyền năng cho Vương quốc Ngài.",
+        "prayer": "Lạy Cha, khi con đối diện với giới hạn và sự yếu đuối của chính mình, xin nhắc con rằng ân điển Chúa luôn trọn vẹn và đủ đầy. Xin sức mạnh Đấng Christ bao phủ và dẫn dắt con hôm nay. Amen.",
+        "tradition": "Thần Học Thập Tự Giá & Ân Điển Toàn Hảo",
+        "audio_duration_seconds": 70,
+        "tags": ["an_dien", "yeu_duoi", "co_rinh_to", "suc_manh", "phao_lo"]
+    },
+    {
+        "id": "dev-heb-11-1",
+        "reference": "Hê-bơ-rơ 11:1",
+        "book": "Hê-bơ-rơ",
+        "chapter": 11,
+        "verse": 1,
+        "title": "Bản Chất Của Đức Tin Sống Động",
+        "theme": "Đức Tin & Đắc Thắng",
+        "golden_verse": "Vả, đức tin là sự biết chắc vững vàng của những điều mình đương trông mong, là bằng cớ của những điều mình chẳng xem thấy.",
+        "reflection": "Đức tin theo Kinh Thánh không phải là cảm xúc mơ hồ hay sự lạc quan mù quáng, mà là sự xác tín vững vàng đặt trên Lời Hứa bất biến của Đức Chúa Trời. Đức tin nhìn thấy điều vô hình, nắm chặt điều hứa nguyện và bước đi can trường giữa những giông bão mắt trần.",
+        "prayer": "Lạy Đức Chúa Trời Thành Tín, xin gia thêm đức tin cho con để con không bước đi theo mắt thấy nhưng theo Lời Hứa của Ngài. Xin neo chặt tâm hồn con nơi Đấng là Cội Rễ và Cuối Cùng của đức tin. Amen.",
+        "tradition": "Thần Học Hê-bơ-rơ & Các Nhân Chứng Đức Tin",
+        "audio_duration_seconds": 64,
+        "tags": ["duc_tin", "he_bo_ro", "trong_mong", "bang_co", "thanh_tin"]
+    },
+    {
+        "id": "dev-prov-4-23",
+        "reference": "Châm-ngôn 4:23",
+        "book": "Châm-ngôn",
+        "chapter": 4,
+        "verse": 23,
+        "title": "Khá Cẩn Thận Giữ Tấm Lòng Hơn Hết",
+        "theme": "Sự Khôn Ngoan & Dẫn Dắt",
+        "golden_verse": "Khá cẩn thận giữ tấm lòng của con hơn hết, Vì các nguồn sự sống do nơi nó mà ra.",
+        "reflection": "Tấm lòng là trung tâm chỉ huy tư tưởng, ước muốn, quyết định và nhân cách của mỗi con người. Canh giữ tấm lòng khỏi cay đắng, tham vọng bất khiết và sự kiêu ngạo là nền tảng để dòng chảy sự sống thiêng liêng tuôn tràn vào mọi hành vi của chúng ta.",
+        "prayer": "Lạy Chúa, xin tạo nên trong con một tấm lòng trong sạch, và làm mới lại trong con một thần linh ngay thẳng. Xin đặt đồn lũy Lời Ngài chung quanh tâm trí con hôm nay. Amen.",
+        "tradition": "Đạo Đức Cơ Đốc & Sự Thánh Khiết Tâm Hồn",
+        "audio_duration_seconds": 62,
+        "tags": ["tam_long", "thanh_khiet", "cham_ngon", "su_song", "canh_giu"]
+    },
+    {
+        "id": "dev-psalm-46-1",
+        "reference": "Thi-thiên 46:1",
+        "book": "Thi-thiên",
+        "chapter": 46,
+        "verse": 1,
+        "title": "Nơi Nương Náu & Sức Lực Lúc Gian Truân",
+        "theme": "Bình An & Che Chở",
+        "golden_verse": "Đức Chúa Trời là nơi nương náu và sức lực của chúng tôi, Ngài sẵn giúp đỡ trong cơn gian truân.",
+        "reflection": "Dù đất biến đổi, dù núi dời vào lòng biển, dân sự Chúa không hề rúng sợ vì Đức Chúa Trời ở giữa họ. Ngài là thành lũy bất khả xâm phạm và là nguồn tiếp trợ sẵn sàng tức thì ngay trong giây phút chúng ta đối diện với khủng hoảng.",
+        "prayer": "Lạy Đức Chúa Trời Hằng Sống, giữa muôn tiếng ồn ào và biến động của thế giới, con chạy đến ẩn náu dưới bóng cánh Ngài. Xin Ngài là nơi trú ẩn và thành lũy vững chắc của đời sống con. Amen.",
+        "tradition": "Thánh Thi Ca Ngợi & Sự Bảo Vệ Toàn Năng",
+        "audio_duration_seconds": 60,
+        "tags": ["nuong_nau", "suc_luc", "gian_truan", "thi_thien", "thanh_luy"]
+    },
+    {
+        "id": "dev-rev-21-4",
+        "reference": "Khải-huyền 21:4",
+        "book": "Khải-huyền",
+        "chapter": 21,
+        "verse": 4,
+        "title": "Ngài Sẽ Lau Ráo Mọi Giọt Nước Mắt",
+        "theme": "Hy Vọng & Tương Lai Phước Hạnh",
+        "golden_verse": "Ngài sẽ lau ráo hết nước mắt khỏi mắt chúng, sẽ không có sự chết, cũng không có than khóc, kêu ca, hay là đau đớn nữa; vì những sự thứ nhất đã qua rồi.",
+        "reflection": "Khải huyền không chỉ là sách về những biến động thời kỳ cuối, mà là bức tranh vinh hiển trác tuyệt về sự tái tạo toàn diện của Đức Chúa Trời. Mọi vết thương, nỗi đau, chia lìa và sự chết đều sẽ bị xóa bỏ hoàn toàn trong sự hiện diện đời đời của Chiên Con.",
+        "prayer": "Lạy Chúa Giê-xu, Đấng Alpha và Omega, lòng con hướng về ngày vinh hiển khi Ngài trở lại đổi mới muôn vật. Xin ban cho con niềm hy vọng sống động để kiên trì phục vụ Chúa cho đến ngày gặp Ngài. Amen.",
+        "tradition": "Mặc Khải Khải Huyền & Cứu Chuộc Tối Hậu",
+        "audio_duration_seconds": 68,
+        "tags": ["khai_huyen", "troi_moi_dat_moi", "lau_nuoc_mat", "hy_vong", "vinh_hien"]
+    },
+    {
+        "id": "dev-gal-5-22",
+        "reference": "Ga-la-ti 5:22",
+        "book": "Ga-la-ti",
+        "chapter": 5,
+        "verse": 22,
+        "title": "Hoa Quả Của Đức Thánh Linh Trong Đời Sống",
+        "theme": "Tận Hiến & Tìm Kiếm Nước Chúa",
+        "golden_verse": "Nhưng trái của Thánh Linh, ấy là lòng yêu thương, sự vui mừng, bình an, nhịn nhục, nhân từ, hiền lành, trung tín, mềm mại, tiết độ.",
+        "reflection": "Trái Thánh Linh không phải là nỗ lực đạo đức của xác thịt con người, mà là kết quả tất yếu của một đời sống kết hiệp mật thiết với Đấng Christ. Khi chúng ta đầu phục Thánh Linh mỗi ngày, chín mỹ đức thiêng liêng này sẽ tự nhiên nở rộ và làm tỏa hương thơm của Đấng Christ.",
+        "prayer": "Lạy Đức Thánh Linh phước hạnh, xin tỉa sửa và làm mềm mại đời sống con. Xin kết quả của Ngài tuôn tràn qua lời nói, thái độ và tình yêu thương của con đối với tha nhân hôm nay. Amen.",
+        "tradition": "Thần Học Đời Sống Thuộc Linh & Thánh Linh",
+        "audio_duration_seconds": 65,
+        "tags": ["trai_thanh_linh", "yeu_thuong", "vui_mung", "ga_la_ti", "thanh_hoa"]
+    },
+    {
+        "id": "dev-josh-1-9",
+        "reference": "Giô-suê 1:9",
+        "book": "Giô-suê",
+        "chapter": 1,
+        "verse": 9,
+        "title": "Hãy Vững Lòng Bền Chí, Chớ Run Sợ",
+        "theme": "Đức Tin & Đắc Thắng",
+        "golden_verse": "Ta há không có phán dặn ngươi sao? Hãy vững lòng bền chí, chớ run sợ, chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ở cùng ngươi trong mọi nơi ngươi đi.",
+        "reflection": "Mệnh lệnh 'hãy vững lòng bền chí' không căn cứ vào tài thao lược hay sức mạnh quân sự của Giô-suê, mà dựa trên lời hứa tuyệt đối: 'Đức Chúa Trời ngươi vẫn ở cùng ngươi'. Sự hiện diện của Chúa là nền tảng tối thượng xua tan mọi nỗi sợ hãi trước những miền đất mới và thách thức to lớn.",
+        "prayer": "Lạy Chúa, xin cất khỏi con sự nhút nhát và sợ hãi. Xin cho con lòng can đảm thánh khiết để bước đi vâng phục tiếng gọi của Ngài, tin quyết rằng Ngài luôn đồng hành bên con trên mọi nẻo đường. Amen.",
+        "tradition": "Lịch Sử Chinh Phục & Sự Đồng Hành Thiên Thượng",
+        "audio_duration_seconds": 62,
+        "tags": ["vung_long_ben_chi", "gio_sue", "cho_run_so", "o_cung", "can_dam"]
+    },
+    {
+        "id": "dev-psalm-119-105",
+        "reference": "Thi-thiên 119:105",
+        "book": "Thi-thiên",
+        "chapter": 119,
+        "verse": 105,
+        "title": "Lời Chúa Là Ngọn Đèn Cho Chân Tôi",
+        "theme": "Sự Khôn Ngoan & Dẫn Dắt",
+        "golden_verse": "Lời Chúa là ngọn đèn cho chân tôi, Ánh sáng cho đường lối tôi.",
+        "reflection": "Trong một thế gian tăm tối đầy dẫy những cạm bẫy đạo đức và tư tưởng sai lạc, Lời Đức Chúa Trời là ngọn đèn dầu soi từng bước đi cụ thể và là ánh bình minh rực rỡ chỉ dẫn toàn bộ hướng đi của cuộc đời. Yêu mến Lời Chúa là bí quyết để không hề vấp ngã.",
+        "prayer": "Lạy Chúa, con tạ ơn Ngài vì đã ban Kinh Thánh làm kim chỉ nam vô giá. Xin mở mắt con để con thấy những điều diệu kỳ trong luật pháp Ngài, và ban cho con tấm lòng vâng giữ Lời Chúa trọn đời. Amen.",
+        "tradition": "Thánh Vịnh Luật Pháp & Quyền Năng Lời Chúa",
+        "audio_duration_seconds": 63,
+        "tags": ["loi_chua", "ngon_den", "anh_sang", "thi_thien_119", "chan_ly"]
+    }
+]
+
+MEDITATIONS_MAP: Dict[str, Dict[str, Any]] = {d["reference"]: d for d in DEVOTIONALS_CATALOGUE}
+
+
+@router.get("/devotionals")
+def list_devotionals(
+    theme: Optional[str] = Query(None, description="Lọc theo chủ đề suy ngẫm"),
+    tag: Optional[str] = Query(None, description="Lọc theo nhãn từ khóa"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """
+    List all theological devotionals with audio duration and metadata (§53).
+    """
+    results = DEVOTIONALS_CATALOGUE
+    if theme and theme.strip() and theme != "all" and theme != "Tất cả":
+        theme_clean = theme.strip().lower()
+        results = [d for d in results if theme_clean in d["theme"].lower()]
+    if tag and tag.strip():
+        tag_clean = tag.strip().lower()
+        results = [d for d in results if any(tag_clean in t.lower() for t in d.get("tags", []))]
+    
+    unique_themes = sorted(list(set(d["theme"] for d in DEVOTIONALS_CATALOGUE)))
+    total = len(results)
+    paginated = results[offset : offset + limit]
+    return {
+        "total": total,
+        "themes": unique_themes,
+        "limit": limit,
+        "offset": offset,
+        "devotionals": paginated
+    }
+
+
+@router.get("/devotionals/search")
+def search_devotionals(
+    q: str = Query(..., min_length=1, description="Từ khóa tìm kiếm suy ngẫm audio"),
+    theme: Optional[str] = Query(None, description="Lọc theo chủ đề")
+):
+    """
+    Accent-insensitive semantic & keyword search across biblical devotionals, prayers and reflections (§53).
+    """
+    norm_q = _normalize_vietnamese(q)
+    results = []
+    for d in DEVOTIONALS_CATALOGUE:
+        if theme and theme.strip() and theme != "all" and theme != "Tất cả":
+            if theme.strip().lower() not in d["theme"].lower():
+                continue
+        searchable_text = f"{d['reference']} {d['title']} {d['theme']} {d['golden_verse']} {d['reflection']} {d['prayer']} {' '.join(d.get('tags', []))}"
+        norm_target = _normalize_vietnamese(searchable_text)
+        if norm_q in norm_target:
+            results.append(d)
+
+    return {
+        "query": q,
+        "theme": theme,
+        "total": len(results),
+        "devotionals": results
+    }
+
+
+@router.get("/devotionals/{devotional_id}")
+def get_devotional_detail(devotional_id: str):
+    """
+    Get full devotional detail by ID with navigation cues (§53).
+    """
+    target = None
+    target_idx = -1
+    for idx, d in enumerate(DEVOTIONALS_CATALOGUE):
+        if d["id"] == devotional_id:
+            target = d
+            target_idx = idx
+            break
+    
+    if not target:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài suy ngẫm devotional này.")
+
+    prev_item = DEVOTIONALS_CATALOGUE[target_idx - 1] if target_idx > 0 else None
+    next_item = DEVOTIONALS_CATALOGUE[target_idx + 1] if target_idx < len(DEVOTIONALS_CATALOGUE) - 1 else None
+
+    return {
+        **target,
+        "prev_id": prev_item["id"] if prev_item else None,
+        "prev_title": prev_item["title"] if prev_item else None,
+        "next_id": next_item["id"] if next_item else None,
+        "next_title": next_item["title"] if next_item else None
+    }
+
+
 @router.get("/daily-insight")
 def get_daily_insight(db: Session = Depends(get_db)):
     """
@@ -429,54 +770,9 @@ def get_daily_insight(db: Session = Depends(get_db)):
     Reference: ROADMAP1.md Section 53
     """
     # 1. Verse of the Day (Curated pool & Theological Meditations)
-    MEDITATIONS_MAP = {
-        "Giăng 3:16": {
-            "title": "Tình Yêu Đời Đời Của Cha Thiên Thượng",
-            "theme": "Sự Sống Đời Đời & Ân Điển Cứu Chuộc",
-            "reflection": "Giăng 3:16 là trọng tâm của Phúc Âm. Đức Chúa Trời không chỉ bày tỏ tình yêu bằng lời phán mà bằng hành động dâng hiến tột bậc: Ngài đã ban Con Một là Chúa Cứu Thế Giê-xu để gánh tội thay cho nhân loại. Khi chúng ta đặt trọn đức tin nơi Đấng Christ, chúng ta không còn bị đoán phạt mà nhận lãnh sự sống vĩnh cửu ngay trong hiện tại.",
-            "prayer": "Lạy Cha từ ái, con tạ ơn Chúa vì tình yêu thương vô đối đã cứu chuộc cuộc đời con. Xin giúp con sống xứng đáng với ơn cứu rỗi và trở nên ngọn đèn chiếu tỏa tình yêu Ngài cho những người xung quanh hôm nay. Trong danh Chúa Giê-xu Christ. Amen."
-        },
-        "Thi-thiên 23:1": {
-            "title": "Đấng Chăn Chiên Nhân Lành Vẹn Toàn",
-            "theme": "Sự Nuôi Dưỡng & Bình An Trọn Vẹn",
-            "reflection": "Khi Đức Giê-hô-va là Đấng Chăn giữ cuộc đời mình, chúng ta sẽ chẳng thiếu thốn gì về nhu cầu tâm linh lẫn thể xác. Ngài dẫn chúng ta đến mé nước bình tịnh, bổ lại linh hồn và dắt lối công bình vì cớ danh Ngài.",
-            "prayer": "Lạy Chúa là Đấng Chăn giữ con, con xin trao phó mọi lo toan, dự định hôm nay vào bàn tay dịu dàng của Ngài. Xin ban cho con sự bình an sâu nhiệm giữa mọi biến động cuộc sống. Amen."
-        },
-        "Rô-ma 8:28": {
-            "title": "Mọi Sự Hiệp Lại Làm Ích",
-            "theme": "Chủ Quyền Tối Thượng Của Đức Chúa Trời",
-            "reflection": "Dù hoàn cảnh hiện tại có thể đầy thách thức hay khó hiểu, Lời Chúa bảo chứng rằng muôn sự đều đang vận hành dưới sự tể trị của Đấng Thành Tín để đem lại ích lợi tối hậu cho những kẻ yêu mến Ngài và được gọi theo ý định Ngài.",
-            "prayer": "Lạy Chúa, ngay cả trong những điều con chưa hiểu thấu, con xin hết lòng nương cậy vào sự khôn ngoan và lòng nhân từ của Ngài. Xin biến đổi thử thách hôm nay thành cơ hội để đức tin con thêm vững vàng. Amen."
-        },
-        "Phi-líp 4:13": {
-            "title": "Năng Lực Đắc Thắng Trong Đấng Christ",
-            "theme": "Năng Quyền Thuộc Linh & Sự Thỏa Lòng",
-            "reflection": "Sứ đồ Phao-lô không tự hào về sức riêng, mà kinh nghiệm năng lực siêu nhiên của Đấng Christ tuôn tràn khi ông ở trong Ngài. Bất kể khi dư dật hay thiếu thốn, người theo Chúa luôn có thể làm được mọi sự nhờ sức Chúa ban.",
-            "prayer": "Lạy Đấng Cứu Thế Giê-xu, con cầu xin Ngài đổ đầy Thánh Linh và sức lực tươi mới trên con trong ngày hôm nay, để con hoàn tất mọi trách nhiệm với lòng trung tín và vinh hiển Danh Ngài. Amen."
-        },
-        "Châm-ngôn 3:5-6": {
-            "title": "Hết Lòng Tin Cậy Đấng Dẫn Đường",
-            "theme": "Sự Khôn Ngoan & Định Hướng Đời Sống",
-            "reflection": "Khôn ngoan của con người là hữu hạn, nhưng sự chỉ dẫn của Chúa là hoàn hảo. Khi chúng ta từ bỏ sự tự phụ, nhận biết Chúa trong mọi bước đường, chính Ngài sẽ san bằng các nẻo chông gai phía trước.",
-            "prayer": "Lạy Chúa, xin dẫn dắt từng quyết định, lời nói và hành vi của con hôm nay. Con xin hạ mình đầu phục trước ý chỉ thánh khiết của Ngài. Amen."
-        },
-        "Ê-sai 40:31": {
-            "title": "Cất Cánh Bay Cao Như Chim Ưng",
-            "theme": "Sự Trông Đợi & Sức Mới Tươi Mát",
-            "reflection": "Kẻ trông đợi Đức Giê-hô-va sẽ được đổi mới sức lực. Như chim ưng giương cánh lướt trên bão gió, đức tin trông cậy nơi Chúa nâng đỡ tâm hồn vượt lên trên những mỏi mệt của trần gian.",
-            "prayer": "Lạy Chúa, khi con cảm thấy kiệt sức, xin phục hồi linh lực cho con. Xin nhắc nhở con rằng nguồn năng lực đời đời thuộc về Ngài. Amen."
-        },
-        "Giê-rê-mi 29:11": {
-            "title": "Ý Tưởng Bình An & Hy Vọng Tương Lai",
-            "theme": "Kế Hoạch Cứu Rỗi & Tương Lai Đầy Hứa Hẹn",
-            "reflection": "Đức Giê-hô-va có chương trình tốt lành định sẵn cho đời sống chúng ta: ý tưởng bình an chứ không phải tai họa, để ban cho chúng ta một sự trông cậy và một kết cục phước hạnh.",
-            "prayer": "Lạy Chúa, con an nghỉ trong lời hứa thành tín của Ngài. Xin gìn giữ lòng con hướng về hy vọng sống động mà Chúa đã sắm sẵn cho con. Amen."
-        }
-    }
-
-    curated_refs = list(MEDITATIONS_MAP.keys())
     import random
-    selected_ref = random.choice(curated_refs)
+    selected_dev = random.choice(DEVOTIONALS_CATALOGUE)
+    selected_ref = selected_dev["reference"]
 
     # Fetch verse text
     v_row = db.execute(
@@ -484,37 +780,30 @@ def get_daily_insight(db: Session = Depends(get_db)):
         SELECT b.name_vi, v.chapter, v.verse, v.text, v.verse_code
         FROM bible_verses v
         JOIN bible_books b ON b.id = v.book_id
-        WHERE v.search_vector @@ plainto_tsquery('simple', :ref_q)
+        WHERE b.name_vi = :book_name AND v.chapter = :chapter AND v.verse = :verse
         LIMIT 1
         """),
-        {"ref_q": selected_ref}
+        {"book_name": selected_dev["book"], "chapter": selected_dev["chapter"], "verse": selected_dev["verse"]}
     ).fetchone()
 
-    verse_data = None
-    if v_row:
-        verse_data = {
-            "reference": selected_ref,
-            "book": v_row.name_vi,
-            "chapter": v_row.chapter,
-            "verse": v_row.verse,
-            "text": v_row.text,
-            "verse_code": v_row.verse_code
-        }
-    else:
-        verse_data = {
-            "reference": "Giăng 3:16",
-            "book": "Giăng",
-            "chapter": 3,
-            "verse": 16,
-            "text": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
-            "verse_code": 43003016
-        }
+    verse_data = {
+        "reference": selected_ref,
+        "book": v_row.name_vi if v_row else selected_dev["book"],
+        "chapter": v_row.chapter if v_row else selected_dev["chapter"],
+        "verse": v_row.verse if v_row else selected_dev["verse"],
+        "text": v_row.text if v_row else selected_dev["golden_verse"],
+        "verse_code": v_row.verse_code if v_row else 43003016
+    }
 
-    devotional_meditation = MEDITATIONS_MAP.get(verse_data["reference"]) or {
-        "title": f"Suy Ngẫm Lời Chúa: {verse_data['reference']}",
-        "theme": "Nuôi Dưỡng Đời Sống Thuộc Linh",
-        "reflection": f"Lời Chúa trong {verse_data['reference']} là kim chỉ nam soi sáng đường lối chúng ta: '{verse_data['text']}'. Hãy dành thời gian suy ngẫm chân lý này và áp dụng vào đời sống hôm nay.",
-        "prayer": "Lạy Cha Thiên Thượng, xin Lời Chúa hôm nay ngự trị trong lòng con, biến đổi tâm trí con và dẫn dắt con bước đi trong sự công bình của Ngài. Amen."
+    devotional_meditation = {
+        "id": selected_dev["id"],
+        "title": selected_dev["title"],
+        "theme": selected_dev["theme"],
+        "reflection": selected_dev["reflection"],
+        "prayer": selected_dev["prayer"],
+        "tradition": selected_dev["tradition"],
+        "audio_duration_seconds": selected_dev["audio_duration_seconds"],
+        "tags": selected_dev["tags"]
     }
 
     # 2. Person of the Day
@@ -624,7 +913,8 @@ def get_daily_insight(db: Session = Depends(get_db)):
             "total_nodes": total_nodes,
             "total_journeys": len(all_j),
             "total_challenge_packs": len(CHALLENGE_PACKS_DATA),
-            "total_sermon_presets": len(SERMON_PRESETS)
+            "total_sermon_presets": len(SERMON_PRESETS),
+            "total_devotionals": len(DEVOTIONALS_CATALOGUE)
         }
     }
 

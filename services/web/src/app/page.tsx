@@ -67,6 +67,24 @@ interface VerseRangeResponse {
   verses: VerseItem[];
 }
 
+interface DevotionalItem {
+  id: string;
+  reference: string;
+  book: string;
+  chapter: number;
+  verse: number;
+  title: string;
+  theme: string;
+  golden_verse?: string;
+  reflection: string;
+  prayer: string;
+  tradition?: string;
+  audio_duration_seconds?: number;
+  tags?: string[];
+  prev_id?: string;
+  next_id?: string;
+}
+
 interface DailyInsight {
   verse_of_the_day: {
     reference: string;
@@ -76,12 +94,7 @@ interface DailyInsight {
     text: string;
     verse_code: number;
   };
-  devotional_meditation?: {
-    title: string;
-    theme: string;
-    reflection: string;
-    prayer: string;
-  };
+  devotional_meditation?: DevotionalItem;
   person_of_the_day: {
     slug: string;
     name_vi: string;
@@ -139,6 +152,7 @@ interface DailyInsight {
     total_journeys?: number;
     total_challenge_packs?: number;
     total_sermon_presets?: number;
+    total_devotionals?: number;
   };
 }
 
@@ -176,37 +190,132 @@ export default function Home() {
   const [isDevotionalExpanded, setIsDevotionalExpanded] = useState(false);
   const [copiedDevotional, setCopiedDevotional] = useState(false);
 
-  function toggleDevotionalSpeech() {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !dailyInsight) return;
+  // Devotional Library & Audio State (§53)
+  const [isDevotionalModalOpen, setIsDevotionalModalOpen] = useState(false);
+  const [devotionalsList, setDevotionalsList] = useState<DevotionalItem[]>([]);
+  const [devotionalThemes, setDevotionalThemes] = useState<string[]>([]);
+  const [selectedDevotionalTheme, setSelectedDevotionalTheme] = useState<string>("Tất cả");
+  const [devotionalSearchQuery, setDevotionalSearchQuery] = useState("");
+  const [loadingDevotionals, setLoadingDevotionals] = useState(false);
+  const [activeDevotionalAudio, setActiveDevotionalAudio] = useState<DevotionalItem | null>(null);
+  const [devotionalSpeechRate, setDevotionalSpeechRate] = useState<number>(1.0);
+  const [playingDevotionalId, setPlayingDevotionalId] = useState<string | null>(null);
 
-    if (isDevotionalSpeaking) {
+  function speakDevotional(dev: DevotionalItem, rate: number = devotionalSpeechRate) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    if (playingDevotionalId === dev.id && isDevotionalSpeaking) {
       window.speechSynthesis.cancel();
+      setPlayingDevotionalId(null);
       setIsDevotionalSpeaking(false);
       return;
     }
 
     window.speechSynthesis.cancel();
-    const v = dailyInsight.verse_of_the_day;
-    const m = dailyInsight.devotional_meditation;
-    
-    let textToSpeak = `Linh lực hằng ngày. Câu gốc suy ngẫm trong ${v.reference}: "${v.text}". `;
-    if (m) {
-      textToSpeak += `Chủ đề suy ngẫm: ${m.title}. ${m.reflection}. Lời cầu nguyện: ${m.prayer}`;
-    }
+    setActiveDevotionalAudio(dev);
+
+    const ref = dev.reference;
+    const text = dev.golden_verse || (dailyInsight?.verse_of_the_day.reference === ref ? dailyInsight?.verse_of_the_day.text : "");
+    const title = dev.title;
+    const reflection = dev.reflection;
+    const prayer = dev.prayer;
+
+    let textToSpeak = `Linh lực hằng ngày. Câu gốc suy ngẫm trong ${ref}: "${text}". Chủ đề: ${title}. ${reflection}. Lời cầu nguyện: ${prayer}`;
 
     const utt = new SpeechSynthesisUtterance(textToSpeak);
     utt.lang = "vi-VN";
-    utt.rate = 0.95;
+    utt.rate = rate;
 
     utt.onend = () => {
+      setPlayingDevotionalId(null);
       setIsDevotionalSpeaking(false);
     };
     utt.onerror = () => {
+      setPlayingDevotionalId(null);
       setIsDevotionalSpeaking(false);
     };
 
+    setPlayingDevotionalId(dev.id);
     setIsDevotionalSpeaking(true);
     window.speechSynthesis.speak(utt);
+  }
+
+  function stopAllSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setPlayingDevotionalId(null);
+      setIsDevotionalSpeaking(false);
+    }
+  }
+
+  function toggleDevotionalSpeech() {
+    if (!dailyInsight || !dailyInsight.devotional_meditation) return;
+    const m = dailyInsight.devotional_meditation;
+    const item: DevotionalItem = {
+      id: m.id || "daily-verse",
+      reference: dailyInsight.verse_of_the_day.reference,
+      book: dailyInsight.verse_of_the_day.book,
+      chapter: dailyInsight.verse_of_the_day.chapter,
+      verse: dailyInsight.verse_of_the_day.verse,
+      title: m.title,
+      theme: m.theme,
+      golden_verse: dailyInsight.verse_of_the_day.text,
+      reflection: m.reflection,
+      prayer: m.prayer,
+      tradition: m.tradition || "Thần Học Suy Ngẫm",
+      audio_duration_seconds: m.audio_duration_seconds || 65,
+      tags: m.tags || []
+    };
+    speakDevotional(item);
+  }
+
+  async function openDevotionalLibrary() {
+    setIsDevotionalModalOpen(true);
+    if (devotionalsList.length === 0) {
+      setLoadingDevotionals(true);
+      try {
+        const res = await fetch(`${apiUrl}/api/bible/devotionals`);
+        if (res.ok) {
+          const data = await res.json();
+          setDevotionalsList(data.devotionals || []);
+          setDevotionalThemes(["Tất cả", ...(data.themes || [])]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch devotionals:", err);
+      } finally {
+        setLoadingDevotionals(false);
+      }
+    }
+  }
+
+  async function handleFilterDevotionals(query: string, theme: string) {
+    setDevotionalSearchQuery(query);
+    setSelectedDevotionalTheme(theme);
+    setLoadingDevotionals(true);
+    try {
+      if (!query.trim()) {
+        const themeParam = theme && theme !== "Tất cả" ? `?theme=${encodeURIComponent(theme)}` : "";
+        const res = await fetch(`${apiUrl}/api/bible/devotionals${themeParam}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDevotionalsList(data.devotionals || []);
+        }
+      } else {
+        let url = `${apiUrl}/api/bible/devotionals/search?q=${encodeURIComponent(query.trim())}`;
+        if (theme && theme !== "Tất cả") {
+          url += `&theme=${encodeURIComponent(theme)}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setDevotionalsList(data.devotionals || []);
+        }
+      }
+    } catch (e) {
+      console.error("Devotional search error:", e);
+    } finally {
+      setLoadingDevotionals(false);
+    }
   }
 
   function handleCopyDevotional() {
@@ -440,11 +549,20 @@ export default function Home() {
       {/* ===================================================================== */}
       {dailyInsight && (
         <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-amber-400" /> Linh Lực & Khám Phá Hằng Ngày (Daily Insight)
+              <Calendar className="w-5 h-5 text-amber-400" /> Linh Lực &amp; Khám Phá Hằng Ngày (Daily Insight)
             </h3>
-            <span className="text-xs text-slate-400 font-mono">ROADMAP1.md §53</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openDevotionalLibrary}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <Headphones className="w-3.5 h-3.5 text-amber-400" />
+                <span>Thư Viện Audio Suy Ngẫm ({dailyInsight.metrics?.total_devotionals || 16}) →</span>
+              </button>
+              <span className="text-xs text-slate-400 font-mono">ROADMAP1.md §53</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -539,18 +657,26 @@ export default function Home() {
               </div>
 
               <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
-                <Link
-                  href={`/bible?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
-                  className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/bible?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
+                    className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" /> Đọc Cả Đoạn →
+                  </Link>
+                  <Link
+                    href={`/study?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
+                    className="text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
+                  >
+                    Giải Kinh →
+                  </Link>
+                </div>
+                <button
+                  onClick={openDevotionalLibrary}
+                  className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1"
                 >
-                  <BookOpen className="w-3.5 h-3.5" /> Đọc Cả Đoạn →
-                </Link>
-                <Link
-                  href={`/study?ref=${encodeURIComponent(dailyInsight.verse_of_the_day.reference)}`}
-                  className="text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
-                >
-                  Giải Kinh →
-                </Link>
+                  <Headphones className="w-3.5 h-3.5" /> Thư viện Audio →
+                </button>
               </div>
             </div>
 
@@ -1325,7 +1451,293 @@ export default function Home() {
             </div>
           </div>
         )}
-      </section>
+      {/* ===================================================================== */}
+      {/* DEVOTIONAL AUDIO & MEDITATION CATALOGUE MODAL (§53) */}
+      {/* ===================================================================== */}
+      {isDevotionalModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+          onClick={() => {
+            setIsDevotionalModalOpen(false);
+          }}
+        >
+          <div 
+            className="max-w-4xl w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-3 border-b border-slate-800">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Kho Linh Lực &amp; Audio (§53)
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">
+                    {devotionalsList.length} bài suy ngẫm
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2 mt-1">
+                  <Headphones className="w-5 h-5 text-amber-400" />
+                  Thư Viện Audio Suy Ngẫm Thần Học &amp; Cầu Nguyện
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Suy ngẫm Lời Chúa theo từng chủ đề với giọng đọc truyền cảm, bài học đức tin và lời nguyện
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  stopAllSpeech();
+                  setIsDevotionalModalOpen(false);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Audio Now Playing Bar */}
+            {activeDevotionalAudio && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-950 to-indigo-950/40 border border-amber-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg shadow-amber-950/20">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                    playingDevotionalId === activeDevotionalAudio.id && isDevotionalSpeaking
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 animate-pulse"
+                      : "bg-slate-800 text-slate-400 border border-slate-700"
+                  }`}>
+                    {playingDevotionalId === activeDevotionalAudio.id && isDevotionalSpeaking ? (
+                      <Volume2 className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <Headphones className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-amber-400">
+                        {activeDevotionalAudio.reference}
+                      </span>
+                      <span className="text-[10px] text-slate-400">•</span>
+                      <span className="text-[10px] text-slate-400">
+                        ⏱ ~{activeDevotionalAudio.audio_duration_seconds || 60}s
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-white truncate">
+                      {activeDevotionalAudio.title}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  {/* Speed Selector */}
+                  <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-[11px]">
+                    {[0.8, 1.0, 1.2].map((rate) => (
+                      <button
+                        key={rate}
+                        onClick={() => {
+                          setDevotionalSpeechRate(rate);
+                          if (playingDevotionalId === activeDevotionalAudio.id && isDevotionalSpeaking) {
+                            speakDevotional(activeDevotionalAudio, rate);
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-lg transition-all ${
+                          devotionalSpeechRate === rate
+                            ? "bg-amber-500 text-slate-950 font-bold"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Play / Pause Toggle */}
+                  <button
+                    onClick={() => speakDevotional(activeDevotionalAudio)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md ${
+                      playingDevotionalId === activeDevotionalAudio.id && isDevotionalSpeaking
+                        ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-900/40"
+                        : "bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-amber-900/40"
+                    }`}
+                  >
+                    {playingDevotionalId === activeDevotionalAudio.id && isDevotionalSpeaking ? (
+                      <>
+                        <Pause className="w-3.5 h-3.5" />
+                        <span>Tạm dừng</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Phát Audio</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={stopAllSpeech}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    title="Dừng hẳn"
+                  >
+                    <VolumeX className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Bar */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 w-full">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    value={devotionalSearchQuery}
+                    onChange={(e) => handleFilterDevotionals(e.target.value, selectedDevotionalTheme)}
+                    placeholder="Tìm theo câu gốc, chủ đề, nội dung suy ngẫm hoặc lời cầu nguyện..."
+                    className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-8 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                  {devotionalSearchQuery && (
+                    <button
+                      onClick={() => handleFilterDevotionals("", selectedDevotionalTheme)}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Theme Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {devotionalThemes.map((theme) => (
+                  <button
+                    key={theme}
+                    onClick={() => handleFilterDevotionals(devotionalSearchQuery, theme)}
+                    className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs font-medium ${
+                      selectedDevotionalTheme === theme
+                        ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
+                        : "bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/40"
+                    }`}
+                  >
+                    {theme}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Devotionals List */}
+            <div className="overflow-y-auto pr-1 flex flex-col gap-3 max-h-[50vh]">
+              {loadingDevotionals ? (
+                <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+                  <p className="text-xs">Đang tìm kiếm bài suy ngẫm...</p>
+                </div>
+              ) : devotionalsList.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 text-xs">
+                  Không tìm thấy bài suy ngẫm nào phù hợp với từ khóa &ldquo;{devotionalSearchQuery}&rdquo;.
+                </div>
+              ) : (
+                devotionalsList.map((dev) => {
+                  const isCurrent = activeDevotionalAudio?.id === dev.id;
+                  const isPlayingThis = playingDevotionalId === dev.id && isDevotionalSpeaking;
+                  return (
+                    <div
+                      key={dev.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col gap-2.5 ${
+                        isCurrent
+                          ? "bg-slate-950/90 border-amber-500/50 shadow-md shadow-amber-950/30"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex flex-wrap justify-between items-start gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-bold text-amber-400 font-mono">
+                            {dev.reference}
+                          </span>
+                          <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            {dev.theme}
+                          </span>
+                          {dev.tradition && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                              {dev.tradition}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => speakDevotional(dev)}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                              isPlayingThis
+                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse"
+                                : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30"
+                            }`}
+                          >
+                            {isPlayingThis ? (
+                              <>
+                                <Pause className="w-3 h-3 text-rose-400" />
+                                <span>Tạm dừng</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3 h-3 fill-current text-amber-400" />
+                                <span>Nghe Audio</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              const text = `[SUY NGẪM: ${dev.title}]\nCâu gốc (${dev.reference}): "${dev.golden_verse}"\nChủ đề: ${dev.theme}\n\n${dev.reflection}\n\n[CẦU NGUYỆN]\n${dev.prayer}\n\n(Nền tảng BibleKnowledge)`;
+                              navigator.clipboard.writeText(text);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                            title="Sao chép bài suy ngẫm"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-white">
+                        {dev.title}
+                      </h4>
+
+                      {dev.golden_verse && (
+                        <p className="text-xs text-amber-200/90 font-serif italic border-l-2 border-amber-500/40 pl-2.5 py-0.5">
+                          &ldquo;{dev.golden_verse}&rdquo;
+                        </p>
+                      )}
+
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                        {dev.reflection}
+                      </p>
+
+                      <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-800/30 text-xs text-amber-100/90 italic font-serif">
+                        <span className="font-bold not-italic text-amber-400 font-sans">Lời cầu nguyện: </span>
+                        {dev.prayer}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400 border-t border-slate-900">
+                        <span className="font-mono">Thời lượng: ~{dev.audio_duration_seconds || 60}s</span>
+                        <Link
+                          href={`/bible?ref=${encodeURIComponent(dev.reference)}`}
+                          onClick={() => {
+                            stopAllSpeech();
+                            setIsDevotionalModalOpen(false);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium hover:underline"
+                        >
+                          <BookOpen className="w-3 h-3" /> Đọc Sách Kinh Thánh →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="text-center text-xs text-slate-500 py-4 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2">

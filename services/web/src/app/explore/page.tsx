@@ -201,6 +201,110 @@ interface CharacterStudyData {
   reflection_questions: string[];
 }
 
+interface EraMetadata {
+  id: string;
+  name: string;
+  shortLabel: string;
+  approxDate: string;
+  periods: string[];
+  keyFigures: string[];
+  keyBooks: string[];
+  redemptiveTheme: string;
+}
+
+const BIBLICAL_ERAS_META: Record<string, EraMetadata> = {
+  all: {
+    id: "all",
+    name: "Toàn Cảnh Dòng Chảy Lịch Sử Cứu Chuộc",
+    shortLabel: "Tất Cả Các Thời Kỳ",
+    approxDate: "Thuở Ban Đầu — Đời Đời Vĩnh Cửu",
+    periods: [],
+    keyFigures: ["A-đam", "Áp-ra-ham", "Môi-se", "Đa-vít", "Chúa Giê-xu", "Phao-lô", "Giăng"],
+    keyBooks: ["Sáng-thế-ký đến Khải-huyền (66 Sách Chính Kinh)"],
+    redemptiveTheme: "Kế hoạch cứu rỗi đời đời của Ba Ngôi Đức Chúa Trời được mặc khải tiệm tiến trong lịch sử loài người."
+  },
+  primeval_patriarch: {
+    id: "primeval_patriarch",
+    name: "Thuở Ban Đầu, Sáng Tạo & Thời Kỳ Các Tổ Phụ",
+    shortLabel: "Sáng Tạo & Tổ Phụ",
+    approxDate: "~4000 – 1800 TCN",
+    periods: ["Creation & Primeval", "Patriarchs"],
+    keyFigures: ["A-đam", "Ê-va", "Hê-nóc", "Nô-ê", "Áp-ra-ham", "Y-sác", "Gia-cốp", "Giô-sép"],
+    keyBooks: ["Sáng-thế-ký 1–50", "Gióp"],
+    redemptiveTheme: "Sự sáng tạo tốt lành, sự sa ngã của nhân loại, Lời hứa về Dòng dõi người nữ (Sáng 3:15) và Giao ước đời đời với Áp-ra-ham."
+  },
+  exodus_judges: {
+    id: "exodus_judges",
+    name: "Xuất Hành, Đồng Vắng, Chinh Phục & Thời Kỳ Các Quan Xét",
+    shortLabel: "Xuất Hành & Quan Xét",
+    approxDate: "~1446 – 1050 TCN",
+    periods: ["Exodus & Wilderness", "Conquest & Settlement", "Judges"],
+    keyFigures: ["Môi-se", "A-rôn", "Giô-suê", "Ca-lép", "Ghi-đê-ôn", "Sam-sôn", "Ru-tơ", "Sa-mu-ên"],
+    keyBooks: ["Xuất Ê-díp-tô Ký", "Lê-vi Ký", "Dân Số Ký", "Phục Truyền", "Giô-suê", "Các Quan Xét", "Ru-tơ"],
+    redemptiveTheme: "Sự giải phóng khỏi ách nô lệ Ai Cập, Giao ước Xi-na-i, Đền tạm hiện diện của Chúa và bước vào Đất Hứa Ca-na-an."
+  },
+  united_kingdom: {
+    id: "united_kingdom",
+    name: "Vương Quốc Thống Nhất Của Y-sơ-ra-ên",
+    shortLabel: "Vương Quốc Thống Nhất",
+    approxDate: "1050 – 931 TCN",
+    periods: ["United Kingdom"],
+    keyFigures: ["Sau-lơ", "Đa-vít", "Sa-lô-môn", "Na-than"],
+    keyBooks: ["I & II Sa-mu-ên", "I Các Vua 1–11", "I Sử Ký", "Thi-thiên", "Châm-ngôn", "Truyền-đạo"],
+    redemptiveTheme: "Giao ước Đa-vít về ngôi nước đời đời (II Sa-mu-ên 7), xây cất Đền Thờ Giê-ru-sa-lem vinh quang, hình bóng Đấng Mê-si."
+  },
+  divided_kingdom: {
+    id: "divided_kingdom",
+    name: "Vương Quốc Phân Chia & Các Tiên Tri Cảnh Báo",
+    shortLabel: "Vương Quốc Phân Chia",
+    approxDate: "931 – 586 TCN",
+    periods: ["Divided Kingdom"],
+    keyFigures: ["Gia-lô-bô-am", "Rô-bô-am", "Ê-li", "Ê-li-sê", "Ê-sai", "Ô-sê", "A-mốt", "Mi-chê", "Ê-xê-chia", "Giô-si-a"],
+    keyBooks: ["I & II Các Vua", "II Sử Ký", "Ê-sai", "Ô-sê", "A-mốt", "Mi-chê"],
+    redemptiveTheme: "Sự bội đạo của hai vương quốc Y-sơ-ra-ên (Bắc) và Giu-đa (Nam); sự phán xét công bình của Chúa và lời tiên tri về Đấng Cứu Thế."
+  },
+  exile: {
+    id: "exile",
+    name: "Thời Kỳ Lưu Đày Ba-by-lôn & Đền Thờ Bị Phá Hủy",
+    shortLabel: "Lưu Đày Ba-by-lôn",
+    approxDate: "586 – 538 TCN",
+    periods: ["Exile"],
+    keyFigures: ["Giê-rê-mi", "Ê-xê-chi-ên", "Đa-ni-ên", "Xa-đơ-rác", "Mê-sác", "A-bết-nê-gô"],
+    keyBooks: ["Giê-rê-mi", "Ca Thương", "Ê-xê-chi-ên", "Đa-ni-ên", "Ha-ba-cúc", "Ô-ba-đia"],
+    redemptiveTheme: "Sự sửa phạt thanh tẩy dân tộc, bài học đức tin trung tín nơi đất khách và khải tượng phục hưng qua thung lũng hài cốt."
+  },
+  restoration_intertestamental: {
+    id: "restoration_intertestamental",
+    name: "Hồi Hương, Tái Thiết Đền Thờ & 400 Năm Giữa Hai Giao Ước",
+    shortLabel: "Hồi Hương & Giữa Hai Ước",
+    approxDate: "538 – 4 TCN",
+    periods: ["Return & Restoration", "Intertestamental"],
+    keyFigures: ["Si-ru", "Xô-rô-ba-bên", "Giê-sua", "E-xơ-ra", "Nê-hê-mi", "Ê-xơ-tê", "A-ghê", "Xa-cha-ri", "Ma-la-chi"],
+    keyBooks: ["E-xơ-ra", "Nê-hê-mi", "Ê-xơ-tê", "A-ghê", "Xa-cha-ri", "Ma-la-chi"],
+    redemptiveTheme: "Chiếu chỉ Si-ru, tái thiết tường thành Giê-ru-sa-lem, bảo tồn dòng dõi Đấng Mê-si và sự chờ đợi Mặt Trời Công Bình mọc lên."
+  },
+  life_of_christ: {
+    id: "life_of_christ",
+    name: "Cuộc Đời & Chức Vụ Cứu Chuộc Của Chúa Cứu Thế Giê-xu",
+    shortLabel: "Cuộc Đời Chúa Giê-xu",
+    approxDate: "4 TCN – 30/33 SCN",
+    periods: ["Life of Christ"],
+    keyFigures: ["Chúa Giê-xu Christ", "Giăng Báp-tít", "Ma-ri", "Giô-sép", "12 Sứ Đồ"],
+    keyBooks: ["Ma-thi-ơ", "Mác", "Lu-ca", "Giăng (Bốn Phúc Âm)"],
+    redemptiveTheme: "Ngôi Lời trở nên xác thịt, Vương quốc Đức Chúa Trời đến gần, sự chết chuộc tội trên Thập tự giá và sự Phục sinh khải hoàn."
+  },
+  apostolic_church: {
+    id: "apostolic_church",
+    name: "Hội Thánh Đầu Tiên, Thời Kỳ Các Sứ Đồ & Niềm Hy Vọng Khải Huyền",
+    shortLabel: "Hội Thánh & Khải Huyền",
+    approxDate: "30 SCN – ~100 SCN",
+    periods: ["Early Church", "Apostolic & Revelation"],
+    keyFigures: ["Phi-e-rơ", "Phao-lô", "Ê-tiên", "Ba-na-ba", "Gia-cơ", "Giăng"],
+    keyBooks: ["Công Vụ Các Sứ Đồ", "Các Thư Tín Phao-lô & Chung", "Khải-huyền"],
+    redemptiveTheme: "Đức Thánh Linh giáng lâm trong ngày Lễ Ngũ Tuần, Phúc Âm truyền bá khắp La Mã, sự vững đạo giữa hoạn nạn và Trời Mới Đất Mới."
+  }
+};
+
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology" | "harmony">("graph");
 
@@ -250,15 +354,19 @@ export default function ExplorePage() {
       // Era filter
       if (selectedTimelineEra === "primeval_patriarch") {
         if (!["Creation & Primeval", "Patriarchs"].includes(ev.period || "")) return false;
-      } else if (selectedTimelineEra === "exodus_conquest") {
+      } else if (selectedTimelineEra === "exodus_judges") {
         if (!["Exodus & Wilderness", "Conquest & Settlement", "Judges"].includes(ev.period || "")) return false;
-      } else if (selectedTimelineEra === "monarchy") {
-        if (!["United Kingdom", "Divided Kingdom"].includes(ev.period || "")) return false;
-      } else if (selectedTimelineEra === "exile_restoration") {
-        if (!["Exile", "Return & Restoration", "Intertestamental"].includes(ev.period || "")) return false;
-      } else if (selectedTimelineEra === "christ") {
+      } else if (selectedTimelineEra === "united_kingdom") {
+        if (!["United Kingdom"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "divided_kingdom") {
+        if (!["Divided Kingdom"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "exile") {
+        if (!["Exile"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "restoration_intertestamental") {
+        if (!["Return & Restoration", "Intertestamental"].includes(ev.period || "")) return false;
+      } else if (selectedTimelineEra === "life_of_christ") {
         if (!["Life of Christ"].includes(ev.period || "")) return false;
-      } else if (selectedTimelineEra === "church") {
+      } else if (selectedTimelineEra === "apostolic_church") {
         if (!["Early Church", "Apostolic & Revelation"].includes(ev.period || "")) return false;
       }
 
@@ -1167,27 +1275,73 @@ export default function ExplorePage() {
             {/* Era Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
               {[
-                { id: "all", label: `Tất Cả (${timeline.length})` },
-                { id: "primeval_patriarch", label: "Sáng Tạo & Tổ Phụ" },
-                { id: "exodus_conquest", label: "Xuất Hành & Quan Xét" },
-                { id: "monarchy", label: "Vương Triều & Tiên Tri" },
-                { id: "exile_restoration", label: "Lưu Đày & Hồi Hương" },
-                { id: "christ", label: "Chúa Giê-xu Giáng Thế" },
-                { id: "church", label: "Hội Thánh & Khải Huyền" }
+                { id: "all", label: `Tất Cả (${timeline.length})`, date: "Toàn bộ" },
+                { id: "primeval_patriarch", label: "Sáng Tạo & Tổ Phụ", date: "~4000-1800 TCN" },
+                { id: "exodus_judges", label: "Xuất Hành & Quan Xét", date: "~1446-1050 TCN" },
+                { id: "united_kingdom", label: "Vương Quốc Thống Nhất", date: "1050-931 TCN" },
+                { id: "divided_kingdom", label: "Vương Quốc Phân Chia", date: "931-586 TCN" },
+                { id: "exile", label: "Lưu Đày Ba-by-lôn", date: "586-538 TCN" },
+                { id: "restoration_intertestamental", label: "Hồi Hương & Giữa Hai Ước", date: "538-4 TCN" },
+                { id: "life_of_christ", label: "Cuộc Đời Chúa Giê-xu", date: "4 TCN-33 SCN" },
+                { id: "apostolic_church", label: "Hội Thánh & Khải Huyền", date: "30-100 SCN" }
               ].map((era) => (
                 <button
                   key={era.id}
                   onClick={() => setSelectedTimelineEra(era.id)}
-                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs font-medium ${
+                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs flex items-center gap-1.5 ${
                     selectedTimelineEra === era.id
                       ? "bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/30"
                       : "bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/40"
                   }`}
                 >
-                  {era.label}
+                  <span>{era.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    selectedTimelineEra === era.id ? "bg-blue-700 text-blue-100 font-mono" : "bg-slate-900 text-slate-500 font-mono"
+                  }`}>
+                    {era.date}
+                  </span>
                 </button>
               ))}
             </div>
+
+            {/* Selected Era Summary Card */}
+            {BIBLICAL_ERAS_META[selectedTimelineEra] && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/30 border border-blue-500/30 flex flex-col gap-2 animate-in fade-in">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {BIBLICAL_ERAS_META[selectedTimelineEra].shortLabel}
+                    </span>
+                    <h4 className="text-xs font-bold text-white">
+                      {BIBLICAL_ERAS_META[selectedTimelineEra].name}
+                    </h4>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-amber-400">
+                    {BIBLICAL_ERAS_META[selectedTimelineEra].approxDate}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-300 font-serif leading-relaxed">
+                  <span className="font-sans font-bold text-amber-300 mr-1.5">Trọng tâm cứu chuộc:</span>
+                  {BIBLICAL_ERAS_META[selectedTimelineEra].redemptiveTheme}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-4 text-[11px] pt-1 text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-purple-400 font-semibold flex items-center gap-1">
+                      <Users className="w-3 h-3" /> Nhân vật:
+                    </span>
+                    <span>{BIBLICAL_ERAS_META[selectedTimelineEra].keyFigures.join(", ")}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" /> Kinh Thánh:
+                    </span>
+                    <span>{BIBLICAL_ERAS_META[selectedTimelineEra].keyBooks.join(", ")}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {loadingTimeline ? (

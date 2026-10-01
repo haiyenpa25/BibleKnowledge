@@ -103,6 +103,14 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `GET /api/bible/parallel-chapter?book={book}&chapter={chapter}&target_translation={kjv|web|asv}`: Returns dual-column parallel verses comparing Vietnamese 1925 with a chosen benchmark English translation, with Strong's Lexicon mappings for interlinear alignment.
   - `GET /api/bible/compare-verse?book={book}&chapter={chapter}&verse={verse}&translations={trans_list}`: Renders a single verse across all 4 translations simultaneously, displaying word count, character length, translation metadata, and original language (Hebrew / Greek) root words for high-fidelity comparative exegesis.
 
+### 2.10 Advanced Semantic Audio Search & Daily Devotional Catalogue (§53)
+- **Endpoints**:
+  - `GET /api/bible/devotionals?theme={theme}&tag={tag}&limit={limit}&offset={offset}`: Lists all 16 canonical theological devotionals with themes, golden verses, reflections, pastoral prayers, theological tradition tags, and audio durations.
+  - `GET /api/bible/devotionals/search?q={query}&theme={theme}`: Accent-insensitive and case-insensitive full-text search across devotionals, scriptures, reflections, prayers, and theological tags.
+  - `GET /api/bible/devotionals/{id}`: Returns single devotional detail with previous/next devotional navigation cues.
+- **Frontend Integration**:
+  - Daily Insight Hub on `/` featuring a dedicated "Thư Viện Audio Suy Ngẫm" modal with speech synthesis, audio speed regulation (0.8x, 1.0x, 1.2x), instant theme filtering, and scripture navigation.
+
 ---
 
 ## 3. Theological RAG & AI Exegesis Engine (`/api/rag`)
