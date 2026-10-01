@@ -1,0 +1,24 @@
+{
+  "name": "bibleknowledge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nền tảng Học & Nghiên cứu Kinh Thánh có AI (Learn, Explore, Connect, Research)",
+  "scripts": {
+    "test": "node scripts/test_platform.js",
+    "audit": "node scripts/find_missing.js",
+    "check-canon": "node scripts/check_missing.js",
+    "seed:books": "node scripts/dump_books.js --apply",
+    "web:lint": "npm run --prefix services/web lint"
+  },
+  "keywords": [
+    "bible",
+    "theology",
+    "rag",
+    "knowledge-graph",
+    "vietnamese-bible",
+    "fastapi",
+    "nextjs"
+  ],
+  "author": "BibleKnowledge Team",
+  "license": "MIT"
+}
