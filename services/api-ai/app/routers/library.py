@@ -167,6 +167,13 @@ def get_library_stats(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/series")
+def list_library_series():
+    """Retrieve series breakdown with counts."""
+    stats = get_library_stats()
+    return stats.get("series", [])
+
+
 @router.get("/catalog")
 def list_catalog(
     category: Optional[str] = Query(None, description="'commentary', 'dictionary', 'survey', or 'monograph'"),
