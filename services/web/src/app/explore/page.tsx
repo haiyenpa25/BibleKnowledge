@@ -18,7 +18,11 @@ import {
   Loader2,
   X,
   Compass,
-  Filter
+  Filter,
+  Map as MapIcon,
+  Navigation,
+  Milestone,
+  CheckCircle2
 } from "lucide-react";
 
 interface GraphNode {
@@ -54,6 +58,37 @@ interface TimelineEvent {
   era_order: number;
 }
 
+interface BiblicalPlace {
+  id: string;
+  slug: string;
+  name_vi: string;
+  name_en?: string;
+  modern_name?: string;
+  latitude: number;
+  longitude: number;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+interface Waypoint {
+  order: number;
+  name: string;
+  modern: string;
+  lat: number;
+  lng: number;
+  scripture: string;
+  notes: string;
+}
+
+interface BiblicalJourney {
+  id: string;
+  title: string;
+  period: string;
+  description: string;
+  color: string;
+  waypoints: Waypoint[];
+}
+
 interface EntityDetail {
   type: string;
   slug: string;
@@ -76,7 +111,7 @@ interface EntityDetail {
 }
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "entities">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities">("graph");
 
   // Graph State
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -92,6 +127,13 @@ export default function ExplorePage() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
 
+  // Map & Journeys State
+  const [places, setPlaces] = useState<BiblicalPlace[]>([]);
+  const [journeys, setJourneys] = useState<BiblicalJourney[]>([]);
+  const [selectedJourneyId, setSelectedJourneyId] = useState<string>("journey-jesus");
+  const [activeWaypoint, setActiveWaypoint] = useState<Waypoint | null>(null);
+  const [loadingMap, setLoadingMap] = useState(true);
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Fetch Graph Data
@@ -106,7 +148,6 @@ export default function ExplorePage() {
       if (res.ok) {
         const data = await res.json();
         
-        // Layout nodes in a radial/grid constellation for clean display
         const total = data.nodes.length;
         const radius = Math.min(340, Math.max(220, total * 10));
         const centerX = 450;
@@ -114,7 +155,6 @@ export default function ExplorePage() {
 
         const positionedNodes = data.nodes.map((n: GraphNode, i: number) => {
           const angle = (i / total) * 2 * Math.PI;
-          // Random slight offset for organic graph look
           const r = n.node_type === "person" && n.node_key === "chua-gie-xu" ? 0 : radius + (i % 3 === 0 ? -30 : i % 2 === 0 ? 20 : 0);
           return {
             ...n,
@@ -149,6 +189,34 @@ export default function ExplorePage() {
     }
   };
 
+  // Fetch Map Places & Journeys
+  const fetchMapData = async () => {
+    setLoadingMap(true);
+    try {
+      const [pRes, jRes] = await Promise.all([
+        fetch(`${apiUrl}/api/graph/places`),
+        fetch(`${apiUrl}/api/graph/journeys`)
+      ]);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        setPlaces(pData);
+      }
+      if (jRes.ok) {
+        const jData = await jRes.json();
+        setJourneys(jData);
+        if (jData.length > 0) {
+          const defaultJ = jData.find((j: BiblicalJourney) => j.id === "journey-jesus") || jData[0];
+          setSelectedJourneyId(defaultJ.id);
+          setActiveWaypoint(defaultJ.waypoints[0] || null);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load map data:", err);
+    } finally {
+      setLoadingMap(false);
+    }
+  };
+
   // Fetch Entity Detail when Node is Selected
   const fetchEntityDetail = async (type: string, slug: string) => {
     setLoadingDetail(true);
@@ -169,6 +237,7 @@ export default function ExplorePage() {
   useEffect(() => {
     fetchGraph();
     fetchTimeline();
+    fetchMapData();
   }, [apiUrl]);
 
   const handleNodeClick = (node: GraphNode) => {
@@ -181,7 +250,6 @@ export default function ExplorePage() {
     fetchGraph(graphFilter, searchKeyword);
   };
 
-  // Helper colors for node types
   const getNodeColor = (type: string) => {
     switch (type) {
       case "person":
@@ -194,6 +262,21 @@ export default function ExplorePage() {
         return { fill: "#8b5cf6", stroke: "#a78bfa", text: "text-indigo-400", bg: "bg-indigo-500/20" };
     }
   };
+
+  // Project Geographic coordinates (lat, lng) to SVG space (900x600)
+  // Region bounds: Lat 26..39, Lng 29..48
+  const projectCoordinates = (lat: number, lng: number) => {
+    const minLat = 26.0;
+    const maxLat = 39.0;
+    const minLng = 29.0;
+    const maxLng = 48.0;
+
+    const x = ((lng - minLng) / (maxLng - minLng)) * 820 + 40;
+    const y = ((maxLat - lat) / (maxLat - minLat)) * 520 + 40;
+    return { x: Math.max(30, Math.min(870, x)), y: Math.max(30, Math.min(570, y)) };
+  };
+
+  const currentJourney = journeys.find((j) => j.id === selectedJourneyId);
 
   return (
     <main className="min-h-screen px-4 py-8 md:px-12 lg:px-20 max-w-7xl mx-auto flex flex-col gap-8">
@@ -212,13 +295,13 @@ export default function ExplorePage() {
               Khám Phá & Đồ Thị Tri Thức (Explore & Connect)
             </h1>
             <p className="text-xs text-slate-400">
-              Đồ thị quan hệ thực thể • Dòng thời gian lịch sử đa tầng • Tra cứu địa danh & nhân vật
+              Đồ thị quan hệ thực thể • Dòng thời gian lịch sử • Bản đồ không gian Thánh địa & Các hành trình
             </p>
           </div>
         </div>
 
         {/* Tab Badges */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab("graph")}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
@@ -240,6 +323,16 @@ export default function ExplorePage() {
             <Clock className="w-4 h-4" /> Dòng Thời Gian
           </button>
           <button
+            onClick={() => setActiveTab("map")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "map"
+                ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <MapIcon className="w-4 h-4" /> Bản Đồ & Hành Trình
+          </button>
+          <button
             onClick={() => setActiveTab("entities")}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "entities"
@@ -257,7 +350,6 @@ export default function ExplorePage() {
       {/* ===================================================================== */}
       {activeTab === "graph" && (
         <div className="flex flex-col gap-4">
-          {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               <span className="text-slate-400 whitespace-nowrap">Lọc:</span>
@@ -284,7 +376,6 @@ export default function ExplorePage() {
               ))}
             </div>
 
-            {/* Search within Graph */}
             <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
@@ -305,9 +396,7 @@ export default function ExplorePage() {
             </form>
           </div>
 
-          {/* Graph Canvas & Side Inspector Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* SVG Interactive Graph Canvas */}
             <div className="lg:col-span-2 rounded-3xl glass-panel border border-slate-700/60 p-4 h-[640px] relative overflow-hidden flex flex-col justify-between">
               {loadingGraph ? (
                 <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -378,7 +467,6 @@ export default function ExplorePage() {
                         onClick={() => handleNodeClick(n)}
                         className="cursor-pointer group"
                       >
-                        {/* Glow halo */}
                         {(isSelected || isCentral) && (
                           <circle
                             r={radius + 8}
@@ -388,8 +476,6 @@ export default function ExplorePage() {
                             className="animate-pulse"
                           />
                         )}
-
-                        {/* Node circle */}
                         <circle
                           r={radius}
                           fill={isCentral ? "#1e3a8a" : "#0f172a"}
@@ -397,14 +483,10 @@ export default function ExplorePage() {
                           strokeWidth={isSelected ? 3 : 2}
                           className="transition-all duration-200 group-hover:scale-110"
                         />
-
-                        {/* Inner icon/dot */}
                         <circle
                           r={4}
                           fill={colors.stroke}
                         />
-
-                        {/* Label text */}
                         <text
                           y={radius + 14}
                           fill={isSelected ? "#ffffff" : "#e2e8f0"}
@@ -421,7 +503,6 @@ export default function ExplorePage() {
                 </svg>
               )}
 
-              {/* Canvas Legend */}
               <div className="flex items-center gap-4 text-xs text-slate-400 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 w-fit">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Nhân vật
@@ -473,7 +554,6 @@ export default function ExplorePage() {
                       </button>
                     </div>
 
-                    {/* Role / Period */}
                     {selectedEntityDetail.title_or_role && (
                       <div className="text-xs text-indigo-300 font-medium bg-indigo-950/40 border border-indigo-800/40 p-2.5 rounded-xl">
                         👑 {selectedEntityDetail.title_or_role}
@@ -492,12 +572,10 @@ export default function ExplorePage() {
                       </div>
                     )}
 
-                    {/* Bio Summary */}
                     <div className="text-xs text-slate-300 leading-relaxed pt-1">
                       {selectedEntityDetail.summary || selectedEntityDetail.description}
                     </div>
 
-                    {/* Connected Nodes List */}
                     <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
                       <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                         <Network className="w-3.5 h-3.5 text-indigo-400" /> Các mối liên kết trực tiếp ({selectedEntityDetail.connections.length})
@@ -524,7 +602,6 @@ export default function ExplorePage() {
                       </div>
                     </div>
 
-                    {/* Scripture Reference Link */}
                     {selectedEntityDetail.metadata?.key_verse && (
                       <Link
                         href={`/bible?ref=${encodeURIComponent(selectedEntityDetail.metadata.key_verse)}`}
@@ -570,15 +647,10 @@ export default function ExplorePage() {
             <div className="relative border-l-2 border-slate-800 ml-4 md:ml-32 flex flex-col gap-8 py-4">
               {timeline.map((ev) => (
                 <div key={ev.id} className="relative pl-6 md:pl-8 group">
-                  {/* Timeline bullet */}
                   <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-slate-900 border-2 border-blue-500 group-hover:border-amber-400 group-hover:scale-125 transition-all"></div>
-
-                  {/* Year tag for larger screens */}
                   <div className="md:absolute md:-left-36 md:top-1 text-xs font-mono font-bold text-amber-400/90 whitespace-nowrap">
                     {ev.approximate_date}
                   </div>
-
-                  {/* Event Card */}
                   <div className="p-5 rounded-2xl glass-card border border-slate-800 hover:border-slate-700 transition-all flex flex-col gap-2">
                     <div className="flex flex-wrap justify-between items-center gap-2">
                       <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -594,7 +666,6 @@ export default function ExplorePage() {
                         </Link>
                       )}
                     </div>
-
                     <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition-colors">
                       {ev.title}
                     </h3>
@@ -610,7 +681,278 @@ export default function ExplorePage() {
       )}
 
       {/* ===================================================================== */}
-      {/* 3. ENTITIES DIRECTORY VIEW */}
+      {/* 3. BIBLE MAP & SPATIAL JOURNEYS (NEW PHASE 6) */}
+      {/* ===================================================================== */}
+      {activeTab === "map" && (
+        <div className="flex flex-col gap-6">
+          {/* Journeys Selector Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span className="text-slate-400 whitespace-nowrap">Chọn hành trình:</span>
+            {journeys.map((j) => (
+              <button
+                key={j.id}
+                onClick={() => {
+                  setSelectedJourneyId(j.id);
+                  setActiveWaypoint(j.waypoints[0] || null);
+                }}
+                className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  selectedJourneyId === j.id
+                    ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
+                    : "bg-slate-800/80 text-slate-400 hover:text-white"
+                }`}
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                <span>{j.title}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Interactive Vector Map Canvas */}
+            <div className="lg:col-span-2 rounded-3xl glass-panel border border-slate-700/60 p-4 h-[620px] relative overflow-hidden flex flex-col justify-between bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+              {loadingMap ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+                  <p className="text-xs">Đang tải bản đồ không gian Thánh địa...</p>
+                </div>
+              ) : (
+                <svg className="w-full h-full select-none" viewBox="0 0 900 600">
+                  <defs>
+                    <linearGradient id="seaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#0f172a" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#1e293b" stopOpacity="0.8" />
+                    </linearGradient>
+                    <filter id="mapGlow">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+
+                  {/* Water bodies & regions hints */}
+                  <rect width="900" height="600" fill="#090d16" />
+
+                  {/* Decorative Ancient Geography Lines & Names */}
+                  <text x="120" y="240" fill="rgba(59, 130, 246, 0.2)" fontSize="18" fontWeight="bold" fontFamily="serif" letterSpacing="4">
+                    ĐỊA TRUNG HẢI (MEDITERRANEAN SEA)
+                  </text>
+                  <text x="210" y="520" fill="rgba(239, 68, 68, 0.2)" fontSize="14" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                    BIỂN ĐỎ (RED SEA)
+                  </text>
+                  <text x="680" y="320" fill="rgba(245, 158, 11, 0.15)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="3">
+                    LƯỠNG HÀ (MESOPOTAMIA)
+                  </text>
+                  <text x="360" y="290" fill="rgba(16, 185, 129, 0.3)" fontSize="13" fontWeight="bold" fontFamily="serif">
+                    CA-NA-AN (ĐẤT HỨA)
+                  </text>
+
+                  {/* Grid latitude lines */}
+                  {[100, 200, 300, 400, 500].map((y) => (
+                    <line key={y} x1="0" y1={y} x2="900" y2={y} stroke="rgba(148, 163, 184, 0.05)" strokeDasharray="3,3" />
+                  ))}
+
+                  {/* Journey Route Polyline */}
+                  {currentJourney && currentJourney.waypoints.length > 1 && (
+                    <g>
+                      {currentJourney.waypoints.slice(0, -1).map((wp, idx) => {
+                        const nextWp = currentJourney.waypoints[idx + 1];
+                        const p1 = projectCoordinates(wp.lat, wp.lng);
+                        const p2 = projectCoordinates(nextWp.lat, nextWp.lng);
+                        return (
+                          <line
+                            key={idx}
+                            x1={p1.x}
+                            y1={p1.y}
+                            x2={p2.x}
+                            y2={p2.y}
+                            stroke={currentJourney.color}
+                            strokeWidth="2.5"
+                            strokeDasharray="6,4"
+                            className="animate-pulse"
+                            opacity="0.8"
+                          />
+                        );
+                      })}
+                    </g>
+                  )}
+
+                  {/* All Places Pins */}
+                  {places.map((pl) => {
+                    if (!pl.latitude || !pl.longitude) return null;
+                    const pt = projectCoordinates(pl.latitude, pl.longitude);
+                    const isWaypoint = currentJourney?.waypoints.some((w) => w.name.includes(pl.name_vi));
+
+                    return (
+                      <g key={pl.id} transform={`translate(${pt.x}, ${pt.y})`} className="cursor-pointer group">
+                        <circle
+                          r={isWaypoint ? 6 : 4}
+                          fill={isWaypoint ? "#ffffff" : "#10b981"}
+                          opacity={isWaypoint ? 0.9 : 0.5}
+                          stroke="#0f172a"
+                          strokeWidth="1.5"
+                        />
+                        <text
+                          y="-8"
+                          fill={isWaypoint ? "#ffffff" : "rgba(148, 163, 184, 0.6)"}
+                          fontSize={isWaypoint ? "10" : "8"}
+                          fontWeight={isWaypoint ? "bold" : "normal"}
+                          textAnchor="middle"
+                          className="pointer-events-none drop-shadow"
+                        >
+                          {pl.name_vi}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Journey Waypoints Pins */}
+                  {currentJourney?.waypoints.map((wp) => {
+                    const pt = projectCoordinates(wp.lat, wp.lng);
+                    const isActive = activeWaypoint?.order === wp.order;
+
+                    return (
+                      <g
+                        key={wp.order}
+                        transform={`translate(${pt.x}, ${pt.y})`}
+                        onClick={() => setActiveWaypoint(wp)}
+                        className="cursor-pointer group"
+                      >
+                        {isActive && (
+                          <circle
+                            r="16"
+                            fill={currentJourney.color}
+                            opacity="0.3"
+                            filter="url(#mapGlow)"
+                            className="animate-ping"
+                          />
+                        )}
+                        <circle
+                          r={isActive ? 12 : 9}
+                          fill={currentJourney.color}
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          className="transition-transform group-hover:scale-125"
+                        />
+                        <text
+                          y="3"
+                          fill="#ffffff"
+                          fontSize="9"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                          className="pointer-events-none select-none"
+                        >
+                          {wp.order}
+                        </text>
+                        <text
+                          y="22"
+                          fill={isActive ? "#ffffff" : "#cbd5e1"}
+                          fontSize="10"
+                          fontWeight={isActive ? "bold" : "medium"}
+                          textAnchor="middle"
+                          className="pointer-events-none drop-shadow"
+                        >
+                          {wp.name}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
+
+              {/* Map Footer Note */}
+              <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800">
+                <span className="flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Khu vực Cận Đông Cổ Đại & Địa Trung Hải • Nhấp vào trạm dừng (1, 2, 3...) để xem chi tiết</span>
+                </span>
+                <span className="font-mono text-[11px] text-slate-500">Tọa độ WGS84</span>
+              </div>
+            </div>
+
+            {/* Journey Stepper & Waypoint Inspector Panel */}
+            <div className="rounded-3xl glass-panel border border-slate-700/60 p-6 flex flex-col justify-between gap-4 overflow-y-auto max-h-[620px]">
+              {currentJourney && (
+                <div className="flex flex-col gap-4">
+                  <div className="pb-3 border-b border-slate-800">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      {currentJourney.period}
+                    </span>
+                    <h3 className="text-xl font-extrabold text-white mt-1.5">
+                      {currentJourney.title}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed font-serif mt-1">
+                      {currentJourney.description}
+                    </p>
+                  </div>
+
+                  {/* Waypoint Detail Highlight */}
+                  {activeWaypoint && (
+                    <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold">
+                          {activeWaypoint.order}
+                        </span>
+                        <Link
+                          href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
+                          className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>{activeWaypoint.scripture}</span>
+                        </Link>
+                      </div>
+
+                      <h4 className="text-base font-bold text-white mt-1">
+                        {activeWaypoint.name}
+                      </h4>
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-emerald-400" />
+                        <span>Vị trí hiện đại: {activeWaypoint.modern}</span>
+                      </div>
+
+                      <p className="text-xs text-slate-200 leading-relaxed font-serif pt-1">
+                        {activeWaypoint.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* All Steps in Journey */}
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Milestone className="w-3.5 h-3.5 text-rose-400" />
+                      Các Chặng Dừng Chân ({currentJourney.waypoints.length})
+                    </h4>
+                    <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                      {currentJourney.waypoints.map((wp) => (
+                        <button
+                          key={wp.order}
+                          onClick={() => setActiveWaypoint(wp)}
+                          className={`p-2.5 rounded-xl border text-left text-xs transition-colors flex items-center justify-between ${
+                            activeWaypoint?.order === wp.order
+                              ? "bg-rose-950/40 border-rose-600 text-white font-semibold"
+                              : "bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold">
+                              {wp.order}
+                            </span>
+                            <span>{wp.name}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {wp.scripture}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 4. ENTITIES DIRECTORY VIEW */}
       {/* ===================================================================== */}
       {activeTab === "entities" && (
         <div className="flex flex-col gap-6">
