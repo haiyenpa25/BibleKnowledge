@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   BookOpen, 
   BrainCircuit, 
@@ -25,7 +26,9 @@ import {
   Check,
   ChevronRight,
   BookMarked,
-  Library
+  Library,
+  FolderKanban,
+  ArrowRight
 } from "lucide-react";
 
 interface HealthStatus {
@@ -102,7 +105,14 @@ export default function Home() {
   const [searchRef, setSearchRef] = useState("Ma-thi-ơ 14:22 - 15:5");
   const [rangeData, setRangeData] = useState<VerseRangeResponse | null>(null);
   const [queryLoading, setQueryLoading] = useState(false);
-  const [queryError, setQueryError] = useState<string | null>(null);
+  const router = useRouter();
+  const [aiResearchInput, setAiResearchInput] = useState("");
+
+  const handleAskAi = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiResearchInput.trim()) return;
+    router.push(`/research?q=${encodeURIComponent(aiResearchInput.trim())}`);
+  };
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -414,6 +424,214 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* ===================================================================== */}
+      {/* ASK BIBLE RESEARCH AI & QUICK STUDY HUB (ROADMAP1.md §53)               */}
+      {/* ===================================================================== */}
+      <section className="flex flex-col gap-6">
+        {/* Ask Bible Research AI Banner */}
+        <div className="p-6 md:p-8 rounded-3xl glass-panel border border-emerald-500/30 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-emerald-950/30 flex flex-col gap-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <BrainCircuit className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                  Đặt Câu Hỏi Nghiên Cứu Thần Học Với AI (Ask Research AI §53)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Phân tích tự động đa tầng: Văn bản Kinh Thánh • Ngữ nguyên Hy Lạp/Hê-bơ-rơ • Đồ thị tri thức • 275 sách chuyên khảo
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono text-emerald-400 font-bold px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 w-fit">
+              ROADMAP1 §51, §53
+            </span>
+          </div>
+
+          <form onSubmit={handleAskAi} className="flex flex-col sm:flex-row gap-2.5">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={aiResearchInput}
+                onChange={(e) => setAiResearchInput(e.target.value)}
+                placeholder="Nhập câu hỏi nghiên cứu (ví dụ: Tại sao Phao-lô và Gia-cơ nói về đức tin khác nhau?)"
+                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-700/80 text-xs md:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!aiResearchInput.trim()}
+              className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/30"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Nghiên Cứu Ngay →</span>
+            </button>
+          </form>
+
+          {/* Preset Prompts */}
+          <div className="flex items-center gap-2 flex-wrap text-xs pt-1">
+            <span className="text-slate-400 text-[11px]">Chủ đề gợi ý:</span>
+            {[
+              "Tại sao Phao-lô và Gia-cơ nói về đức tin khác nhau?",
+              "Ý nghĩa của Giao Ước Mới trong sách Hê-bơ-rơ",
+              "Sự tương phản giữa Luật Pháp Môi-se và Ân Điển Đấng Christ"
+            ].map((p, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  setAiResearchInput(p);
+                  router.push(`/research?q=${encodeURIComponent(p)}`);
+                }}
+                className="px-2.5 py-1 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 3 Action Pillars: Continue Reading, Daily Quiz, Review Flashcards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Continue Reading */}
+          <Link
+            href="/bible?book=jhn&chapter=1"
+            className="p-5 rounded-3xl glass-card border border-blue-500/20 hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">
+                Đọc Kinh Thánh (§53)
+              </span>
+              <BookOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white group-hover:text-blue-200 transition-colors">
+                Tiếp Tục Đọc: Phúc Âm Giăng
+              </h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Đoạn 1: Ban đầu có Đạo, Đạo ở cùng Đức Chúa Trời, và Đạo là Đức Chúa Trời.
+              </p>
+            </div>
+            <div className="text-xs text-blue-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Mở Trình Đọc Kinh Thánh →
+            </div>
+          </Link>
+
+          {/* Card 2: Daily Quiz */}
+          <Link
+            href="/learn"
+            className="p-5 rounded-3xl glass-card border border-amber-500/20 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-3 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                Thử Thách Hôm Nay (§53)
+              </span>
+              <GraduationCap className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white group-hover:text-amber-200 transition-colors">
+                Đố Vui Hằng Ngày (Daily Quiz)
+              </h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                5 câu hỏi trắc nghiệm & Who Am I ngẫu nhiên kiểm tra kiến thức Kinh Thánh.
+              </p>
+            </div>
+            <div className="text-xs text-amber-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Bắt Đầu Làm Bài Ngay →
+            </div>
+          </Link>
+
+          {/* Card 3: Review Flashcards */}
+          <Link
+            href="/learn"
+            className="p-5 rounded-3xl glass-card border border-purple-500/20 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-3 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">
+                Học Thích Ứng (§5, §53)
+              </span>
+              <BookMarked className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors">
+                Ôn Tập Thẻ Ghi Nhớ (SM-2)
+              </h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Thuật toán Lặp lại ngắt quãng (Spaced Repetition) củng cố ghi nhớ dài hạn.
+              </p>
+            </div>
+            <div className="text-xs text-purple-400 font-medium flex items-center gap-1 pt-2 border-t border-slate-800/80">
+              Ôn Luyện Flashcards →
+            </div>
+          </Link>
+        </div>
+
+        {/* Study Projects Showcase Card */}
+        <div className="p-6 md:p-7 rounded-3xl glass-panel border border-slate-800 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderKanban className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                Không Gian Dự Án Nghiên Cứu Tiêu Biểu (Study Projects §50, §53)
+              </h3>
+            </div>
+            <Link
+              href="/study"
+              className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
+            >
+              Quản lý Dự Án (/study) →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                title: "Hành Trình Đức Tin Của Si-môn Phi-e-rơ",
+                desc: "Khảo cứu sự biến đổi từ ngư phủ bốc đồng thành người chăn bầy tận tụy dưới ân điển.",
+                verses: 6,
+                notes: 3,
+                id: "1"
+              },
+              {
+                title: "Thần Học Giao Ước & Ân Điển Trong Thư Rô-ma",
+                desc: "Đối chiếu sự công chính bởi đức tin (Sola Fide) và công cuộc cứu chuộc trọn vẹn.",
+                verses: 8,
+                notes: 5,
+                id: "2"
+              },
+              {
+                title: "Bài Giảng Trên Núi & Đạo Đức Nước Trời",
+                desc: "Ý nghĩa của 8 Phước Lành, luật pháp trọn vẹn và lối sống môn đồ môn hóa thế giới.",
+                verses: 7,
+                notes: 4,
+                id: "3"
+              }
+            ].map((proj) => (
+              <Link
+                key={proj.id}
+                href="/study"
+                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-3 group"
+              >
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
+                    {proj.title}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                    {proj.desc}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-800/60 font-mono">
+                  <span>📖 {proj.verses} câu ghim</span>
+                  <span>📝 {proj.notes} ghi chú</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 4-Layer Product Architecture Grid */}
       <section className="flex flex-col gap-4">

@@ -1641,7 +1641,7 @@ Câu hỏi: {q_raw}
 Hãy viết đoạn tổng hợp kết luận thần học (2-3 đoạn ngắn, sâu sắc, chính xác, phân biệt rõ văn bản và diễn giải).
 """
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/generate",
                 json={

@@ -385,6 +385,21 @@ export default function ResearchPage() {
       }
     }
     loadInitialData();
+
+    // Check URL parameters (?q=... or ?tab=...)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlQ = params.get("q");
+      const urlTab = params.get("tab");
+      if (urlTab && ["agent", "context", "lexicon", "qa", "character", "theme"].includes(urlTab)) {
+        setActiveTab(urlTab as any);
+      }
+      if (urlQ && urlQ.trim()) {
+        setAgentQuery(urlQ.trim());
+        setActiveTab("agent");
+        handleRunAgentResearch(urlQ.trim());
+      }
+    }
   }, [apiUrl]);
 
   // Load Context Study when Context tab is selected
