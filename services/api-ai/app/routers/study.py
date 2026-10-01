@@ -679,3 +679,136 @@ def export_project_to_flashcards(project_id: str, db: Session = Depends(get_db))
     db.commit()
     return {"message": f"Đã xuất thành công {created_count} thẻ ghi nhớ Flashcard vào hệ thống Học Tập!", "created_count": created_count}
 
+
+@router.get("/export-bundle")
+def export_study_bundle(db: Session = Depends(get_db)):
+    """Export complete user study workspace as structured JSON and Markdown summary bundle (§48, §50)."""
+    # 1. Bookmarks
+    bm_rows = db.execute(
+        text("SELECT verse_code, reference, note, color, created_at FROM user_bookmarks ORDER BY created_at DESC")
+    ).fetchall()
+    bookmarks = [
+        {
+            "verse_code": r.verse_code,
+            "reference": r.reference,
+            "note": r.note or "",
+            "color": r.color or "blue",
+            "created_at": r.created_at.isoformat() if r.created_at else ""
+        }
+        for r in bm_rows
+    ]
+
+    # 2. Notes
+    note_rows = db.execute(
+        text("SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes ORDER BY updated_at DESC")
+    ).fetchall()
+    notes = [
+        {
+            "id": str(r.id),
+            "title": r.title,
+            "scripture_ref": r.scripture_ref or "",
+            "content": r.content,
+            "tags": r.tags if isinstance(r.tags, list) else json.loads(r.tags or "[]"),
+            "created_at": r.created_at.isoformat() if r.created_at else "",
+            "updated_at": r.updated_at.isoformat() if r.updated_at else ""
+        }
+        for r in note_rows
+    ]
+
+    # 3. Projects
+    proj_rows = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, pinned_entities, study_questions, ai_outline, created_at, updated_at FROM study_projects ORDER BY updated_at DESC")
+    ).fetchall()
+    projects = [
+        {
+            "id": str(r.id),
+            "title": r.title,
+            "description": r.description or "",
+            "category": r.category or "theology",
+            "pinned_verses": parse_json_field(r.pinned_verses),
+            "pinned_entities": parse_json_field(r.pinned_entities),
+            "study_questions": parse_json_field(r.study_questions),
+            "ai_outline": parse_json_field(r.ai_outline),
+            "created_at": r.created_at.isoformat() if r.created_at else "",
+            "updated_at": r.updated_at.isoformat() if r.updated_at else ""
+        }
+        for r in proj_rows
+    ]
+
+    # 4. Generate Comprehensive Markdown Document
+    md_lines = [
+        "# Sổ Tay & Hồ Sơ Nghiên Cứu Kinh Thánh — BibleKnowledge",
+        f"> Xuất dữ liệu vào: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "---",
+        "",
+        f"## 1. Ghi Chú Cá Nhân ({len(notes)} ghi chú)",
+        ""
+    ]
+
+    if notes:
+        for idx, n in enumerate(notes, 1):
+            md_lines.append(f"### {idx}. {n['title']}")
+            if n['scripture_ref']:
+                md_lines.append(f"- **Kinh văn tham chiếu**: `{n['scripture_ref']}`")
+            if n['tags']:
+                md_lines.append(f"- **Nhãn chủ đề**: {', '.join(f'`#{t}`' for t in n['tags'])}")
+            md_lines.append(f"- **Ngày cập nhật**: {n['updated_at']}")
+            md_lines.append("")
+            md_lines.append(n['content'])
+            md_lines.append("")
+            md_lines.append("---")
+            md_lines.append("")
+    else:
+        md_lines.append("*Chưa có ghi chú cá nhân.*")
+        md_lines.append("")
+
+    md_lines.append(f"## 2. Các Đoạn Kinh Thánh Đánh Dấu ({len(bookmarks)} câu)")
+    md_lines.append("")
+    if bookmarks:
+        for bm in bookmarks:
+            note_str = f" — *{bm['note']}*" if bm['note'] else ""
+            md_lines.append(f"- **{bm['reference']}** ({bm['color']}){note_str}")
+    else:
+        md_lines.append("*Chưa có câu đánh dấu.*")
+    md_lines.append("")
+    md_lines.append("---")
+    md_lines.append("")
+
+    md_lines.append(f"## 3. Dự Án Nghiên Cứu Thần Học ({len(projects)} chuyên đề)")
+    md_lines.append("")
+    for p in projects:
+        md_lines.append(f"### Chuyên đề: {p['title']}")
+        if p['description']:
+            md_lines.append(f"> {p['description']}")
+            md_lines.append("")
+        if p['study_questions']:
+            md_lines.append("#### Câu hỏi trọng tâm:")
+            for q in p['study_questions']:
+                md_lines.append(f"- {q}")
+            md_lines.append("")
+        if p['pinned_verses']:
+            md_lines.append("#### Kinh văn nền tảng:")
+            for pv in p['pinned_verses']:
+                md_lines.append(f"- **{pv.get('reference', '')}**: {pv.get('text', '')}")
+            md_lines.append("")
+        if p['ai_outline']:
+            md_lines.append("#### Đề cương nghiên cứu:")
+            for sec in p['ai_outline']:
+                md_lines.append(f"- **{sec.get('section', '')}**: {sec.get('content', '')}")
+            md_lines.append("")
+        md_lines.append("---")
+        md_lines.append("")
+
+    return {
+        "summary": {
+            "total_notes": len(notes),
+            "total_bookmarks": len(bookmarks),
+            "total_projects": len(projects)
+        },
+        "notes": notes,
+        "bookmarks": bookmarks,
+        "projects": projects,
+        "markdown_bundle": "\n".join(md_lines)
+    }
+
