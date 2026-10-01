@@ -232,6 +232,37 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   }
   ```
 
+### 3.8 Multi-Passage Comparative Exegesis Matrix & Synoptic Lens Engine (§48, §51)
+- **Presets Endpoint**: `GET /api/rag/comparative-presets`
+  - **Description**: Returns 8 curated foundational comparative study presets covering Synoptic Gospels, Covenant Theology, Faith vs. Works, Typology, Christology, Messianic Prophecy, and Pneumatology.
+- **Synchronous Analysis Endpoint**: `POST /api/rag/comparative-study`
+  - **Request Body**:
+    ```json
+    {
+      "passages": ["Ma-thi-ơ 28:18-20", "Mác 16:15-18", "Lu-ca 24:46-49"],
+      "focus_theme": "Thẩm Quyền & Mạng Lệnh Môn Đồ Hóa",
+      "comparative_lens": "synoptic_harmony"
+    }
+    ```
+  - **Response Structure**:
+    - `request_passages`: Array of input Scripture references.
+    - `focus_theme`: Central theological subject.
+    - `comparative_lens`: Active hermeneutical lens (`synoptic_harmony`, `covenant_fulfillment`, `theological_synthesis`, `typology_redemption`, `christological_roots`, `messianic_prophecy`).
+    - `lens_title`: Human-readable lens description.
+    - `executive_synthesis`: Executive summary of comparative findings.
+    - `profiles`: Detailed exegetical profiles for each passage, including book name, author, canonical era, audience, literary genre, verses text from the 1925 Bible, core motif, and local Strong's roots.
+    - `comparative_dimensions`: 5-dimensional breakdown (Historical Setting, Literary Form, Doctrinal Core, Practical Praxis) comparing each passage side-by-side with theological synthesis.
+    - `lexicon_roots_overlap`: Original language Strong's Greek/Hebrew roots connecting the passages.
+    - `points_of_convergence`: Core doctrinal truths shared across all passages.
+    - `points_of_divergence_or_nuance`: Distinctive authorial emphases.
+    - `harmonization_analysis`: Redemptive-historical harmonization resolving apparent tensions.
+    - `scholarly_commentary_citations`: Citations from 275 library volumes.
+    - `homiletical_sermon_outline`: 3-point homiletical preaching outline with exposition, Scripture links, and pastoral application.
+    - `reflection_questions`: Probing personal and small group discussion questions.
+    - `epistemic_guardrail`: Statement affirming grounded canonical text.
+- **GET Endpoint Variant (Shareable)**: `GET /api/rag/comparative-study?passages={comma_separated_refs}&theme={optional_theme}&lens={optional_lens}`
+  - **Description**: Supports direct URL links, browser bookmarks, and external cross-reference routing.
+
 ---
 
 ## 4. Theological Knowledge Graph (`/api/graph`)

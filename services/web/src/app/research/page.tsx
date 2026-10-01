@@ -38,7 +38,10 @@ import {
   ShieldAlert,
   Clock,
   GitCommit,
-  AlertTriangle
+  AlertTriangle,
+  Scale,
+  Columns3,
+  ArrowRightLeft
 } from "lucide-react";
 
 // --- Context Study Interfaces (§15) ---
@@ -261,6 +264,83 @@ interface ComparativeColumn {
   synthesis: string;
 }
 
+// Multi-Passage Comparative Exegesis Interfaces (§48, §51)
+interface PassageExegesisProfile {
+  reference: string;
+  book_code: string;
+  book_name: string;
+  testament: string;
+  total_verses: number;
+  verses_text: Array<{ verse: number; text: string }>;
+  author: string;
+  date_and_era: string;
+  original_audience: string;
+  literary_genre: string;
+  core_theological_motif: string;
+  key_strong_roots: Array<{
+    strong_number: string;
+    lemma: string;
+    transliteration: string;
+    definition: string;
+    theological_significance: string;
+  }>;
+}
+
+interface ComparativeDimensionPoint {
+  dimension_title: string;
+  category: string;
+  details_by_passage: Record<string, string>;
+  theological_synthesis: string;
+}
+
+interface LexiconRootOverlap {
+  strong_number: string;
+  language: string;
+  lemma: string;
+  transliteration: string;
+  definition: string;
+  theological_significance: string;
+  present_in_passages: string[];
+}
+
+interface HomileticalOutlinePoint {
+  point_number: number;
+  title: string;
+  subheading: string;
+  exposition: string;
+  scripture_links: string[];
+  pastoral_application: string;
+}
+
+interface ComparativeMatrixData {
+  request_passages: string[];
+  focus_theme: string;
+  comparative_lens: string;
+  lens_title: string;
+  executive_synthesis: string;
+  profiles: PassageExegesisProfile[];
+  comparative_dimensions: ComparativeDimensionPoint[];
+  lexicon_roots_overlap: LexiconRootOverlap[];
+  points_of_convergence: string[];
+  points_of_divergence_or_nuance: string[];
+  harmonization_analysis: string;
+  scholarly_commentary_citations: Citation[];
+  homiletical_sermon_outline: HomileticalOutlinePoint[];
+  reflection_questions: string[];
+  epistemic_guardrail: string;
+}
+
+interface ComparativePresetItem {
+  id: string;
+  title: string;
+  passages: string[];
+  focus_theme: string;
+  comparative_lens: string;
+  description: string;
+  badge_label: string;
+}
+
+
 interface AgentResearchData {
   query: string;
   focus: string;
@@ -394,7 +474,24 @@ export default function ResearchPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Active Research Mode Tab
-  const [activeTab, setActiveTab] = useState<"agent" | "passage" | "context" | "lexicon" | "qa" | "character" | "theme">("agent");
+  const [activeTab, setActiveTab] = useState<"agent" | "passage" | "context" | "lexicon" | "qa" | "character" | "theme" | "compare">("agent");
+
+  // --- Tab: Multi-Passage Comparative Exegesis States (§48, §51) ---
+  const [comparativePresets, setComparativePresets] = useState<ComparativePresetItem[]>([]);
+  const [selectedComparePresetId, setSelectedComparePresetId] = useState<string>("synoptic_great_commission");
+  const [comparePassagesInput, setComparePassagesInput] = useState<string[]>([
+    "Ma-thi-ơ 28:18-20",
+    "Mác 16:15-18",
+    "Lu-ca 24:46-49"
+  ]);
+  const [compareNewPassageText, setCompareNewPassageText] = useState("");
+  const [compareThemeInput, setCompareThemeInput] = useState("Thẩm Quyền & Mạng Lệnh Môn Đồ Hóa");
+  const [compareLensInput, setCompareLensInput] = useState("synoptic_harmony");
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareData, setCompareData] = useState<ComparativeMatrixData | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [copiedCompareOutline, setCopiedCompareOutline] = useState(false);
+  const [selectedCompareProfileRef, setSelectedCompareProfileRef] = useState<string | null>(null);
 
   // --- Tab: Passage Exegesis Study States (ROADMAP1.md §13) ---
   const [passagePresets, setPassagePresets] = useState<PassagePresetItem[]>([]);
@@ -456,10 +553,11 @@ export default function ResearchPage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const [themeRes, presetRes, passPresetRes] = await Promise.all([
+        const [themeRes, presetRes, passPresetRes, compPresetRes] = await Promise.all([
           fetch(`${apiUrl}/api/rag/themes`),
           fetch(`${apiUrl}/api/rag/context-preset-options`),
-          fetch(`${apiUrl}/api/rag/passage-presets`)
+          fetch(`${apiUrl}/api/rag/passage-presets`),
+          fetch(`${apiUrl}/api/rag/comparative-presets`)
         ]);
         if (themeRes.ok) {
           const tData = await themeRes.json();
@@ -473,25 +571,40 @@ export default function ResearchPage() {
           const passData = await passPresetRes.json();
           setPassagePresets(passData);
         }
+        if (compPresetRes.ok) {
+          const compData = await compPresetRes.json();
+          setComparativePresets(compData);
+        }
       } catch (e) {
         console.error("Failed to load initial presets:", e);
       }
     }
     loadInitialData();
 
-    // Check URL parameters (?q=... or ?tab=... or ?passage=...)
+    // Check URL parameters (?q=... or ?tab=... or ?passage=... or ?compare=...)
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const urlQ = params.get("q");
       const urlTab = params.get("tab");
       const urlPassage = params.get("passage") || params.get("ref");
+      const urlCompare = params.get("compare");
 
-      if (urlPassage && urlPassage.trim()) {
+      if (urlCompare && urlCompare.trim()) {
+        const passList = urlCompare.split(",").map(s => s.trim()).filter(Boolean);
+        if (passList.length >= 2) {
+          setComparePassagesInput(passList);
+          setActiveTab("compare");
+          handleRunComparativeStudy(passList);
+        }
+      } else if (urlPassage && urlPassage.trim()) {
         setPassageRefInput(urlPassage.trim());
         setActiveTab("passage");
         handlePassageStudy(urlPassage.trim());
-      } else if (urlTab && ["agent", "passage", "context", "lexicon", "qa", "character", "theme"].includes(urlTab)) {
+      } else if (urlTab && ["agent", "passage", "context", "lexicon", "qa", "character", "theme", "compare"].includes(urlTab)) {
         setActiveTab(urlTab as any);
+        if (urlTab === "compare") {
+          handleRunComparativeStudy();
+        }
       }
 
       if (urlQ && urlQ.trim()) {
@@ -501,6 +614,101 @@ export default function ResearchPage() {
       }
     }
   }, [apiUrl]);
+
+  // Load Comparative Study when Compare tab is selected
+  useEffect(() => {
+    if (activeTab === "compare" && !compareData && !compareLoading) {
+      handleRunComparativeStudy(comparePassagesInput, compareThemeInput, compareLensInput);
+    }
+  }, [activeTab]);
+
+  const handleRunComparativeStudy = async (
+    passagesToUse?: string[],
+    themeToUse?: string,
+    lensToUse?: string
+  ) => {
+    const list = passagesToUse || comparePassagesInput;
+    const cleanList = list.filter(p => p.trim().length > 0);
+    if (cleanList.length < 2) {
+      setCompareError("Vui lòng cung cấp ít nhất 2 phân đoạn Kinh Thánh để thực hiện đối chiếu.");
+      return;
+    }
+    setCompareLoading(true);
+    setCompareError(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/rag/comparative-study`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passages: cleanList,
+          focus_theme: themeToUse || compareThemeInput,
+          comparative_lens: lensToUse || compareLensInput
+        })
+      });
+      if (res.ok) {
+        const data: ComparativeMatrixData = await res.json();
+        setCompareData(data);
+        if (data.profiles && data.profiles.length > 0) {
+          setSelectedCompareProfileRef(data.profiles[0].reference);
+        }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setCompareError(errJson.detail || "Không thể thực hiện đối chiếu các phân đoạn Kinh Thánh này.");
+      }
+    } catch (e: any) {
+      setCompareError(e.message || "Lỗi kết nối máy chủ nghiên cứu so sánh đối chiếu.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const handleApplyComparePreset = (preset: ComparativePresetItem) => {
+    setSelectedComparePresetId(preset.id);
+    setComparePassagesInput(preset.passages);
+    setCompareThemeInput(preset.focus_theme);
+    setCompareLensInput(preset.comparative_lens);
+    handleRunComparativeStudy(preset.passages, preset.focus_theme, preset.comparative_lens);
+  };
+
+  const handleAddComparePassage = () => {
+    if (!compareNewPassageText.trim()) return;
+    if (comparePassagesInput.length >= 4) {
+      alert("Hệ thống hỗ trợ đối chiếu tối đa 4 phân đoạn cùng một lúc để đảm bảo độ sâu giải kinh.");
+      return;
+    }
+    const updated = [...comparePassagesInput, compareNewPassageText.trim()];
+    setComparePassagesInput(updated);
+    setCompareNewPassageText("");
+  };
+
+  const handleRemoveComparePassage = (indexToRemove: number) => {
+    if (comparePassagesInput.length <= 2) {
+      alert("Cần duy trì tối thiểu 2 phân đoạn để đối chiếu so sánh.");
+      return;
+    }
+    const updated = comparePassagesInput.filter((_, idx) => idx !== indexToRemove);
+    setComparePassagesInput(updated);
+  };
+
+  const handleCopyCompareOutline = () => {
+    if (!compareData || !compareData.homiletical_sermon_outline) return;
+    const textToCopy = `DÀN BÀI GIẢNG / KHẢO LUẬN SO SÁNH: ${compareData.focus_theme}
+Lăng Kính: ${compareData.lens_title}
+Các Phân Đoạn: ${compareData.request_passages.join(" | ")}
+
+` + compareData.homiletical_sermon_outline.map(pt => (
+`Điểm ${pt.point_number}: ${pt.title}
+- Luận đề: ${pt.subheading}
+- Giải nghĩa: ${pt.exposition}
+- Kinh Thánh: ${pt.scripture_links.join(", ")}
+- Áp dụng mục vụ: ${pt.pastoral_application}
+`)).join("\n") + `\n\nNguồn: BibleKnowledge Research Platform (§48)`;
+
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedCompareOutline(true);
+    setTimeout(() => setCopiedCompareOutline(false), 2200);
+  };
+
 
   // Load Passage Study when Passage tab is selected
   useEffect(() => {
@@ -936,6 +1144,26 @@ export default function ResearchPage() {
         >
           <Layers className="w-4 h-4 text-amber-200" />
           <span>Chuyên Đề Thần Học</span>
+        </button>
+
+        {/* Mode 8: Multi-Passage Comparative Exegesis (§48, §51) */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("compare");
+            if (!compareData && !compareLoading) {
+              handleRunComparativeStudy();
+            }
+          }}
+          className={`px-4 py-2 rounded-2xl flex items-center gap-2 font-bold transition-all whitespace-nowrap ${
+            activeTab === "compare"
+              ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-600/30 border border-teal-400/40"
+              : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <Scale className="w-4 h-4 text-teal-200" />
+          <span>So Sánh Đối Chiếu Đa Đoạn</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-teal-400/20 text-teal-300 uppercase tracking-wider">Mới §48</span>
         </button>
       </nav>
 
@@ -3278,6 +3506,610 @@ export default function ResearchPage() {
                 </div>
               </div>
             </article>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 8: MULTI-PASSAGE COMPARATIVE EXEGESIS (§48, §51)     */}
+      {/* ======================================================== */}
+      {activeTab === "compare" && (
+        <div className="flex flex-col gap-8">
+          {/* Hero & Overview Banner */}
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-teal-950/50 via-slate-900/60 to-emerald-950/40 border border-teal-500/30 flex flex-col gap-4 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider">
+                <Scale className="w-4 h-4" /> Multi-Passage Comparative Exegesis Matrix &bull; §48 &bull; §51
+              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-medium">
+                Đối Chiếu Đồng Quan &bull; 6 Lăng Kính Thần Học
+              </span>
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-white mb-2">
+                So Sánh Đối Chiếu Đa Đoạn &amp; Khảo Luận Đồng Quan
+              </h2>
+              <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-sans max-w-4xl">
+                Nền tảng giải kinh đối chiếu đồng bộ 2 đến 4 phân đoạn Kinh Thánh: Trích xuất bản văn nguyên thủy 1925, 
+                phân tích bối cảnh lịch sử của từng trước giả, căn ngữ Hy Lạp / Hê-bơ-rơ tương đồng, điểm đồng quy giáo lý, 
+                sự khác biệt nhấn mạnh, sự hòa hợp cứu rỗi và dàn ý bài giảng mục vụ 3 điểm.
+              </p>
+            </div>
+          </div>
+
+          {/* Curated Foundations & Presets Bar */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Bộ Đề Đối Chiếu Mẫu Nổi Bật (8 Presets §48)
+              </span>
+              <span className="text-[11px] text-slate-400">Chọn đề mục để nạp nhanh phân đoạn và lăng kính</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {comparativePresets.map((preset) => {
+                const isSelected = selectedComparePresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleApplyComparePreset(preset)}
+                    className={`p-3.5 rounded-2xl text-left transition-all border flex flex-col justify-between gap-2.5 ${
+                      isSelected
+                        ? "bg-teal-950/60 border-teal-400 text-white shadow-lg shadow-teal-900/30 ring-1 ring-teal-400/50"
+                        : "bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1.5">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-300 font-semibold border border-teal-500/20">
+                          {preset.badge_label}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {preset.passages.length} đoạn
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-white line-clamp-1">
+                        {preset.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                        {preset.description}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 text-[10px] font-mono text-teal-300/80">
+                      {preset.passages.map((p, pIdx) => (
+                        <span key={pIdx} className="px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700">
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Interactive Configuration & Query Bar */}
+          <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-5 shadow-xl">
+            <div className="flex flex-col gap-3">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Các phân đoạn đang đối chiếu (2 – 4 phân đoạn)</span>
+                <span className="text-[11px] font-normal text-slate-400">Nhấn &ldquo;x&rdquo; để bỏ hoặc nhập thêm bên dưới</span>
+              </label>
+
+              {/* Passage Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                {comparePassagesInput.map((pRef, idx) => (
+                  <div 
+                    key={idx}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-950/70 border border-teal-500/40 text-teal-200 text-xs font-medium shadow-sm"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-teal-400" />
+                    <span>{pRef}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveComparePassage(idx)}
+                      title="Bỏ phân đoạn này"
+                      className="w-4 h-4 rounded-full hover:bg-teal-800/60 text-teal-400 hover:text-white flex items-center justify-center text-[10px] transition-colors"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add new passage inline */}
+                {comparePassagesInput.length < 4 && (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={compareNewPassageText}
+                      onChange={(e) => setCompareNewPassageText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddComparePassage();
+                        }
+                      }}
+                      placeholder="Thêm phân đoạn (ví dụ: Công-vụ 1:8)..."
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 w-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddComparePassage}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+                    >
+                      + Thêm
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Theme & Lens Configuration */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-400">
+                  Chủ đề thần học trọng tâm (Tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  value={compareThemeInput}
+                  onChange={(e) => setCompareThemeInput(e.target.value)}
+                  placeholder="Ví dụ: Đại Mạng Lệnh Môn Đồ Hóa, Đức Tin & Việc Làm..."
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-400">
+                  Lăng kính nghiên cứu đối chiếu (Comparative Lens)
+                </label>
+                <select
+                  value={compareLensInput}
+                  onChange={(e) => setCompareLensInput(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  <option value="synoptic_harmony">Phúc Âm Đồng Quan &amp; Hòa Hợp Tự Sự</option>
+                  <option value="covenant_fulfillment">Tiến Trình Thần Học Giao Ước (Lời Hứa &amp; Ứng Nghiệm)</option>
+                  <option value="theological_synthesis">Tổng Hợp Giáo Lý Tương Hỗ (Phao-lô &amp; Gia-cơ)</option>
+                  <option value="typology_redemption">Biểu Tượng Tiên Tri (Typology Cựu &bull; Tân Ước)</option>
+                  <option value="christological_roots">Kitô Học: Tiền Hữu, Nhập Thể &amp; Tối Thượng</option>
+                  <option value="messianic_prophecy">Ứng Nghiệm Tiên Tri Đấng Mê-si-a</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Execute Button */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                Văn bản đối chiếu trực tiếp từ 31,081 câu Kinh Thánh 1925
+              </span>
+
+              <button
+                type="button"
+                onClick={() => handleRunComparativeStudy()}
+                disabled={compareLoading}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-teal-600/20 transition-all disabled:opacity-50"
+              >
+                {compareLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang giải kinh đối chiếu...</span>
+                  </>
+                ) : (
+                  <>
+                    <Scale className="w-4 h-4" />
+                    <span>Chạy Đối Chiếu Thần Học</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {compareError && (
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{compareError}</span>
+            </div>
+          )}
+
+          {/* Loading Indicator */}
+          {compareLoading && !compareData && (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800/60 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+              <p className="text-xs">Đang truy vấn nguyên văn Kinh Thánh và phân tích đối chiếu đa tầng...</p>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {compareData && (
+            <div className="flex flex-col gap-8">
+              {/* Executive Synthesis Card */}
+              <div className="p-6 rounded-3xl bg-slate-900/90 border border-teal-500/30 flex flex-col gap-3 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                      Tổng Luận Đối Chiếu
+                    </span>
+                    <span className="text-xs text-slate-400">&bull;</span>
+                    <span className="text-xs font-semibold text-white">
+                      {compareData.focus_theme}
+                    </span>
+                  </div>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                    {compareData.lens_title}
+                  </span>
+                </div>
+                <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                  {compareData.executive_synthesis}
+                </p>
+              </div>
+
+              {/* Synchronous Multi-Column Passage Viewer */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Columns3 className="w-4 h-4 text-teal-400" />
+                    <span>Đối Chiếu Song Song Bản Văn Kinh Thánh ({compareData.profiles.length} Phân Đoạn)</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-mono">Bản Dịch Truyền Thống 1925</span>
+                </div>
+
+                <div className={`grid grid-cols-1 ${
+                  compareData.profiles.length === 2 
+                    ? "md:grid-cols-2" 
+                    : compareData.profiles.length === 3 
+                    ? "md:grid-cols-3" 
+                    : "md:grid-cols-2 lg:grid-cols-4"
+                } gap-4`}>
+                  {compareData.profiles.map((profile, pIdx) => (
+                    <div 
+                      key={pIdx}
+                      className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/40 transition-colors flex flex-col justify-between gap-4 shadow-lg"
+                    >
+                      {/* Passage Header */}
+                      <div className="flex flex-col gap-2 pb-3 border-b border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            profile.testament === "OT"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                          }`}>
+                            {profile.testament === "OT" ? "Cựu Ước" : "Tân Ước"}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {profile.total_verses} câu
+                          </span>
+                        </div>
+                        <h4 className="text-base font-bold text-white">
+                          {profile.reference}
+                        </h4>
+                        <div className="text-[11px] text-slate-400 flex flex-col gap-0.5">
+                          <span><strong>Trước giả:</strong> {profile.author}</span>
+                          <span><strong>Thời điểm:</strong> {profile.date_and_era}</span>
+                          <span><strong>Độc giả:</strong> {profile.original_audience}</span>
+                          <span><strong>Thể loại:</strong> {profile.literary_genre}</span>
+                        </div>
+                      </div>
+
+                      {/* Verses Scrollbox */}
+                      <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1 text-xs font-serif leading-relaxed text-slate-200">
+                        {profile.verses_text && profile.verses_text.length > 0 ? (
+                          profile.verses_text.map((v, vIdx) => (
+                            <div key={vIdx} className="flex items-start gap-2 p-1.5 rounded-lg hover:bg-slate-800/50 transition-colors">
+                              <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-950/80 text-teal-300 border border-teal-500/30">
+                                {v.verse}
+                              </span>
+                              <p className="italic text-slate-300">
+                                {v.text}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-slate-500 text-xs italic">Không có câu hiển thị.</p>
+                        )}
+                      </div>
+
+                      {/* Core Theological Motif & Strong's Lexicon Roots */}
+                      <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
+                        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px]">
+                          <span className="font-bold text-teal-300 block mb-0.5">Trọng tâm mạc khải:</span>
+                          <span className="text-slate-300">{profile.core_theological_motif}</span>
+                        </div>
+
+                        {profile.key_strong_roots && profile.key_strong_roots.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {profile.key_strong_roots.map((root, rIdx) => (
+                              <span
+                                key={rIdx}
+                                title={`${root.definition}: ${root.theological_significance}`}
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/50 text-cyan-300 border border-cyan-500/20"
+                              >
+                                {root.strong_number} &bull; {root.lemma}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5-Dimensional Comparative Exegesis Matrix Table */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Workflow className="w-4 h-4 text-teal-400" />
+                    <span>Ma Trận Đối Chiếu Chi Tiết (5 Chiều Kích Giải Kinh)</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400">Phân định minh bạch giữa các bản văn</span>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {compareData.comparative_dimensions.map((dim, dIdx) => (
+                    <div 
+                      key={dIdx}
+                      className="p-5 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-3 shadow-md"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-teal-400" />
+                          <span>{dim.dimension_title}</span>
+                        </h4>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 uppercase font-mono">
+                          {dim.category}
+                        </span>
+                      </div>
+
+                      {/* Columns per passage */}
+                      <div className={`grid grid-cols-1 ${
+                        compareData.profiles.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
+                      } gap-3`}>
+                        {Object.entries(dim.details_by_passage).map(([pRef, pText], entryIdx) => (
+                          <div 
+                            key={entryIdx}
+                            className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex flex-col gap-1 text-xs"
+                          >
+                            <span className="font-bold text-teal-300 text-[11px] font-mono">
+                              {pRef}
+                            </span>
+                            <p className="text-slate-300 leading-relaxed font-sans">
+                              {pText}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Synthesis */}
+                      <div className="p-3 rounded-2xl bg-teal-950/40 border border-teal-500/20 text-xs text-teal-200 flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 shrink-0 text-teal-400 mt-0.5" />
+                        <p className="leading-relaxed">
+                          <strong>Tổng hợp thần học:</strong> {dim.theological_synthesis}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lexicon Roots Overlap (Strong's Concordance) */}
+              {compareData.lexicon_roots_overlap && compareData.lexicon_roots_overlap.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Languages className="w-4 h-4 text-cyan-400" />
+                      <span>Căn Ngữ Nguyên Văn Đối Chiếu (Strong&apos;s Greek &amp; Hebrew Roots)</span>
+                    </h3>
+                    <span className="text-[11px] text-slate-400">Mạch nguồn nguyên ngữ kết nối các phân đoạn</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {compareData.lexicon_roots_overlap.map((lr, lIdx) => (
+                      <div 
+                        key={lIdx}
+                        className="p-4 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-cyan-500/40 transition-colors flex flex-col justify-between gap-3 shadow-md"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
+                              {lr.strong_number}
+                            </span>
+                            <span className="text-[10px] uppercase text-slate-400 font-bold">
+                              {lr.language}
+                            </span>
+                          </div>
+                          <div className="text-lg font-bold text-white font-serif">
+                            {lr.lemma} <span className="text-xs text-cyan-300 font-sans font-normal">({lr.transliteration})</span>
+                          </div>
+                          <div className="text-xs text-slate-300 mt-1 font-sans">
+                            {lr.definition}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                          <p className="line-clamp-3">{lr.theological_significance}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Points of Convergence vs Nuance */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Convergence (Đồng quy) */}
+                <div className="p-6 rounded-3xl bg-slate-900/80 border border-emerald-500/30 flex flex-col gap-3 shadow-lg">
+                  <h4 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Điểm Đồng Quy Thần Học (Convergence)</span>
+                  </h4>
+                  <ul className="flex flex-col gap-2 text-xs text-slate-200 leading-relaxed font-sans">
+                    {compareData.points_of_convergence.map((pt, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                        <span>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Nuance & Distinctives (Khác biệt sắc thái) */}
+                <div className="p-6 rounded-3xl bg-slate-900/80 border border-amber-500/30 flex flex-col gap-3 shadow-lg">
+                  <h4 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Sắc Thái Độc Đáo &amp; Bổ Khuyết (Nuance &amp; Emphases)</span>
+                  </h4>
+                  <ul className="flex flex-col gap-2 text-xs text-slate-200 leading-relaxed font-sans">
+                    {compareData.points_of_divergence_or_nuance.map((pt, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                        <span>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Harmonization & Redemptive Analysis Box */}
+              <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-teal-950/30 via-slate-900/70 to-indigo-950/30 border border-teal-500/30 flex flex-col gap-3 shadow-xl">
+                <h4 className="text-sm font-bold text-teal-300 flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-teal-400" />
+                  <span>Sự Hòa Hợp Trong Lịch Sử Cứu Rỗi (Redemptive Harmonization)</span>
+                </h4>
+                <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                  {compareData.harmonization_analysis}
+                </p>
+              </div>
+
+              {/* Homiletical Preaching Outline (3 Points) */}
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col gap-5 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-teal-400" />
+                      <span>Dàn Ý Bài Giảng / Khảo Luận Mục Vụ (Homiletical Outline)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Gợi ý 3 luận điểm giảng luận và học Kinh Thánh liên kết các phân đoạn
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyCompareOutline}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 hover:text-white flex items-center gap-1.5 transition-colors"
+                  >
+                    {copiedCompareOutline ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300">Đã sao chép!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Sao chép dàn bài</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {compareData.homiletical_sermon_outline.map((pt) => (
+                    <div 
+                      key={pt.point_number}
+                      className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex flex-col gap-2.5 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-bold text-teal-300">
+                          Điểm {pt.point_number}: {pt.title}
+                        </h4>
+                        <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                          {pt.scripture_links.map((sLink, sIdx) => (
+                            <span key={sIdx} className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
+                              {sLink}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-400 italic">
+                        &ldquo;{pt.subheading}&rdquo;
+                      </p>
+
+                      <p className="text-slate-200 leading-relaxed font-sans">
+                        {pt.exposition}
+                      </p>
+
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 text-emerald-300 text-[11px] flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 shrink-0 text-emerald-400 mt-0.5" />
+                        <p className="leading-relaxed">
+                          <strong>Ứng dụng mục vụ:</strong> {pt.pastoral_application}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scholarly Commentary Citations from 275 Books */}
+              {compareData.scholarly_commentary_citations && compareData.scholarly_commentary_citations.length > 0 && (
+                <div className="flex flex-col gap-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Library className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Trích dẫn từ 275 Bộ Sách Thần Học &amp; Chú Giải</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {compareData.scholarly_commentary_citations.map((cite, cIdx) => (
+                      <div 
+                        key={cIdx}
+                        className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between gap-2 text-xs"
+                      >
+                        <blockquote className="text-slate-300 italic leading-relaxed font-serif">
+                          &ldquo;{cite.quote}&rdquo;
+                        </blockquote>
+                        <div className="text-[11px] text-teal-300 font-semibold pt-2 border-t border-slate-800/80">
+                          &mdash; {cite.source_title} ({cite.chapter})
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Practical Reflection Questions */}
+              {compareData.reflection_questions && compareData.reflection_questions.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 flex flex-col gap-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-teal-300 flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-teal-400" />
+                    <span>Câu Hỏi Suy Ngẫm &amp; Thảo Luận Nhóm Nhỏ</span>
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-200">
+                    {compareData.reflection_questions.map((q, qIdx) => (
+                      <div 
+                        key={qIdx}
+                        className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 text-[10px] font-bold">
+                          {qIdx + 1}
+                        </span>
+                        <p className="leading-relaxed">{q}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Epistemic Guardrail Banner */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/30 text-[11px] text-slate-400 flex items-center gap-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{compareData.epistemic_guardrail}</span>
+              </div>
+            </div>
           )}
         </div>
       )}

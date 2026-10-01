@@ -151,6 +151,12 @@ async function main() {
   const rPassagePresets = await testEndpoint('/api/rag/passage-presets', d => (!Array.isArray(d) || d.length !== 6) && `Expected 6 passage presets, got ${d?.length}`);
   report('GET /api/rag/passage-presets (11-Dimension passage presets)', rPassagePresets.ok, rPassagePresets.error);
 
+  const rCompPresets = await testEndpoint('/api/rag/comparative-presets', d => (!Array.isArray(d) || d.length !== 8) && `Expected 8 comparative presets, got ${d?.length}`);
+  report('GET /api/rag/comparative-presets (8 Multi-passage comparative presets §48)', rCompPresets.ok, rCompPresets.error);
+
+  const rCompStudy = await testEndpoint(`/api/rag/comparative-study?passages=${encodeURIComponent('Ma-thi-ơ 28:18-20,Mác 16:15-18')}&lens=synoptic_harmony`, d => (!d.profiles || d.profiles.length < 2 || !d.comparative_dimensions || !d.homiletical_sermon_outline) && 'Invalid comparative study response');
+  report('GET /api/rag/comparative-study (Multi-passage comparative exegesis matrix & homiletical outline)', rCompStudy.ok, rCompStudy.error);
+
   const rMorphGreek = await testEndpoint('/api/rag/morphology?code=G4102', d => (!d.lemma || d.strong_number !== 'G4102') && 'Invalid Greek morphology');
   report('GET /api/rag/morphology?code=G4102 (Greek Pistis morphological analysis)', rMorphGreek.ok, rMorphGreek.error);
 
