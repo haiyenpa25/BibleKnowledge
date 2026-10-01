@@ -38,8 +38,76 @@ import {
   FileText,
   Trophy,
   UserCheck,
-  X
+  X,
+  Star,
+  BookmarkCheck,
+  Eye,
+  EyeOff,
+  CheckSquare,
+  Square,
+  ListChecks
 } from "lucide-react";
+
+interface MemorizeVerseItem {
+  id: string;
+  reference: string;
+  text: string;
+  category: string;
+  difficulty: number;
+  xp_reward: number;
+  core_doctrine: string;
+  audio_anchor: string;
+  words: string[];
+  total_words: number;
+  level1_blank_indices: number[];
+  level2_blank_indices: number[];
+  level3_blank_indices: number[];
+  mastery_stars: number;
+  review_count: number;
+  last_practiced: string | null;
+}
+
+interface RecordMemorizePracticeResponse {
+  verse_id: string;
+  stars_awarded: number;
+  xp_earned: number;
+  total_xp: number;
+  streak: number;
+  message: string;
+}
+
+interface ReadingDayItem {
+  day: number;
+  title: string;
+  passages: string[];
+  primary_book: string;
+  primary_chapter: number;
+  golden_verse: string;
+  devotional_prompt: string;
+  is_completed?: boolean;
+}
+
+interface ReadingPlanSummary {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  total_days: number;
+  difficulty: string;
+  icon: string;
+  badge_name: string;
+  recommended_for: string;
+  description: string;
+  completed_count: number;
+  completion_percentage: number;
+  current_day: number;
+  streak: number;
+  last_read_date: string | null;
+}
+
+interface ReadingPlanDetail extends ReadingPlanSummary {
+  days: ReadingDayItem[];
+}
 
 interface ChallengePackQuestionItem {
   id: string;
@@ -217,7 +285,31 @@ interface TimelineChallenge {
 }
 
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "challenge_packs" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "true_false" | "match" | "adaptive" | "flashcards" | "fill_in_blank" | "timeline" | "challenge_packs" | "generator" | "memorize" | "reading_plans">("quiz");
+
+  // Scripture Memorization State (§3, §4)
+  const [memorizeVerses, setMemorizeVerses] = useState<MemorizeVerseItem[]>([]);
+  const [selectedMemorizeVerse, setSelectedMemorizeVerse] = useState<MemorizeVerseItem | null>(null);
+  const [memorizeCategoryFilter, setMemorizeCategoryFilter] = useState<string>("all");
+  const [memorizeLevel, setMemorizeLevel] = useState<1 | 2 | 3>(1);
+  const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
+  const [userTypedWords, setUserTypedWords] = useState<Record<number, string>>({});
+  const [memorizeChecked, setMemorizeChecked] = useState(false);
+  const [memorizeScorePct, setMemorizeScorePct] = useState(0);
+  const [memorizeResult, setMemorizeResult] = useState<RecordMemorizePracticeResponse | null>(null);
+  const [loadingMemorize, setLoadingMemorize] = useState(false);
+  const [memorizeSubmitting, setMemorizeSubmitting] = useState(false);
+  const [speakingVerseId, setSpeakingVerseId] = useState<string | null>(null);
+
+  // Bible Reading Plans State (§3, §46)
+  const [readingPlans, setReadingPlans] = useState<ReadingPlanSummary[]>([]);
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<ReadingPlanDetail | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("plan_1_year");
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [loadingPlanDetail, setLoadingPlanDetail] = useState(false);
+  const [togglingDay, setTogglingDay] = useState<number | null>(null);
+  const [planFilterCategory, setPlanFilterCategory] = useState<string>("all");
+  const [planSearch, setPlanSearch] = useState<string>("");
 
   // Challenge Packs State (§46)
   const [challengePacks, setChallengePacks] = useState<ChallengePackItem[]>([]);
@@ -436,6 +528,198 @@ export default function LearnPage() {
     navigator.clipboard.writeText(exportData.content);
     setCopiedExport(true);
     setTimeout(() => setCopiedExport(false), 2500);
+  };
+
+  // ===========================================================================
+  // Scripture Memorization Handlers (§3, §4)
+  // ===========================================================================
+  const fetchMemorizeVerses = async (category?: string) => {
+    setLoadingMemorize(true);
+    try {
+      let url = `${apiUrl}/api/learn/memorize-verses`;
+      const cat = category !== undefined ? category : memorizeCategoryFilter;
+      if (cat && cat !== "all") {
+        url += `?category=${encodeURIComponent(cat)}`;
+      }
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setMemorizeVerses(data);
+        if (data.length > 0 && !selectedMemorizeVerse) {
+          handleSelectMemorizeVerse(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch memorize verses:", err);
+    } finally {
+      setLoadingMemorize(false);
+    }
+  };
+
+  const handleSelectMemorizeVerse = (verse: MemorizeVerseItem) => {
+    setSelectedMemorizeVerse(verse);
+    setRevealedHints(new Set());
+    setUserTypedWords({});
+    setMemorizeChecked(false);
+    setMemorizeScorePct(0);
+    setMemorizeResult(null);
+  };
+
+  const handleToggleHint = (index: number) => {
+    setRevealedHints((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const handleSpeechSpeak = (textToSpeak: string, id: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speakingVerseId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingVerseId(null);
+    } else {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(textToSpeak);
+      utt.lang = "vi-VN";
+      utt.rate = 0.9;
+      utt.onend = () => setSpeakingVerseId(null);
+      utt.onerror = () => setSpeakingVerseId(null);
+      window.speechSynthesis.speak(utt);
+      setSpeakingVerseId(id);
+    }
+  };
+
+  const handleCheckMemorize = async () => {
+    if (!selectedMemorizeVerse) return;
+    setMemorizeSubmitting(true);
+
+    const blankIndices = memorizeLevel === 1 
+      ? selectedMemorizeVerse.level1_blank_indices 
+      : (memorizeLevel === 2 ? selectedMemorizeVerse.level2_blank_indices : selectedMemorizeVerse.level3_blank_indices);
+
+    let correctCount = 0;
+    const totalBlanks = blankIndices.length;
+
+    blankIndices.forEach((idx) => {
+      const expected = (selectedMemorizeVerse.words[idx] || "").replace(/[.,;!?:"]/g, "").trim().toLowerCase();
+      const entered = (userTypedWords[idx] || "").replace(/[.,;!?:"]/g, "").trim().toLowerCase();
+      if (entered === expected) {
+        correctCount++;
+      }
+    });
+
+    const calculatedPct = totalBlanks > 0 ? Math.round((correctCount / totalBlanks) * 100) : 100;
+    setMemorizeScorePct(calculatedPct);
+    setMemorizeChecked(true);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/memorize-verses/record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          verse_id: selectedMemorizeVerse.id,
+          accuracy_percent: calculatedPct,
+          level_tested: memorizeLevel
+        })
+      });
+      if (res.ok) {
+        const resData: RecordMemorizePracticeResponse = await res.json();
+        setMemorizeResult(resData);
+        fetchProfile();
+        // Update local item
+        setMemorizeVerses((prev) =>
+          prev.map((v) =>
+            v.id === selectedMemorizeVerse.id
+              ? { ...v, mastery_stars: Math.max(v.mastery_stars, resData.stars_awarded), review_count: v.review_count + 1 }
+              : v
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to record memorize practice:", err);
+    } finally {
+      setMemorizeSubmitting(false);
+    }
+  };
+
+  // ===========================================================================
+  // Bible Reading Plans Handlers (§3, §46)
+  // ===========================================================================
+  const fetchReadingPlans = async () => {
+    setLoadingPlans(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/reading-plans`);
+      if (res.ok) {
+        const data = await res.json();
+        setReadingPlans(data);
+        if (data.length > 0 && !selectedPlanDetail) {
+          fetchPlanDetail(selectedPlanId || data[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch reading plans:", err);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  const fetchPlanDetail = async (planId: string) => {
+    setLoadingPlanDetail(true);
+    setSelectedPlanId(planId);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/reading-plans/${planId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedPlanDetail(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reading plan detail:", err);
+    } finally {
+      setLoadingPlanDetail(false);
+    }
+  };
+
+  const handleTogglePlanDay = async (planId: string, day: number) => {
+    setTogglingDay(day);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/reading-plans/${planId}/toggle-day`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Update local plan detail
+        setSelectedPlanDetail((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            completed_count: data.completed_count,
+            completion_percentage: data.completion_percentage,
+            current_day: data.current_day,
+            streak: data.streak,
+            days: prev.days.map((d) => (d.day === day ? { ...d, is_completed: data.is_completed } : d))
+          };
+        });
+        // Update plans summary list
+        setReadingPlans((prev) =>
+          prev.map((p) =>
+            p.id === planId
+              ? { ...p, completed_count: data.completed_count, completion_percentage: data.completion_percentage, current_day: data.current_day, streak: data.streak }
+              : p
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to toggle plan day:", err);
+    } finally {
+      setTogglingDay(null);
+    }
   };
 
   // Fetch Quiz Questions
@@ -1323,6 +1607,38 @@ export default function LearnPage() {
           <Trophy className="w-4 h-4 text-amber-300" />
           <span>Gói Thử Thách (Packs)</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-400/20 text-rose-300 font-bold">Hot §46</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("memorize");
+            if (memorizeVerses.length === 0) fetchMemorizeVerses();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "memorize"
+              ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 font-bold"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Award className="w-4 h-4 text-amber-900 fill-amber-400" />
+          <span>Học Thuộc Lòng (§3, §4)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400/30 text-amber-950 font-black">Mới §3, §4</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("reading_plans");
+            if (readingPlans.length === 0) fetchReadingPlans();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "reading_plans"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-emerald-200" />
+          <span>Lịch Đọc Kinh Thánh (§3, §46)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 font-bold">Lộ Trình §46</span>
         </button>
 
         <button
@@ -3281,6 +3597,641 @@ export default function LearnPage() {
                       </>
                     )}
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 8. SCRIPTURE MEMORIZATION TAB (§3, §4)                                */}
+      {/* ===================================================================== */}
+      {activeTab === "memorize" && (
+        <div className="flex flex-col gap-8 animate-in fade-in duration-300">
+          {/* Header & Subtitle */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-3xl border border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Thử Thách Trí Nhớ (§3, §4)
+                </span>
+                <span className="text-xs text-slate-400">
+                  Phương pháp Che Chữ Lũy Tiến (Word Occlusion) & Lắng Nghe
+                </span>
+              </div>
+              <h2 className="text-2xl font-black text-white">
+                Học Thuộc Lòng Câu Kinh Thánh Nền Tảng
+              </h2>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+              {[
+                { id: "all", label: "Tất cả chủ đề" },
+                { id: "Tình Yêu & Sự Cứu Chuộc", label: "Tình Yêu & Cứu Chuộc" },
+                { id: "Sự Quan Phòng & Bình An", label: "Quan Phòng & Bình An" },
+                { id: "Sức Mạnh & Sự Đắc Thắng", label: "Sức Mạnh & Đắc Thắng" },
+                { id: "Ân Điển & Đức Tin", label: "Ân Điển & Đức Tin" },
+                { id: "Đại Mạng Lệnh & Sứ Mạng", label: "Đại Mạng Lệnh" }
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setMemorizeCategoryFilter(cat.id);
+                    fetchMemorizeVerses(cat.id);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    memorizeCategoryFilter === cat.id
+                      ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
+                      : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingMemorize ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+              <p className="text-sm">Đang tải kho câu Kinh Thánh ghi nhớ...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: List of Verses (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                  <span>Kho câu gốc ({memorizeVerses.length} câu)</span>
+                  <span>Nhấn để chọn và luyện tập</span>
+                </div>
+
+                <div className="flex flex-col gap-3 max-h-[700px] overflow-y-auto pr-1">
+                  {memorizeVerses.map((v) => {
+                    const isSelected = selectedMemorizeVerse?.id === v.id;
+                    return (
+                      <div
+                        key={v.id}
+                        onClick={() => handleSelectMemorizeVerse(v)}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col gap-2 relative group ${
+                          isSelected
+                            ? "bg-amber-500/10 border-amber-500/60 shadow-lg shadow-amber-500/10"
+                            : "glass-panel border-slate-800 hover:border-slate-700 bg-slate-900/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+                            {v.reference}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3].map((starIdx) => (
+                              <Star
+                                key={starIdx}
+                                className={`w-3.5 h-3.5 ${
+                                  starIdx <= v.mastery_stars
+                                    ? "text-amber-400 fill-amber-400 drop-shadow"
+                                    : "text-slate-700"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-semibold text-amber-400/90">
+                          {v.category}
+                        </span>
+
+                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                          {v.text}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10px] text-slate-500">
+                          <span>Đã ôn: {v.review_count} lần</span>
+                          <span className="font-mono text-amber-400 font-bold">+{v.xp_reward} XP</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right Column: Active Memorization Playground (7 cols) */}
+              <div className="lg:col-span-7">
+                {selectedMemorizeVerse ? (
+                  <div className="rounded-3xl glass-panel border border-slate-700 p-6 sm:p-8 flex flex-col gap-6 shadow-2xl relative">
+                    {/* Header bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {selectedMemorizeVerse.core_doctrine}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            Cấp độ: {selectedMemorizeVerse.difficulty === 1 ? "Căn Bản" : selectedMemorizeVerse.difficulty === 2 ? "Trung Bình" : "Thử Thách Cao"}
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-black text-white">
+                          {selectedMemorizeVerse.reference}
+                        </h3>
+                      </div>
+
+                      {/* TTS Audio Narration Button */}
+                      <button
+                        onClick={() => handleSpeechSpeak(selectedMemorizeVerse.text, selectedMemorizeVerse.id)}
+                        className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all ${
+                          speakingVerseId === selectedMemorizeVerse.id
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20 animate-pulse font-bold"
+                            : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700"
+                        }`}
+                      >
+                        <Volume2 className="w-4 h-4 text-amber-300" />
+                        <span>{speakingVerseId === selectedMemorizeVerse.id ? "Đang Đọc Mẫu..." : "Nghe Đọc Mẫu"}</span>
+                      </button>
+                    </div>
+
+                    {/* Occlusion Level Selector */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
+                      <span className="text-slate-400 font-medium">Chế độ che chữ (Occlusion):</span>
+                      <div className="flex items-center gap-1.5">
+                        {[
+                          { lvl: 1 as const, label: "Mức 1 (Ẩn 25%)", desc: "Dễ" },
+                          { lvl: 2 as const, label: "Mức 2 (Ẩn 50%)", desc: "Vừa" },
+                          { lvl: 3 as const, label: "Mức 3 (Ẩn 100%)", desc: "Khó" }
+                        ].map((item) => (
+                          <button
+                            key={item.lvl}
+                            onClick={() => {
+                              setMemorizeLevel(item.lvl);
+                              setRevealedHints(new Set());
+                              setMemorizeChecked(false);
+                              setMemorizeResult(null);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                              memorizeLevel === item.lvl
+                                ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                                : "text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Word Occlusion Interactive Canvas */}
+                    <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-wrap gap-2.5 items-center leading-loose select-none">
+                      {selectedMemorizeVerse.words.map((word, wIdx) => {
+                        const isBlank = memorizeLevel === 1 
+                          ? selectedMemorizeVerse.level1_blank_indices.includes(wIdx)
+                          : (memorizeLevel === 2 
+                              ? selectedMemorizeVerse.level2_blank_indices.includes(wIdx)
+                              : selectedMemorizeVerse.level3_blank_indices.includes(wIdx));
+
+                        if (!isBlank) {
+                          return (
+                            <span key={wIdx} className="text-base text-slate-200 font-serif">
+                              {word}
+                            </span>
+                          );
+                        }
+
+                        const cleanWord = word.replace(/[.,;!?:"]/g, "");
+                        const punctuation = word.slice(cleanWord.length);
+                        const isHintRevealed = revealedHints.has(wIdx);
+                        const typed = userTypedWords[wIdx] || "";
+                        const isCorrect = typed.trim().toLowerCase() === cleanWord.toLowerCase();
+
+                        return (
+                          <div key={wIdx} className="inline-flex items-center gap-1 relative my-1">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={typed}
+                                placeholder={isHintRevealed ? cleanWord.slice(0, 2) + "..." : "______"}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setUserTypedWords((prev) => ({ ...prev, [wIdx]: val }));
+                                }}
+                                className={`w-28 sm:w-32 px-2.5 py-1 text-xs text-center rounded-lg border font-mono transition-all outline-none ${
+                                  memorizeChecked
+                                    ? isCorrect
+                                      ? "bg-emerald-950/60 border-emerald-500 text-emerald-300 font-bold"
+                                      : "bg-rose-950/60 border-rose-500 text-rose-300 font-bold"
+                                    : "bg-slate-950 border-slate-700 text-amber-300 focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                                }`}
+                              />
+                              {/* Clickable hint icon */}
+                              <button
+                                type="button"
+                                title="Xem gợi ý chữ cái đầu"
+                                onClick={() => handleToggleHint(wIdx)}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-amber-400 p-0.5"
+                              >
+                                {isHintRevealed ? <Eye className="w-3 h-3 text-amber-400" /> : <EyeOff className="w-3 h-3" />}
+                              </button>
+                            </div>
+                            {punctuation && <span className="text-slate-400 font-serif">{punctuation}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Result Banner if Checked */}
+                    {memorizeChecked && (
+                      <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in zoom-in-95 duration-200 ${
+                        memorizeScorePct >= 80 
+                          ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-200" 
+                          : "bg-amber-950/40 border-amber-500/40 text-amber-200"
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3].map((s) => (
+                              <Star
+                                key={s}
+                                className={`w-6 h-6 ${
+                                  memorizeResult && s <= memorizeResult.stars_awarded
+                                    ? "text-amber-400 fill-amber-400 drop-shadow-md animate-bounce"
+                                    : "text-slate-700"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-sm text-white">
+                              Độ chính xác: {memorizeScorePct}%
+                            </h4>
+                            <p className="text-xs text-slate-300">
+                              {memorizeResult?.message || "Hoàn thành phiên luyện tập!"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setUserTypedWords({});
+                              setRevealedHints(new Set());
+                              setMemorizeChecked(false);
+                              setMemorizeResult(null);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                            <span>Luyện Lại</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Bar */}
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                      <div className="text-xs text-slate-400">
+                        Mẹo: Nhấn vào biểu tượng con mắt để xem chữ cái gợi ý đầu tiên.
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserTypedWords({});
+                            setRevealedHints(new Set());
+                            setMemorizeChecked(false);
+                            setMemorizeResult(null);
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+                        >
+                          Xóa Trắng
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={memorizeSubmitting}
+                          onClick={handleCheckMemorize}
+                          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+                        >
+                          {memorizeSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Đang Đánh Giá...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                              <span>Kiểm Tra Hoàn Thành</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-16 rounded-3xl glass-panel text-center text-slate-500 text-sm">
+                    Hãy chọn một câu Kinh Thánh ở cột bên trái để bắt đầu luyện trí nhớ.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 9. BIBLE READING PLANS TAB (§3, §46)                                  */}
+      {/* ===================================================================== */}
+      {activeTab === "reading_plans" && (
+        <div className="flex flex-col gap-8 animate-in fade-in duration-300">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-3xl border border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Lộ Trình Đọc Có Hướng Dẫn (§3, §46)
+                </span>
+                <span className="text-xs text-slate-400">
+                  Kỷ Luật Tâm Linh & Theo Dõi Tiến Độ Hằng Ngày
+                </span>
+              </div>
+              <h2 className="text-2xl font-black text-white">
+                Kế Hoạch Đọc Kinh Thánh
+              </h2>
+            </div>
+
+            {/* Plan Category Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+              {[
+                { id: "all", label: "Tất cả kế hoạch" },
+                { id: "Toàn Kinh Thánh", label: "Toàn Kinh Thánh" },
+                { id: "Tân Ước", label: "Tân Ước" },
+                { id: "Khôn Ngoan & Thơ Ca", label: "Khôn Ngoan & Thi Ca" },
+                { id: "Phúc Âm & Biên Niên", label: "Phúc Âm" },
+                { id: "Thư Tín & Giáo Lý", label: "Thư Tín" }
+              ].map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setPlanFilterCategory(c.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    planFilterCategory === c.id
+                      ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
+                      : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingPlans ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+              <p className="text-sm">Đang tải các kế hoạch đọc Kinh Thánh...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-8">
+              {/* Plan Cards Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {readingPlans
+                  .filter((p) => planFilterCategory === "all" || p.category === planFilterCategory)
+                  .map((plan) => {
+                    const isSelected = selectedPlanDetail?.id === plan.id;
+                    return (
+                      <div
+                        key={plan.id}
+                        onClick={() => fetchPlanDetail(plan.id)}
+                        className={`p-6 rounded-3xl border cursor-pointer transition-all flex flex-col justify-between gap-5 relative group ${
+                          isSelected
+                            ? "bg-emerald-950/20 border-emerald-500/60 shadow-xl shadow-emerald-950/30"
+                            : "glass-panel border-slate-800 hover:border-slate-700 bg-slate-900/40"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                              {plan.category}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>{plan.total_days} ngày</span>
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-extrabold text-white group-hover:text-emerald-300 transition-colors">
+                            {plan.title}
+                          </h3>
+
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                            {plan.description}
+                          </p>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400 font-medium">Tiến độ: {plan.completed_count}/{plan.total_days} ngày</span>
+                            <span className="text-emerald-400 font-bold font-mono">{plan.completion_percentage}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                              style={{ width: `${plan.completion_percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Selected Plan Details & Day-by-Day Checklist */}
+              {selectedPlanDetail && (
+                <div className="rounded-3xl glass-panel border border-slate-700 p-6 sm:p-8 flex flex-col gap-8 shadow-2xl">
+                  {/* Plan Headline */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {selectedPlanDetail.category}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          Mục tiêu: {selectedPlanDetail.recommended_for}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white">
+                        {selectedPlanDetail.title}
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        {selectedPlanDetail.subtitle}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col items-end">
+                        <span className="text-xs text-slate-400">Chuỗi chuyên cần</span>
+                        <span className="text-lg font-black text-amber-400 flex items-center gap-1">
+                          <Flame className="w-4 h-4 fill-amber-400" />
+                          <span>{selectedPlanDetail.streak} ngày</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Today Card (Highlighted Prompt) */}
+                  {(() => {
+                    const todayDayNum = selectedPlanDetail.current_day || 1;
+                    const todayDayInfo = selectedPlanDetail.days.find((d) => d.day === todayDayNum) || selectedPlanDetail.days[0];
+                    if (!todayDayInfo) return null;
+
+                    return (
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-teal-950/30 border border-emerald-500/40 flex flex-col gap-4 shadow-xl">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-xl bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20">
+                            Phân Đoạn Đọc Hôm Nay (Ngày {todayDayInfo.day})
+                          </span>
+                          <span className="text-xs font-semibold text-emerald-300">
+                            {todayDayInfo.is_completed ? "✔ Đã đọc xong" : "Chưa hoàn thành"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <h4 className="text-xl font-extrabold text-white">
+                            {todayDayInfo.title}
+                          </h4>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {todayDayInfo.passages.map((ps, pIdx) => (
+                              <span key={pIdx} className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-emerald-300 font-mono font-medium">
+                                📖 {ps}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {todayDayInfo.golden_verse && (
+                          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs italic text-slate-300 font-serif">
+                            "{todayDayInfo.golden_verse}"
+                          </div>
+                        )}
+
+                        {todayDayInfo.devotional_prompt && (
+                          <p className="text-xs text-slate-300 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span><strong>Suy ngẫm:</strong> {todayDayInfo.devotional_prompt}</span>
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 flex-wrap gap-3">
+                          <Link
+                            href={`/bible?book=${todayDayInfo.primary_book}&chapter=${todayDayInfo.primary_chapter}`}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            <span>Mở Trong Trình Đọc Kinh Thánh (1-Click)</span>
+                          </Link>
+
+                          <button
+                            type="button"
+                            disabled={togglingDay === todayDayInfo.day}
+                            onClick={() => handleTogglePlanDay(selectedPlanDetail.id, todayDayInfo.day)}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+                              todayDayInfo.is_completed
+                                ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                                : "bg-emerald-500/20 border-emerald-500 text-emerald-300 hover:bg-emerald-500/30"
+                            }`}
+                          >
+                            {togglingDay === todayDayInfo.day ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                            ) : todayDayInfo.is_completed ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Square className="w-4 h-4 text-emerald-400" />
+                            )}
+                            <span>{todayDayInfo.is_completed ? "Đánh dấu Chưa Hoàn Thành" : "Đánh Dấu Đã Đọc Xong"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Day-by-Day Grid Checklist */}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                        <ListChecks className="w-4 h-4 text-emerald-400" />
+                        <span>Danh Sách Lộ Trình Từng Ngày ({selectedPlanDetail.days.length} ngày)</span>
+                      </h4>
+
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm phân đoạn hoặc ngày..."
+                        value={planSearch}
+                        onChange={(e) => setPlanSearch(e.target.value)}
+                        className="px-3 py-1.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-slate-300 placeholder-slate-500 outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[500px] overflow-y-auto pr-1">
+                      {selectedPlanDetail.days
+                        .filter((d) => {
+                          if (!planSearch) return true;
+                          const s = planSearch.toLowerCase();
+                          return (
+                            d.title.toLowerCase().includes(s) ||
+                            d.day.toString() === s ||
+                            d.passages.some((p) => p.toLowerCase().includes(s))
+                          );
+                        })
+                        .map((dayItem) => {
+                          const isCurrent = selectedPlanDetail.current_day === dayItem.day;
+                          return (
+                            <div
+                              key={dayItem.day}
+                              className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all ${
+                                dayItem.is_completed
+                                  ? "bg-emerald-950/20 border-emerald-800/40"
+                                  : isCurrent
+                                  ? "bg-slate-900 border-amber-500/50 shadow-md shadow-amber-500/10"
+                                  : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[11px] font-bold ${isCurrent ? "text-amber-400" : "text-slate-300"}`}>
+                                  Ngày {dayItem.day}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={togglingDay === dayItem.day}
+                                  onClick={() => handleTogglePlanDay(selectedPlanDetail.id, dayItem.day)}
+                                  className="text-slate-400 hover:text-emerald-400 transition-colors p-0.5"
+                                >
+                                  {dayItem.is_completed ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                  ) : (
+                                    <div className="w-4 h-4 rounded border border-slate-600 hover:border-emerald-400" />
+                                  )}
+                                </button>
+                              </div>
+
+                              <p className="text-xs text-slate-300 line-clamp-1 font-medium">
+                                {dayItem.title}
+                              </p>
+
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px]">
+                                <span className="text-emerald-400 truncate max-w-[70%] font-mono">
+                                  {dayItem.passages[0] || ""}
+                                </span>
+                                <Link
+                                  href={`/bible?book=${dayItem.primary_book}&chapter=${dayItem.primary_chapter}`}
+                                  className="text-slate-400 hover:text-white font-semibold flex items-center gap-0.5"
+                                >
+                                  <span>Đọc</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </Link>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -31,7 +31,8 @@ import {
   ArrowRight,
   Compass,
   FileText,
-  GitCompare
+  GitCompare,
+  Flame
 } from "lucide-react";
 
 interface HealthStatus {
@@ -129,12 +130,34 @@ interface DailyInsight {
   };
 }
 
+interface TodayReadingPlanData {
+  plan_id: string;
+  plan_title: string;
+  plan_category: string;
+  total_days: number;
+  current_day: number;
+  is_completed: boolean;
+  day_info: {
+    day: number;
+    title: string;
+    passages: string[];
+    primary_book: string;
+    primary_chapter: number;
+    golden_verse: string;
+    devotional_prompt: string;
+  };
+  streak: number;
+  completed_count: number;
+  completion_percentage: number;
+}
+
 export default function Home() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(true);
 
   // Daily Insight State
   const [dailyInsight, setDailyInsight] = useState<DailyInsight | null>(null);
+  const [todayPlan, setTodayPlan] = useState<TodayReadingPlanData | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(true);
   const [copiedVerse, setCopiedVerse] = useState(false);
 
@@ -177,13 +200,20 @@ export default function Home() {
 
     async function fetchDaily() {
       try {
-        const res = await fetch(`${apiUrl}/api/bible/daily-insight`, { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
+        const [dRes, pRes] = await Promise.all([
+          fetch(`${apiUrl}/api/bible/daily-insight`, { cache: "no-store" }),
+          fetch(`${apiUrl}/api/bible/reading-plans/today`, { cache: "no-store" })
+        ]);
+        if (dRes.ok) {
+          const data = await dRes.json();
           setDailyInsight(data);
         }
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          setTodayPlan(pData);
+        }
       } catch (err) {
-        console.error("Failed to fetch daily insight:", err);
+        console.error("Failed to fetch daily insight or reading plan:", err);
       } finally {
         setLoadingDaily(false);
       }
@@ -614,6 +644,109 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* ===================================================================== */}
+      {/* BIBLE READING PLAN TODAY WIDGET (§3, §46, §53)                        */}
+      {/* ===================================================================== */}
+      {todayPlan && (
+        <section className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-amber-950/20 p-6 shadow-xl backdrop-blur-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-inner">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold">
+                    Kế Hoạch Đọc Hôm Nay • Ngày {todayPlan.current_day}/{todayPlan.total_days}
+                  </span>
+                  {todayPlan.streak > 0 && (
+                    <span className="text-[10px] font-mono text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20 flex items-center gap-1 font-bold">
+                      <Flame className="w-3 h-3 text-orange-400" />
+                      {todayPlan.streak} ngày liên tục
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-white mt-1">
+                  {todayPlan.plan_title}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs text-slate-400">Tiến độ kế hoạch</div>
+                <div className="text-sm font-bold text-amber-300 font-mono">
+                  {todayPlan.completed_count}/{todayPlan.total_days} ngày ({todayPlan.completion_percentage}%)
+                </div>
+              </div>
+              <Link
+                href="/learn"
+                className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all hover:scale-[1.02]"
+              >
+                <span>Xem Tất Cả 5 Kế Hoạch</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2 space-y-3">
+              <div>
+                <div className="text-xs text-amber-400/90 font-medium mb-1">
+                  {todayPlan.day_info.title}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {todayPlan.day_info.passages.map((p, idx) => (
+                    <Link
+                      key={idx}
+                      href={`/bible?book=${encodeURIComponent(todayPlan.day_info.primary_book)}&chapter=${todayPlan.day_info.primary_chapter}`}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-amber-500/20 border border-slate-700/60 hover:border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{p}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {todayPlan.day_info.golden_verse && (
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold block mb-1">
+                    Câu Gốc Suy Ngẫm
+                  </span>
+                  <p className="text-xs text-amber-100 font-serif italic leading-relaxed">
+                    "{todayPlan.day_info.golden_verse}"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold block mb-1">
+                  Chủ Đề & Câu Hỏi Tĩnh Nguyện
+                </span>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {todayPlan.day_info.devotional_prompt}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  {todayPlan.is_completed ? "Đã hoàn thành hôm nay" : "Chưa hoàn thành"}
+                </span>
+                <Link
+                  href="/learn"
+                  className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                >
+                  Vào Học & Đánh Dấu →
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
       )}

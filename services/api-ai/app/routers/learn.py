@@ -2161,4 +2161,319 @@ def submit_challenge_pack(
     )
 
 
+# ==============================================================================
+# §3, §4 — Interactive Scripture Memorization Assistant & Word Occlusion
+# ==============================================================================
+
+class RecordMemorizePracticeRequest(BaseModel):
+    verse_id: str
+    accuracy_percent: float = Field(..., ge=0.0, le=100.0)
+    level_tested: int = Field(1, ge=1, le=3)
+    user_identifier: str = Field("local_user")
+
+
+class RecordMemorizePracticeResponse(BaseModel):
+    verse_id: str
+    stars_awarded: int
+    xp_earned: int
+    total_xp: int
+    streak: int
+    message: str
+
+
+MEMORIZE_VERSES_DATA = [
+    {
+        "id": "john-3-16",
+        "reference": "Giăng 3:16",
+        "text": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
+        "category": "Tình Yêu & Sự Cứu Chuộc",
+        "difficulty": 1,
+        "xp_reward": 50,
+        "core_doctrine": "Ân Điển & Sự Cứu Rỗi",
+        "audio_anchor": "Vì Đức Chúa Trời yêu thương thế gian đến nỗi đã ban Con một của Ngài..."
+    },
+    {
+        "id": "romans-8-28",
+        "reference": "Rô-ma 8:28",
+        "text": "Vả, chúng ta biết rằng mọi sự hiệp lại làm ích cho kẻ yêu mến Đức Chúa Trời, tức là cho kẻ được gọi theo ý muốn Ngài đã định.",
+        "category": "Sự Quan Phòng & Bình An",
+        "difficulty": 2,
+        "xp_reward": 60,
+        "core_doctrine": "Sự Quan Phòng Thần Thượng",
+        "audio_anchor": "Vả chúng ta biết rằng mọi sự hiệp lại làm ích cho kẻ yêu mến Đức Chúa Trời..."
+    },
+    {
+        "id": "philippians-4-13",
+        "reference": "Phi-líp 4:13",
+        "text": "Tôi làm được mọi sự nhờ Đấng ban thêm sức cho tôi.",
+        "category": "Sức Mạnh & Sự Đắc Thắng",
+        "difficulty": 1,
+        "xp_reward": 40,
+        "core_doctrine": "Năng Quyền Đấng Christ",
+        "audio_anchor": "Tôi làm được mọi sự nhờ Đấng ban thêm sức cho tôi."
+    },
+    {
+        "id": "psalm-23-1-3",
+        "reference": "Thi-thiên 23:1-3",
+        "text": "Đức Giê-hô-va là Đấng chăn giữ tôi; tôi sẽ chẳng thiếu thốn gì. Ngài khiến tôi an nghỉ nơi đồng cỏ xanh tươi, dẫn tôi đến mé nước bình tịnh. Ngài bổ lại linh hồn tôi, dẫn tôi vào các lối công bình, vì cớ danh Ngài.",
+        "category": "Sự An Nghỉ & Tiếp Trợ",
+        "difficulty": 2,
+        "xp_reward": 75,
+        "core_doctrine": "Đấng Chăn Chiên Hiền Lành",
+        "audio_anchor": "Đức Giê-hô-va là Đấng chăn giữ tôi tôi sẽ chẳng thiếu thốn gì..."
+    },
+    {
+        "id": "proverbs-3-5-6",
+        "reference": "Châm-ngôn 3:5-6",
+        "text": "Hãy hết lòng tin cậy Đức Giê-hô-va, chớ nương cậy nơi sự thông sáng của con. Phàm trong các việc làm của con, khá nhận biết Ngài, thì Ngài sẽ chỉ dẫn các nẻo của con.",
+        "category": "Sự Khôn Ngoan & Dẫn Dắt",
+        "difficulty": 2,
+        "xp_reward": 65,
+        "core_doctrine": "Đức Tin & Sự Khôn Ngoan",
+        "audio_anchor": "Hãy hết lòng tin cậy Đức Giê-hô-va chớ nương cậy nơi sự thông sáng của con..."
+    },
+    {
+        "id": "jeremiah-29-11",
+        "reference": "Giê-rê-mi 29:11",
+        "text": "Đức Giê-hô-va phán: Vì ta biết ý tưởng ta nghĩ đối cùng các ngươi, là ý tưởng bình an, không phải tai họa, để ban cho các ngươi một sự trông cậy trong lúc cuối cùng của các ngươi.",
+        "category": "Hy Vọng & Tương Lai",
+        "difficulty": 2,
+        "xp_reward": 60,
+        "core_doctrine": "Kế Hoạch Tốt Lành Của Đức Chúa Trời",
+        "audio_anchor": "Đức Giê-hô-va phán vì ta biết ý tưởng ta nghĩ đối cùng các ngươi..."
+    },
+    {
+        "id": "galatians-2-20",
+        "reference": "Ga-la-ti 2:20",
+        "text": "Tôi đã bị đóng đinh vào thập tự giá với Đấng Christ, mà tôi sống, không phải là tôi sống nữa, nhưng Đấng Christ sống trong tôi; nay tôi còn sống trong xác thịt, ấy là sống trong đức tin của Con Đức Chúa Trời, là Đấng đã yêu tôi, và phó chính mình Ngài vì tôi.",
+        "category": "Đời Sống Môn Đồ Mới",
+        "difficulty": 3,
+        "xp_reward": 80,
+        "core_doctrine": "Sự Đồng Chết & Đồng Sống",
+        "audio_anchor": "Tôi đã bị đóng đinh vào thập tự giá với Đấng Christ..."
+    },
+    {
+        "id": "ephesians-2-8-9",
+        "reference": "Ê-phê-sô 2:8-9",
+        "text": "Vả, ấy là nhờ ân điển, bởi đức tin, mà anh em được cứu, điều đó không phải đến từ anh em, bèn là sự ban cho của Đức Chúa Trời. Ấy chẳng phải bởi việc làm đâu, hầu cho không ai khoe mình.",
+        "category": "Ân Điển & Đức Tin",
+        "difficulty": 2,
+        "xp_reward": 65,
+        "core_doctrine": "Sola Gratia - Sola Fide",
+        "audio_anchor": "Vả ấy là nhờ ân điển bởi đức tin mà anh em được cứu..."
+    },
+    {
+        "id": "2timothy-3-16-17",
+        "reference": "2 Ti-mô-thê 3:16-17",
+        "text": "Cả Kinh Thánh đều là bởi Đức Chúa Trời soi dẫn, có ích cho sự dạy dỗ, bẻ trách, sửa trị, dạy người trong sự công bình, hầu cho người của Đức Chúa Trời được trọn vẹn và sắm sẵn để làm mọi việc lành.",
+        "category": "Lời Chúa & Nền Tảng",
+        "difficulty": 2,
+        "xp_reward": 70,
+        "core_doctrine": "Thần Hựu Toàn Vẹn Của Kinh Thánh",
+        "audio_anchor": "Cả Kinh Thánh đều là bởi Đức Chúa Trời soi dẫn..."
+    },
+    {
+        "id": "hebrews-11-1",
+        "reference": "Hê-bơ-rơ 11:1",
+        "text": "Vả, đức tin là sự biết chắc vững vàng của những điều mình đang trông mong, là bằng cớ của những điều mình chẳng xem thấy.",
+        "category": "Đức Tin",
+        "difficulty": 1,
+        "xp_reward": 50,
+        "core_doctrine": "Định Nghĩa Đức Tin Thật",
+        "audio_anchor": "Vả đức tin là sự biết chắc vững vàng của những điều mình đang trông mong..."
+    },
+    {
+        "id": "joshua-1-9",
+        "reference": "Giô-suê 1:9",
+        "text": "Ta há không có phán dặn ngươi sao? Hãy vững lòng bền chí, chớ run sợ, chớ kinh khủng; vì Giê-hô-va Đức Chúa Trời ngươi vẫn ở cùng ngươi trong mọi nơi ngươi đi.",
+        "category": "Lòng Can Đảm & Sự Hiện Diện",
+        "difficulty": 2,
+        "xp_reward": 60,
+        "core_doctrine": "Sự Hiện Diện Toàn Năng Của Chúa",
+        "audio_anchor": "Ta há không có phán dặn ngươi sao hãy vững lòng bền chí..."
+    },
+    {
+        "id": "matthew-28-19-20",
+        "reference": "Ma-thi-ơ 28:19-20",
+        "text": "Vậy, hãy đi dạy dỗ muôn dân, hãy nhân danh Đức Cha, Đức Con, và Đức Thánh Linh mà làm phép báp-tem cho họ, và dạy họ giữ hết cả mọi điều mà ta đã truyền cho các ngươi. Và này, ta thường ở cùng các ngươi luôn cho đến tận thế.",
+        "category": "Đại Mạng Lệnh & Sứ Mạng",
+        "difficulty": 3,
+        "xp_reward": 85,
+        "core_doctrine": "Đại Mạng Lệnh Toàn Cầu",
+        "audio_anchor": "Vậy hãy đi dạy dỗ muôn dân hãy nhân danh Đức Cha Đức Con và Đức Thánh Linh..."
+    }
+]
+
+
+MEMORIZE_PRACTICE_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _tokenize_verse_with_occlusion(text: str) -> Dict[str, Any]:
+    """Splits verse text into words and generates level 1 (25%), level 2 (50%), and level 3 (100%) blank indices."""
+    tokens = text.split()
+    total = len(tokens)
+
+    # Deterministic index generation based on word position and significance
+    l1_blanks = [i for i in range(total) if i % 4 == 1 or (len(tokens[i]) > 4 and i % 3 == 0)]
+    l2_blanks = [i for i in range(total) if i % 2 == 1 or i % 3 == 0]
+    l3_blanks = list(range(total))
+
+    # ensure deduplicated and sorted
+    l1_blanks = sorted(list(set(l1_blanks)))
+    l2_blanks = sorted(list(set(l2_blanks)))
+
+    return {
+        "words": tokens,
+        "total_words": total,
+        "level1_blank_indices": l1_blanks,
+        "level2_blank_indices": l2_blanks,
+        "level3_blank_indices": l3_blanks
+    }
+
+
+@router.get("/memorize-verses")
+def get_memorize_verses(
+    category: Optional[str] = Query(None),
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get curated golden memorization verses with multi-level word occlusion and user practice records.
+    """
+    results = []
+
+    # Query DB for practiced verses
+    db_progress = {}
+    try:
+        sql = text("SELECT verse_key, mastery_stars, review_count, last_practiced FROM user_memorized_verses WHERE user_identifier = :u")
+        rows = db.execute(sql, {"u": user_identifier}).fetchall()
+        for r in rows:
+            db_progress[r.verse_key] = {
+                "mastery_stars": r.mastery_stars or 0,
+                "review_count": r.review_count or 0,
+                "last_practiced": str(r.last_practiced) if r.last_practiced else None
+            }
+    except Exception as e:
+        logger.warning(f"Could not read user_memorized_verses: {e}")
+
+    for v in MEMORIZE_VERSES_DATA:
+        if category and category != "all" and v["category"] != category:
+            continue
+
+        occ = _tokenize_verse_with_occlusion(v["text"])
+        user_rec = db_progress.get(v["id"]) or MEMORIZE_PRACTICE_CACHE.get(f"{user_identifier}_{v['id']}", {
+            "mastery_stars": 0,
+            "review_count": 0,
+            "last_practiced": None
+        })
+
+        results.append({
+            "id": v["id"],
+            "reference": v["reference"],
+            "text": v["text"],
+            "category": v["category"],
+            "difficulty": v["difficulty"],
+            "xp_reward": v["xp_reward"],
+            "core_doctrine": v["core_doctrine"],
+            "audio_anchor": v["audio_anchor"],
+            "words": occ["words"],
+            "total_words": occ["total_words"],
+            "level1_blank_indices": occ["level1_blank_indices"],
+            "level2_blank_indices": occ["level2_blank_indices"],
+            "level3_blank_indices": occ["level3_blank_indices"],
+            "mastery_stars": user_rec["mastery_stars"],
+            "review_count": user_rec["review_count"],
+            "last_practiced": user_rec["last_practiced"]
+        })
+
+    return results
+
+
+@router.post("/memorize-verses/record", response_model=RecordMemorizePracticeResponse)
+def record_memorize_practice(
+    req: RecordMemorizePracticeRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Record user practice session on a memorization verse, calculate stars and award XP.
+    """
+    v_item = next((v for v in MEMORIZE_VERSES_DATA if v["id"] == req.verse_id), None)
+    if not v_item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu Kinh Thánh này.")
+
+    user_id = req.user_identifier or "local_user"
+    cache_key = f"{user_id}_{req.verse_id}"
+
+    # Calculate stars based on accuracy and level
+    stars = 0
+    if req.accuracy_percent >= 90.0:
+        stars = 3 if req.level_tested == 3 else (2 if req.level_tested == 2 else 1)
+    elif req.accuracy_percent >= 80.0:
+        stars = 2 if req.level_tested >= 2 else 1
+    elif req.accuracy_percent >= 60.0:
+        stars = 1
+
+    # XP bonus: base xp * level * accuracy ratio
+    earned_xp = int(v_item["xp_reward"] * (req.level_tested * 0.5 + 0.5) * (req.accuracy_percent / 100.0))
+    if earned_xp < 10:
+        earned_xp = 10
+
+    # Persist to DB
+    total_xp = 0
+    streak = 1
+    try:
+        sql_verse = text("""
+            INSERT INTO user_memorized_verses (user_identifier, verse_key, mastery_stars, review_count, last_practiced)
+            VALUES (:u, :v, :s, 1, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_identifier, verse_key)
+            DO UPDATE SET 
+                mastery_stars = GREATEST(user_memorized_verses.mastery_stars, EXCLUDED.mastery_stars),
+                review_count = user_memorized_verses.review_count + 1,
+                last_practiced = CURRENT_TIMESTAMP
+        """)
+        db.execute(sql_verse, {"u": user_id, "v": req.verse_id, "s": stars})
+
+        sql_user = text("""
+            UPDATE user_learning_profiles
+            SET total_score = total_score + :xp,
+                daily_streak = daily_streak + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_identifier = :u
+            RETURNING total_score, daily_streak
+        """)
+        row = db.execute(sql_user, {"xp": earned_xp, "u": user_id}).fetchone()
+        if row:
+            total_xp = row.total_score
+            streak = row.daily_streak
+        db.commit()
+    except Exception as e:
+        logger.warning(f"DB update failed for memorize practice: {e}")
+        db.rollback()
+
+    # Update in-memory cache
+    prev = MEMORIZE_PRACTICE_CACHE.get(cache_key, {"mastery_stars": 0, "review_count": 0})
+    MEMORIZE_PRACTICE_CACHE[cache_key] = {
+        "mastery_stars": max(prev["mastery_stars"], stars),
+        "review_count": prev["review_count"] + 1,
+        "last_practiced": str(datetime.now())
+    }
+
+    if stars == 3:
+        msg = f"Tuyệt hảo! Bạn đã xuất sắc ghi nhớ trọn vẹn câu {v_item['reference']} ở Mức 3 và đạt 3 Sao Vàng! (+{earned_xp} XP)"
+    elif stars >= 1:
+        msg = f"Rất tốt! Bạn đạt {req.accuracy_percent}% ở Mức {req.level_tested} và nhận được {stars} Sao! (+{earned_xp} XP)"
+    else:
+        msg = f"Bạn đạt {req.accuracy_percent}%. Hãy lắng nghe giọng đọc mẫu hoặc bật gợi ý chữ cái đầu để tiếp tục luyện tập nhé!"
+
+    return RecordMemorizePracticeResponse(
+        verse_id=req.verse_id,
+        stars_awarded=stars,
+        xp_earned=earned_xp,
+        total_xp=total_xp,
+        streak=streak,
+        message=msg
+    )
+
+
+
 

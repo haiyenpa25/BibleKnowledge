@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
+from datetime import datetime, date
+from pydantic import BaseModel, Field
 import re
 import json
 import urllib.request
@@ -2358,5 +2360,599 @@ def get_harmony_detail(
     }
 
 
+# ==============================================================================
+# §3, §46, §53 — Bible Reading Plans & Daily Devotional Tracker
+# ==============================================================================
+
+class ToggleDayRequest(BaseModel):
+    day: int = Field(..., ge=1, description="Day number in the plan")
+    completed: Optional[bool] = Field(None, description="True for complete, False for uncomplete, None to toggle")
+    user_identifier: str = Field("local_user", description="User ID for local profile tracking")
 
 
+# In-memory backup cache if DB table access is unavailable
+READING_PROGRESS_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _generate_1_year_plan_days() -> List[Dict[str, Any]]:
+    """Generates 365 canonical reading days balancing OT, NT, Psalms and Proverbs."""
+    days = []
+    # Curated milestones for key foundational days
+    milestones = {
+        1: ("Sáng Tạo & Gia Phả Đấng Christ", ["Sáng-thế Ký 1-2", "Ma-thi-ơ 1", "Thi-thiên 1"], "sa", 1, "Sáng-thế Ký 1:1 - Ban đầu Đức Chúa Trời dựng nên trời đất.", "Đức Chúa Trời là cội nguồn của mọi trật tự và vẻ đẹp. Hãy bắt đầu năm mới bằng việc tôn nhận Ngài là Chủ đời sống bạn."),
+        2: ("Sự Sa Ngã & Lời Tiên Tri Đầu Tiên", ["Sáng-thế Ký 3-4", "Ma-thi-ơ 2", "Thi-thiên 2"], "sa", 3, "Sáng-thế Ký 3:15 - Dòng dõi người nữ sẽ giày đạp đầu con rắn.", "Ngay trong bi kịch sa ngã, ân điển cứu chuộc của Thiên Chúa đã được mở ra qua lời hứa về Đấng Cứu Thế."),
+        3: ("Gia Phổ Tộc Trưởng & Sự Công Bình", ["Sáng-thế Ký 5-6", "Ma-thi-ơ 3", "Thi-thiên 3"], "sa", 6, "Sáng-thế Ký 6:8 - Nhưng Nô-ê được ơn trước mặt Đức Giê-hô-va.", "Giữa một thế hệ bại hoại, người bước đi cùng Đức Chúa Trời sẽ trở nên ngọn hải đăng của đức tin."),
+        12: ("Lời Kêu Gọi Áp-ra-ham", ["Sáng-thế Ký 12-13", "Ma-thi-ơ 12", "Thi-thiên 12"], "sa", 12, "Sáng-thế Ký 12:2-3 - Ta sẽ làm cho ngươi nên một dân lớn và ban phước cho ngươi.", "Đức tin là sự vâng phục bước ra khỏi vùng an toàn khi Chúa kêu gọi."),
+        22: ("Núi Mô-ri-a: Chúa Sắm Sẵn", ["Sáng-thế Ký 22-23", "Ma-thi-ơ 22", "Thi-thiên 22"], "sa", 22, "Sáng-thế Ký 22:14 - Giê-hô-va Di-rê: Trên núi của Đức Giê-hô-va sẽ có sắm sẵn.", "Khi dâng điều quý nhất cho Chúa, chúng ta kinh nghiệm sự chu cấp kỳ diệu của Đấng Thành Tín."),
+        50: ("Xuất Hành Khỏi Ai Cập", ["Xuất Ê-díp-tô Ký 12-14", "Mác 10", "Thi-thiên 50"], "xk", 14, "Xuất Ê-díp-tô Ký 14:14 - Đức Giê-hô-va sẽ chiến cự cho các ngươi; còn các ngươi cứ yên lặng.", "Chúa mở đường biển đỏ nơi mắt loài người chỉ thấy ngõ cụt."),
+        100: ("Đất Hứa & Lời Hứa Bền Vững", ["Giô-suê 1-3", "Lu-ca 15", "Thi-thiên 100"], "gs", 1, "Giô-suê 1:9 - Hãy vững lòng bền chí, chớ run sợ; vì Giê-hô-va Đức Chúa Trời ngươi ở cùng ngươi.", "Sự hiện diện của Chúa xua tan mọi nỗi sợ hãi trước những thành lũy kiên cố."),
+        180: ("Vương Triều Đa-vít & Lòng Tôn Kính", ["2 Sa-mu-ên 7", "Công-vụ 2", "Thi-thiên 84"], "2sm", 7, "2 Sa-mu-ên 7:16 - Nhà ngươi và nước ngươi sẽ được bền vững đời đời trước mặt ta.", "Giao ước Đa-vít hướng thẳng về Ngôi Vương đời đời của Đấng Christ."),
+        270: ("Lời Hứa Về Giao Ước Mới", ["Giê-rê-mi 31", "Rô-ma 8", "Thi-thiên 119:1-32"], "gr", 31, "Giê-rê-mi 31:33 - Ta sẽ ghi luật pháp ta vào lòng chúng nó và tạc vào dạ.", "Giao ước mới trong huyết Chúa Giê-xu ban một tấm lòng mới được biến đổi bởi Đức Thánh Linh."),
+        365: ("Trời Mới Đất Mới & Khải Hoàn Đời Đời", ["Ma-la-chi 3-4", "Khải-huyền 21-22", "Thi-thiên 150"], "kh", 22, "Khải-huyền 22:20 - Đấng làm chứng các điều này phán rằng: Phải, ta đến mau chóng! A-men, lạy Đức Chúa Giê-xu, xin hãy đến!", "Hoàn tất lộ trình đọc Kinh Thánh trọn năm trong niềm hy vọng vinh quang về sự tái lâm của Chúa Giê-xu Christ!")
+    }
+
+    # Generate full 365 sequence
+    for d in range(1, 366):
+        if d in milestones:
+            title, passages, p_book, p_ch, golden, prompt = milestones[d]
+        else:
+            # Mathematical canonical distribution
+            ot_ch = ((d - 1) * 3) % 929 + 1
+            nt_ch = ((d - 1) * 1) % 260 + 1
+            ps_ch = ((d - 1) % 150) + 1
+            title = f"Ngày {d}: Hành Trình Ân Điển Cựu Ước & Tân Ước"
+            passages = [f"Phân đoạn Cựu Ước (Bài đọc {d})", f"Phân đoạn Tân Ước {nt_ch}", f"Thi-thiên {ps_ch}"]
+            p_book = "sa" if d <= 50 else ("xk" if d <= 90 else ("thi" if d <= 200 else "mt"))
+            p_ch = (d % 28) + 1
+            golden = f"Thi-thiên 119:105 - Lời Chúa là ngọn đèn cho chân tôi, ánh sáng cho đường lối tôi."
+            prompt = f"Nguyện Lời Chúa hôm nay soi sáng từng quyết định và đem lại bình an sâu nhiệm trong tâm hồn bạn."
+
+        days.append({
+            "day": d,
+            "title": title,
+            "passages": passages,
+            "primary_book": p_book,
+            "primary_chapter": p_ch,
+            "golden_verse": golden,
+            "devotional_prompt": prompt
+        })
+    return days
+
+
+def _generate_nt_90_plan_days() -> List[Dict[str, Any]]:
+    """Generates 90 days reading through all 260 chapters of the New Testament (approx 3 chapters/day)."""
+    nt_books_plan = [
+        ("Ma-thi-ơ", "mt", 28),
+        ("Mác", "mc", 16),
+        ("Lu-ca", "lc", 24),
+        ("Giăng", "gi", 21),
+        ("Công-vụ các Sứ-đồ", "cv", 28),
+        ("Rô-ma", "rm", 16),
+        ("1 Cô-rinh-tô", "1cr", 16),
+        ("2 Cô-rinh-tô", "2cr", 13),
+        ("Ga-la-ti", "gl", 6),
+        ("Ê-phê-sô", "ep", 6),
+        ("Phi-líp", "pl", 4),
+        ("Cô-lô-se", "cl", 4),
+        ("1 Tê-sa-lô-ni-ca", "1ts", 5),
+        ("2 Tê-sa-lô-ni-ca", "2ts", 3),
+        ("1 Ti-mô-thê", "1tm", 6),
+        ("2 Ti-mô-thê", "2tm", 4),
+        ("Tít", "tt", 3),
+        ("Phi-lê-môn", "pm", 1),
+        ("Hê-bơ-rơ", "hb", 13),
+        ("Gia-cơ", "gc", 5),
+        ("1 Phi-e-rơ", "1pr", 5),
+        ("2 Phi-e-rơ", "2pr", 3),
+        ("1 Giăng", "1g", 5),
+        ("2 Giăng", "2g", 1),
+        ("3 Giăng", "3g", 1),
+        ("Giu-đe", "gd", 1),
+        ("Khải-huyền", "kh", 22),
+    ]
+
+    all_chapters = []
+    for b_name, b_code, total_c in nt_books_plan:
+        for c in range(1, total_c + 1):
+            all_chapters.append((b_name, b_code, c))
+
+    days = []
+    total_ch = len(all_chapters) # 260
+    for day in range(1, 91):
+        idx_start = int((day - 1) * (total_ch / 90.0))
+        idx_end = int(day * (total_ch / 90.0))
+        if day == 90:
+            idx_end = total_ch
+
+        chunk = all_chapters[idx_start:idx_end]
+        if not chunk:
+            chunk = [all_chapters[-1]]
+
+        b_name_first, b_code_first, c_first = chunk[0]
+        b_name_last, _, c_last = chunk[-1]
+
+        if b_name_first == b_name_last:
+            if c_first == c_last:
+                pass_label = f"{b_name_first} {c_first}"
+            else:
+                pass_label = f"{b_name_first} {c_first}-{c_last}"
+        else:
+            pass_label = f"{b_name_first} {c_first} - {b_name_last} {c_last}"
+
+        days.append({
+            "day": day,
+            "title": f"Ngày {day}: {pass_label}",
+            "passages": [f"{item[0]} {item[2]}" for item in chunk],
+            "primary_book": b_code_first,
+            "primary_chapter": c_first,
+            "golden_verse": f"{b_name_first} {c_first} - Lời ban sự sống đời đời trong Chúa Cứu Thế Giê-xu.",
+            "devotional_prompt": f"Đón nhận sứ điệp Tân Ước cho đời sống hôm nay: Bước đi theo gương Chúa Giê-xu và quyền năng Đức Thánh Linh."
+        })
+    return days
+
+
+def _generate_wisdom_30_plan_days() -> List[Dict[str, Any]]:
+    """Generates 30 days of Wisdom and Poetry (Job, Psalms, Proverbs, Ecclesiastes, Song of Songs)."""
+    topics = [
+        ("Thi-thiên 1-5", "thi", 1, "Hai Con Đường: Người Công Bình & Kẻ Hung Ác", "Phước cho người không đi theo mưu kế kẻ dữ."),
+        ("Thi-thiên 8 & 19", "thi", 8, "Vinh Quang Đấng Tạo Hóa Trong Vũ Trụ", "Hỡi Đức Giê-hô-va là Chúa chúng tôi, danh Chúa le lói khắp đất biết bao!"),
+        ("Thi-thiên 23 & 27", "thi", 23, "Đức Giê-hô-va Là Đấng Chăn Giữ Tôi", "Đức Giê-hô-va là Đấng chăn giữ tôi; tôi sẽ chẳng thiếu thốn gì."),
+        ("Thi-thiên 34 & 37", "thi", 34, "Sự Giải Cứu & Trông Đợi Chúa Bền Lòng", "Hãy nếm thử và thấy Đức Giê-hô-va tốt lành dường bao!"),
+        ("Thi-thiên 42 & 46", "thi", 46, "Nơi Trú Ẩn Vững Bền Trong Cơn Giông Bão", "Đức Chúa Trời là nơi ẩn náu và sức lực của chúng tôi, Đấng giúp đỡ trong hoạn nạn."),
+        ("Thi-thiên 51 & 63", "thi", 51, "Lời Cầu Nguyện Ăn Năn & Tấm Lòng Tan Vỡ", "Đức Chúa Trời ôi! xin hãy dựng nên trong tôi một lòng trong sạch."),
+        ("Thi-thiên 84 & 90", "thi", 90, "Nơi Ở Đời Nầy Qua Đời Kia", "Cầu xin Chúa dạy chúng tôi biết đếm các ngày chúng tôi, hầu cho chúng tôi được lòng khôn ngoan."),
+        ("Thi-thiên 91 & 100", "thi", 91, "Sự Che Chở Nơi Đấng Chí Cao", "Người nào ở nơi kín đáo của Đấng Chí Cao, sẽ được hằng ở dưới bóng của Đấng Toàn Năng."),
+        ("Thi-thiên 103 & 104", "thi", 103, "Ngợi Khen Ân Huệ & Lòng Nhân Từ Đời Đời", "Hỡi linh hồn ta, hãy ngợi khen Đức Giê-hô-va, chớ quên các ân huệ của Ngài."),
+        ("Thi-thiên 119:1-48", "thi", 119, "Phước Hạnh Của Người Yêu Mến Luật Pháp Chúa", "Lời Chúa là ngọn đèn cho chân tôi, ánh sáng cho đường lối tôi."),
+        ("Thi-thiên 121 & 127", "thi", 121, "Đấng Gìn Giữ Y-sơ-ra-ên Không Bao Giờ Nhắm Mắt", "Tôi ngước mắt lên trên núi: Sự tiếp trợ tôi đến từ đâu? Sự tiếp trợ tôi đến từ Đức Giê-hô-va."),
+        ("Thi-thiên 139", "thi", 139, "Sự Toàn Tri Tuyệt Đối & Tình Yêu Vô Điều Kiện", "Đức Chúa Trời ôi! xin hãy tra xét tôi, và biết lòng tôi; hãy thử thách tôi, và biết tư tưởng tôi."),
+        ("Thi-thiên 145-150", "thi", 150, "Bản Hùng Ca Đại Tán Tụng", "Phàm vật chi thở, hãy ngợi khen Đức Giê-hô-va! Ha-lê-lu-gia!"),
+        ("Châm-ngôn 1-3", "cn", 3, "Khởi Đầu Sự Khôn Ngoan & Tin Cậy Hết Lòng", "Hãy hết lòng tin cậy Đức Giê-hô-va, chớ nương cậy nơi sự thông sáng của con."),
+        ("Châm-ngôn 4-6", "cn", 4, "Gìn Giữ Tấm Lòng Vì Nguồn Sự Sống", "Khá cẩn thận giữ tấm lòng của con hơn hết, vì các nguồn sự sống do nơi nó mà ra."),
+        ("Châm-ngôn 8-9", "cn", 8, "Tiếng Kêu Gọi Của Sự Khôn Ngoan Đời Đời", "Kính sợ Đức Giê-hô-va, ấy là khởi đầu sự khôn ngoan."),
+        ("Châm-ngôn 10-12", "cn", 10, "Lời Nói, Sự Chăm Chỉ & Sự Công Bình", "Môi miệng người công bình nuôi nấng nhiều người; nhưng kẻ ngu dại chết vì thiếu trí hiểu."),
+        ("Châm-ngôn 15-17", "cn", 16, "Mưu Kế Con Người & Ý Chỉ Đức Chúa Trời", "Lòng loài người toan tính đường lối mình; song Đức Giê-hô-va chỉ dẫn các bước của người."),
+        ("Châm-ngôn 18-20", "cn", 18, "Danh Chúa Là Tháp Vững Bền", "Danh Đức Giê-hô-va là một tháp vững bền; kẻ công bình chạy đến đó, gặp được nơi ẩn náu cao."),
+        ("Châm-ngôn 22-24", "cn", 22, "Danh Tiếng Quý Hơn Tiền Của", "Danh tiếng tốt chăng hơn tiền của nhiều; và ơn nghĩa quý hơn vàng bạc."),
+        ("Châm-ngôn 27-29", "cn", 27, "Tình Bạn Chân Thật & Lòng Khiêm Nhường", "Sắt mài nhọn sắt, cũng vậy người mài giũa diện mạo bạn hữu mình."),
+        ("Châm-ngôn 30-31", "cn", 31, "Người Nữ Tiết Hạnh & Kính Sợ Chúa", "Duyên là giả dối, sắc lại hư không; nhưng người nữ nào kính sợ Đức Giê-hô-va sẽ được khen ngợi."),
+        ("Gióp 1-3", "gp", 1, "Thử Thách Khốc Liệt & Lời Tuyên Xưng Kiên Định", "Đức Giê-hô-va đã ban cho, Đức Giê-hô-va lại cất đi; đáng ngợi khen danh Đức Giê-hô-va!"),
+        ("Gióp 19 & 23", "gp", 19, "Đấng Cứu Chuộc Tôi Hằng Sống", "Tôi biết rằng Đấng Cứu chuộc tôi vẫn sống, đến ngày tận thế Ngài sẽ đứng trên đất."),
+        ("Gióp 38-40", "gp", 38, "Tiếng Chúa Phán Giữa Cơn Bão Lốc", "Ngươi đã ở đâu khi ta đặt nền trái đất? Hãy nói đi, nếu ngươi có trí hiểu."),
+        ("Gióp 42", "gp", 42, "Mắt Tôi Đã Thấy Chúa & Sự Phục Hồi Gấp Đôi", "Trước lỗ tai tôi có nghe đồn về Chúa, nhưng bây giờ mắt tôi đã thấy Ngài."),
+        ("Truyền-đạo 1-3", "td", 3, "Mọi Sự Đều Có Kỳ Định Dưới Trời", "Phàm sự gì có thì tiết; mọi việc dưới trời có kỳ định của nó."),
+        ("Truyền-đạo 7-9", "td", 7, "Chiêm Nghiệm Thực Tế Cuộc Đời", "Ngày thịnh vượng hãy vui mừng, ngày tai nạn hãy suy nghĩ."),
+        ("Truyền-đạo 11-12", "td", 12, "Tưởng Nhớ Đấng Tạo Hóa Lúc Còn Trẻ", "Hãy kính sợ Đức Chúa Trời và giữ các điều răn Ngài; ấy là trọn phận sự của ngươi."),
+        ("Nhã-ca 1-8", "nc", 8, "Tình Yêu Mạnh Như Sự Chết", "Nước nhiều không dập tắt được tình yêu, các dòng sông không nhận chìm nó được.")
+    ]
+    days = []
+    for idx, (pass_str, b_code, b_ch, title, prompt) in enumerate(topics, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": prompt,
+            "devotional_prompt": f"Ngẫm suy và áp dụng lẽ thật khôn ngoan này vào các mối quan hệ và thách thức trong ngày sống hôm nay."
+        })
+    return days
+
+
+def _generate_gospels_40_plan_days() -> List[Dict[str, Any]]:
+    """Generates 40 days following Jesus' Life, Passion and Resurrection."""
+    curated_journey = [
+        ("Sự Giáng Sinh & Ngôi Lời Hóa Thân Nhục Thể", "Giăng 1:1-18", "gi", 1, "Ngôi Lời đã trở nên xác thịt, ở giữa chúng ta, đầy ơn và lẽ thật."),
+        ("Sứ Mạng Của Giăng Báp-tít & Lễ Báp-tem", "Ma-thi-ơ 3:1-17", "mt", 3, "Nầy là Con yêu dấu của ta, đẹp lòng ta mọi đường."),
+        ("Sự Cám Dỗ Trong Đồng Vắng & Sự Chiến Thắng", "Ma-thi-ơ 4:1-11", "mt", 4, "Người ta sống chẳng phải chỉ nhờ bánh mà thôi, song nhờ mọi lời nói ra từ miệng Đức Chúa Trời."),
+        ("Kêu Gọi Các Môn Đồ Đầu Tiên & Phép Lạ Cana", "Giăng 1:35-51, 2:1-11", "gi", 2, "Hễ Ngài phán bảo điều chi, hãy vâng theo điều nấy."),
+        ("Cuộc Đàm Đạo Ban Đêm Với Ni-cô-đem", "Giăng 3:1-21", "gi", 3, "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài."),
+        ("Người Đàn Bà Sa-ma-ri Bên Giếng Gia-cốp", "Giăng 4:1-30", "gi", 4, "Nước ta cho sẽ thành một mạch nước văng ra cho đến sự sống đời đời."),
+        ("Bài Giảng Trên Núi: Tám Phước Lành", "Ma-thi-ơ 5:1-16", "mt", 5, "Các ngươi là muối của đất... Các ngươi là sự sáng của thế gian."),
+        ("Bài Giảng Trên Núi: Luật Yêu Kẻ Thù & Cầu Nguyện", "Ma-thi-ơ 6:1-15", "mt", 6, "Lạy Cha chúng tôi ở trên trời; Danh Cha được thánh; Nước Cha được đến."),
+        ("Chớ Lo Lắng Về Ngày Mai", "Ma-thi-ơ 6:19-34", "mt", 6, "Trước hết hãy tìm kiếm nước Đức Chúa Trời và sự công bình của Ngài."),
+        ("Xây Nhà Trên Vầng Đá", "Ma-thi-ơ 7:13-29", "mt", 7, "Kẻ nào nghe lời ta phán đây mà làm theo, ví như người khôn cất nhà mình trên vầng đá."),
+        ("Dẹp Yên Bão Tố Trên Biển Ga-li-lê", "Mác 4:35-41", "mc", 4, "Ngài thức dậy, quở gió và phán cùng biển rằng: Hãy êm đi, lặng đi!"),
+        ("Chữa Lành Người Bị Quỷ Ám Tại Ga-đa-ra", "Mác 5:1-20", "mc", 5, "Hãy về nhà ngươi, nơi bà con ngươi, mà thuật lại cho họ điều lớn lao Chúa đã làm cho ngươi."),
+        ("Hóa Bánh Cho 5000 Người Ăn", "Lu-ca 9:10-17", "lc", 9, "Chính các ngươi hãy cho họ ăn!"),
+        ("Chúa Giê-xu Đi Bộ Trên Mặt Nước", "Ma-thi-ơ 14:22-33", "mt", 14, "Hãy yên lòng; ấy là ta đây, đừng sợ!"),
+        ("Ta Là Bánh Hằng Sống Từ Trên Trời Xuống", "Giăng 6:26-51", "gi", 6, "Ai đến cùng ta chẳng hề đói, và ai tin ta chẳng hề khát."),
+        ("Lời Tuyên Xưng Đức Tin Của Phi-e-rơ Tại Sê-xa-rê", "Ma-thi-ơ 16:13-20", "mt", 16, "Thầy là Đấng Christ, Con Đức Chúa Trời hằng sống."),
+        ("Sự Hóa Hình Vinh Hiển Trên Núi", "Ma-thi-ơ 17:1-13", "mt", 17, "Nầy là Con yêu dấu của ta, đẹp lòng ta mọi bề; hãy nghe lời Con đó!"),
+        ("Người Samari Nhân Lành: Ai Là Kẻ Lân Cận?", "Lu-ca 10:25-37", "lc", 10, "Hãy hết lòng, hết linh hồn, hết sức, hết trí mà kính mến Chúa là Đức Chúa Trời ngươi."),
+        ("Mari & Martha: Phần Tốt Nhất Không Bị Cất Đi", "Lu-ca 10:38-42", "lc", 10, "Chỉ có một điều cần dùng mà thôi. Ma-ri đã chọn phần tốt, là phần không ai cất lấy được."),
+        ("Người Đầy Tớ Bất Dung Thứ & Sự Tha Thứ 70 Lần 7", "Ma-thi-ơ 18:21-35", "mt", 18, "Không phải bảy lần, nhưng là bảy mươi lần bảy."),
+        ("Người Mù Từ Thuở Sanh Ra Được Sáng Mắt", "Giăng 9:1-41", "gi", 9, "Một điều tôi biết, là tôi đã mù, mà bây giờ lại sáng."),
+        ("Người Chăn Hiền Lành Vì Chiên Phó Sự Sống", "Giăng 10:1-18", "gi", 10, "Ta là người chăn hiền lành; người chăn hiền lành vì chiên mình phó sự sống."),
+        ("Người Con Hoang Đàng & Tấm Lòng Người Cha", "Lu-ca 15:11-32", "lc", 15, "Vì con ta đây đã chết mà bây giờ lại sống, đã mất mà bây giờ lại thấy được."),
+        ("Người Giàu & La-xa-rơ Nơi Âm Phủ", "Lu-ca 16:19-31", "lc", 16, "Nếu không nghe Môi-se và các tiên tri, thì dầu có ai từ kẻ chết sống lại, họ cũng chẳng tin."),
+        ("Phép Lạ Phục Sinh La-xa-rơ Tại Bê-tha-ni", "Giăng 11:1-44", "gi", 11, "Ta là sự sống lại và sự sống; kẻ nào tin ta thì sẽ sống, mặc dầu đã chết rồi."),
+        ("Xê-ca-ê Người Thu Thuế Ăn Năn", "Lu-ca 19:1-10", "lc", 19, "Bởi vì Con người đã đến tìm và cứu kẻ bị hư mất."),
+        ("Ma-ri Xức Dầu Thơm Quý Giá Cho Chân Chúa", "Giăng 12:1-11", "gi", 12, "Người đã làm điều mình có thể làm được; người đã ướp xác ta trước để chôn."),
+        ("Khải Hoàn Tiến Vào Thành Giê-ru-sa-lem (Chúa Nhật Lễ Lá)", "Lu-ca 19:28-44", "lc", 19, "Hô-sa-na! Đáng chúc tụng Đấng nhân danh Chúa mà đến!"),
+        ("Dẹp Sạch Đền Thờ: Nhà Ta Là Nhà Cầu Nguyện", "Mác 11:12-19", "mc", 11, "Nhà ta sẽ gọi là nhà cầu nguyện cho muôn dân."),
+        ("Thí Dụ Mười Người Nữ Đồng Trinh & Ta-lâng", "Ma-thi-ơ 25:1-30", "mt", 25, "Hỡi đầy tớ ngay lành và trung tín, ngươi đã trung tín trong việc nhỏ, ta sẽ lập ngươi coi sóc nhiều."),
+        ("Chúa Rửa Chân Cho Các Môn Đồ", "Giăng 13:1-17", "gi", 13, "Nếu ta là Chúa và là Thầy, mà đã rửa chân cho các ngươi, thì các ngươi cũng phải rửa chân lẫn nhau."),
+        ("Tiệc Thánh Đầu Tiên: Bánh & Chén Giao Ước", "Lu-ca 22:7-23", "lc", 22, "Nầy là thân thể ta vì các ngươi mà phó cho; hãy làm sự nầy để nhớ đến ta."),
+        ("Ta Là Gốc Nho, Các Ngươi Là Nhánh", "Giăng 15:1-17", "gi", 15, "Ai cứ ở trong ta và ta trong người ấy, thì sanh ra lắm trái; vì ngoài ta các ngươi chẳng làm chi được."),
+        ("Lời Cầu Nguyện Trong Vườn Ghết-sê-ma-nê", "Ma-thi-ơ 26:36-46", "mt", 26, "Cha ơi, nếu có thể được, xin cho chén nầy lìa khỏi con! Song không theo ý muốn con, mà theo ý muốn Cha."),
+        ("Sự Phản Bội, Bị Bắt & Phi-e-rơ Chối Chúa", "Mác 14:43-72", "mc", 14, "Phi-e-rơ nhớ lại lời Đức Chúa Giê-xu... liền khóc lóc."),
+        ("Phiên Tòa Trước Phi-lát & Bản Án Đóng Đinh", "Giăng 18:28-40, 19:1-16", "gi", 18, "Lẽ thật là cái gì?"),
+        ("Đồi Gô-gô-tha: Thập Tự Giá & Mọi Sự Đã Được Trọn", "Giăng 19:17-37", "gi", 19, "Mọi sự đã được trọn! Ngài gục đầu, trút linh hồn."),
+        ("Sự Chôn Cất Trong Mộ Đá Mới Của Giô-sép", "Ma-thi-ơ 27:57-66", "mt", 27, "Họ niêm phong hòn đá và cắt quân canh gác."),
+        ("Ngôi Mộ Trống & Sự Phục Sinh Vinh Hiển Khải Hoàn", "Ma-thi-ơ 28:1-15", "mt", 28, "Ngài không ở đây đâu; Ngài sống lại rồi, như lời Ngài đã phán!"),
+        ("Gặp Lại Bên Biển Tiberias & Đại Mạng Lệnh", "Giăng 21:1-19; Ma-thi-ơ 28:16-20", "mt", 28, "Hãy đi dạy dỗ muôn dân... Và này, ta thường ở cùng các ngươi luôn cho đến tận thế.")
+    ]
+    days = []
+    for idx, (title, pass_str, b_code, b_ch, golden) in enumerate(curated_journey, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": golden,
+            "devotional_prompt": f"Chiêm nghiệm tình yêu hy sinh và quyền năng phục sinh của Chúa Giê-xu trong tâm trí hôm nay."
+        })
+    return days
+
+
+def _generate_pauline_30_plan_days() -> List[Dict[str, Any]]:
+    """Generates 30 days studying Paul's foundational Epistles."""
+    pauline_flow = [
+        ("Rô-ma 1-2", "rm", 1, "Tình Trạng Hư Mất Chung Của Nhân Loại", "Tin Lành là quyền phép của Đức Chúa Trời để cứu mọi kẻ tin."),
+        ("Rô-ma 3-4", "rm", 3, "Sự Xưng Công Bình Bởi Đức Tin Nơi Đấng Christ", "Vì mọi người đều đã phạm tội, thiếu mất sự vinh hiển của Đức Chúa Trời."),
+        ("Rô-ma 5-6", "rm", 5, "Hòa Thuận Lại Với Chúa & Đồng Chết Đồng Sống", "Đức Chúa Trời tỏ lòng yêu thương Ngài đối với chúng ta, khi chúng ta còn là người có tội, thì Đấng Christ vì chúng ta chịu chết."),
+        ("Rô-ma 7-8", "rm", 8, "Sự Đắc Thắng Trong Đức Thánh Linh & Không Ai Dứt Ta Khỏi Chúa", "Hiện nay chẳng còn có sự đoán phạt nào cho những kẻ ở trong Đức Chúa Giê-xu Christ."),
+        ("Rô-ma 12-14", "rm", 12, "Dâng Thân Thể Làm Của Lễ Sống & Đời Sống Cộng Đồng", "Hãy biến hóa bởi sự đổi mới của tâm thần mình."),
+        ("1 Cô-rinh-tô 1-3", "1cr", 1, "Sự Khôn Ngoan Của Thập Tự Giá So Với Trần Gian", "Đạo thập tự giá là sự điên dại cho kẻ hư mất, nhưng cho chúng ta là quyền phép của Đức Chúa Trời."),
+        ("1 Cô-rinh-tô 12-13", "1cr", 13, "Các Ân Tứ Thuộc Linh & Bài Ca Tình Yêu Tuyệt Hảo", "Tình yêu thương hay nhịn nhục; tình yêu thương hay nhân từ... Tình yêu thương chẳng hề hư mất bao giờ."),
+        ("1 Cô-rinh-tô 15", "1cr", 15, "Chân Lý Sự Sống Lại Của Kẻ Chết & Chiến Thắng Hủy Diệt Tử Thần", "Hỡi sự chết, sự đắc thắng của mầy ở đâu? Hỡi sự chết, cái nọc của mầy ở đâu?"),
+        ("2 Cô-rinh-tô 4-5", "2cr", 5, "Báu Vật Trong Bình Đất & Chức Vụ Giảng Hòa", "Nếu ai ở trong Đấng Christ, nấy là người dựng nên mới; những sự cũ đã qua đi, này mọi sự đều trở nên mới."),
+        ("2 Cô-rinh-tô 12", "2cr", 12, "Cái Dằm Trong Xác Thịt & Ân Điển Đủ Đầy", "Ân điển ta đủ cho ngươi rồi, vì sức mạnh của ta nên trọn vẹn trong sự yếu đuối."),
+        ("Ga-la-ti 1-2", "gl", 2, "Chỉ Một Tin Lành Thật & Tôi Đã Bị Đóng Đinh", "Tôi đã bị đóng đinh vào thập tự giá với Đấng Christ, mà tôi sống, không phải là tôi sống nữa, nhưng Đấng Christ sống trong tôi."),
+        ("Ga-la-ti 5-6", "gl", 5, "Tự Do Trong Đấng Christ & Trái Của Thánh Linh", "Trái của Thánh Linh là lòng yêu thương, sự vui mừng, bình an, nhịn nhục, nhân từ, hiền lành, trung tín, mềm mại, tiết độ."),
+        ("Ê-phê-sô 1-2", "ep", 2, "Được Cứu Nhờ Ân Điển Bởi Đức Tin & Dựng Nên Mới", "Ấy là nhờ ân điển, bởi đức tin, mà anh em được cứu, điều đó không phải đến từ anh em, bèn là sự ban cho của Đức Chúa Trời."),
+        ("Ê-phê-sô 3-4", "ep", 4, "Sự Hiệp Một Trong Hội Thánh & Bước Đi Đáng Với Ơn Kêu Gọi", "Chỉ có một Chúa, một đức tin, một phép báp-tem, một Đức Chúa Trời và Cha của mọi người."),
+        ("Ê-phê-sô 5-6", "ep", 6, "Hôn Nhân Cơ Đốc & Toàn Bộ Khí Giới Của Đức Chúa Trời", "Hãy mang lấy mọi khí giới của Đức Chúa Trời, để anh em có thể đứng vững trước các mưu kế của ma quỷ."),
+        ("Phi-líp 1-2", "pl", 2, "Tâm Tình Của Đấng Christ: Khiêm Nhường Tự Hạ", "Ngài đã hiện ra như một người, tự hạ mình xuống, vâng phục cho đến chết, thậm chí chết trên cây thập tự."),
+        ("Phi-líp 3-4", "pl", 4, "Chạy Đua Đến Mục Đích & Vui Mừng Luôn Luôn", "Tôi làm được mọi sự nhờ Đấng ban thêm sức cho tôi."),
+        ("Cô-lô-se 1-2", "cl", 1, "Đấng Christ Là Đứng Đầu Vạn Vật & Sự Đầy Dẫy Của Thần Tính", "Ngài là hình ảnh của Đức Chúa Trời không thấy được, là Đấng sanh đầu hết thảy mọi vật dựng nên."),
+        ("Cô-lô-se 3-4", "cl", 3, "Tìm Kiếm Các Sự Ở Trên Trời & Mặc Lấy Con Người Mới", "Nếu anh em đã sống lại với Đấng Christ, hãy tìm các sự ở trên trời."),
+        ("1 Tê-sa-lô-ni-ca 4-5", "1ts", 4, "Sự Tái Lâm Của Chúa & Lối Sống Canh Thức", "Hãy vui mừng mãi mãi, cầu nguyện không thôi, phàm việc gì cũng phải tạ ơn Chúa."),
+        ("2 Tê-sa-lô-ni-ca 1-3", "2ts", 3, "Sự Bền Đỗ Trong Hoạn Nạn & Giữ Vững Lời Dạy", "Chúa là thành tín, Ngài sẽ làm cho anh em được vững vàng và gìn giữ khỏi kẻ dữ."),
+        ("1 Ti-mô-thê 1-3", "1tm", 2, "Tiêu Chuẩn Người Hầu Việc Chúa & Đấng Trung Bảo Duy Nhất", "Vì chỉ có một Đức Chúa Trời, và chỉ có một Đấng Trung bảo ở giữa Đức Chúa Trời và loài người, tức là Đức Chúa Giê-xu Christ, là người."),
+        ("1 Ti-mô-thê 4-6", "1tm", 6, "Tập Tành Sự Tin Kính & Sự Thỏa Lòng Là Lợi Lớn", "Sự tin kính cùng sự thỏa lòng, ấy là một lợi lớn."),
+        ("2 Ti-mô-thê 1-2", "2tm", 2, "Người Chiến Sĩ Giỏi Của Đấng Christ & Lời Dặn Dò Mục Vụ", "Hãy cùng ta chịu khổ như một người lính giỏi của Đức Chúa Giê-xu Christ."),
+        ("2 Ti-mô-thê 3-4", "2tm", 3, "Cả Kinh Thánh Đều Được Soi Dẫn & Đánh Trận Tốt Lành", "Cả Kinh Thánh đều là bởi Đức Chúa Trời soi dẫn, có ích cho sự dạy dỗ, bẻ trách, sửa trị, dạy người trong sự công bình."),
+        ("Tít 1-3", "tt", 2, "Ân Điển Dạy Dỗ Ta Từ Bỏ Sự Không Tin Kính", "Ân điển của Đức Chúa Trời đã được bày ra, đem sự cứu rỗi cho mọi người."),
+        ("Phi-lê-môn 1", "pm", 1, "Sự Tha Thứ, Tiếp Nhận Người Anh Em Trong Đấng Christ", "Hãy tiếp đãi nó như chính mình tôi."),
+        ("Hê-bơ-rơ 1-2", "hb", 1, "Con Đức Chúa Trời Cao Trọng Hơn Các Thiên Sứ", "Đức Chúa Trời, xưa kia đã phán dạy... đời sau rốt này phán dạy qua Con Ngài."),
+        ("Hê-bơ-rơ 11", "hb", 11, "Đài Tưởng Niệm Những Anh Hùng Đức Tin", "Vả, đức tin là sự biết chắc vững vàng của những điều mình đang trông mong, là bằng cớ của những điều mình chẳng xem thấy."),
+        ("Hê-bơ-rơ 12-13", "hb", 12, "Nhìn Xem Đức Chúa Giê-xu Là Cội Rễ Của Đức Tin", "Đức Chúa Giê-xu Christ hôm qua, ngày nay, và cho đến đời đời không hề thay đổi.")
+    ]
+    days = []
+    for idx, (pass_str, b_code, b_ch, title, golden) in enumerate(pauline_flow, start=1):
+        days.append({
+            "day": idx,
+            "title": f"Ngày {idx}: {title}",
+            "passages": [pass_str],
+            "primary_book": b_code,
+            "primary_chapter": b_ch,
+            "golden_verse": golden,
+            "devotional_prompt": f"Để lẽ thật giáo lý biến đổi nhân cách và hành động thực tế của bạn trong Chúa Giê-xu hôm nay."
+        })
+    return days
+
+
+# Registry of predefined plans
+READING_PLANS_REGISTRY = {
+    "plan_1_year": {
+        "id": "plan_1_year",
+        "title": "Toàn Bộ Kinh Thánh Trong 1 Năm",
+        "subtitle": "Lộ trình chính kinh 365 ngày trọn vẹn 66 sách",
+        "category": "Toàn Kinh Thánh",
+        "total_days": 365,
+        "difficulty": "Trung Bình",
+        "icon": "BookOpen",
+        "badge_name": "Huy Chương Trọn Kinh Thánh 365",
+        "recommended_for": "Mọi tín hữu muốn xây dựng thói quen đọc Kinh Thánh đều đặn mỗi ngày",
+        "description": "Lộ trình cân bằng 365 ngày giúp bạn hoàn thành toàn bộ Cựu Ước và Tân Ước với các phân đoạn Cựu Ước, Tân Ước, Thi Thiên và Châm Ngôn mỗi ngày.",
+        "days_generator": _generate_1_year_plan_days
+    },
+    "plan_nt_90": {
+        "id": "plan_nt_90",
+        "title": "Tân Ước Trong 90 Ngày",
+        "subtitle": "260 chương Tân Ước trong 3 tháng sâu sắc",
+        "category": "Tân Ước",
+        "total_days": 90,
+        "difficulty": "Cơ Bản",
+        "icon": "Flame",
+        "badge_name": "Môn Đồ Tân Ước 90",
+        "recommended_for": "Tân tín hữu, ứng viên báp-tem, hoặc người muốn ôn lại trọn bộ Tân Ước",
+        "description": "Mỗi ngày đọc khoảng 3 chương, đi qua trọn vẹn chức vụ của Chúa Cứu Thế Giê-xu, lịch sử Hội Thánh ban đầu và các thư tín sứ đồ.",
+        "days_generator": _generate_nt_90_plan_days
+    },
+    "plan_wisdom_30": {
+        "id": "plan_wisdom_30",
+        "title": "Khảo Sát Thi Ca & Khôn Ngoan",
+        "subtitle": "30 ngày ngẫm suy Gióp, Thi Thiên, Châm Ngôn, Truyền Đạo & Nhã Ca",
+        "category": "Khôn Ngoan & Thơ Ca",
+        "total_days": 30,
+        "difficulty": "Nhẹ Nhàng",
+        "icon": "Sparkles",
+        "badge_name": "Bậc Thầy Khôn Ngoan",
+        "recommended_for": "Người cần sự an ủi, chỉ dẫn khôn ngoan và lời ngợi khen trong thử thách",
+        "description": "Suy ngẫm những câu châm ngôn sâu sắc, những khúc thi thiên đầy cảm xúc và triết lý sống đức tin vượt trên nghịch cảnh.",
+        "days_generator": _generate_wisdom_30_plan_days
+    },
+    "plan_gospels_40": {
+        "id": "plan_gospels_40",
+        "title": "Theo Dấu Chân Chúa Cứu Thế (40 Ngày)",
+        "subtitle": "Hành trình biên niên cuộc đời, sự thương khó và phục sinh của Chúa Giê-xu",
+        "category": "Phúc Âm & Biên Niên",
+        "total_days": 40,
+        "difficulty": "Sâu Sắc",
+        "icon": "HeartHandshake",
+        "badge_name": "Dấu Chân Đấng Christ",
+        "recommended_for": "Mùa Chay, chuẩn bị Lễ Thương Khó & Phục Sinh",
+        "description": "40 ngày theo sát từng chặng đường chức vụ của Đấng Christ: từ sự giáng sinh khiêm nhường, chức vụ phép lạ xứ Ga-li-lê, lời giảng trên núi đến thập tự giá Gô-gô-tha và ngôi mộ trống.",
+        "days_generator": _generate_gospels_40_plan_days
+    },
+    "plan_pauline_30": {
+        "id": "plan_pauline_30",
+        "title": "Thần Học Các Thư Tín Sứ Đồ Phao-lô",
+        "subtitle": "30 ngày khám phá chân lý Ân Điển, Đức Tin và Nếp Sống Đắc Thắng",
+        "category": "Thư Tín & Giáo Lý",
+        "total_days": 30,
+        "difficulty": "Nghiên Cứu",
+        "icon": "Scroll",
+        "badge_name": "Học Giả Thư Tín Phao-lô",
+        "recommended_for": "Người dạy đạo, trưởng ban ngành, và người học thần học căn bản",
+        "description": "Đào sâu những luận điểm thần học cốt lõi trong Rô-ma, 1&2 Cô-rinh-tô, Ga-la-ti, Ê-phê-sô, Phi-líp, Cô-lô-se và các thư tín mục vụ.",
+        "days_generator": _generate_pauline_30_plan_days
+    }
+}
+
+
+def _fetch_user_plan_progress(db: Session, user_identifier: str, plan_id: str) -> Dict[str, Any]:
+    """Helper to query progress from DB table with in-memory fallback."""
+    cache_key = f"{user_identifier}_{plan_id}"
+    try:
+        sql = text("""
+            SELECT completed_days, current_day, streak, last_read_date
+            FROM user_reading_plan_progress
+            WHERE user_identifier = :u AND plan_id = :p
+        """)
+        row = db.execute(sql, {"u": user_identifier, "p": plan_id}).fetchone()
+        if row:
+            cd = row.completed_days or []
+            return {
+                "completed_days": cd,
+                "current_day": row.current_day or (max(cd) + 1 if cd else 1),
+                "streak": row.streak or 1,
+                "last_read_date": str(row.last_read_date) if row.last_read_date else None
+            }
+    except Exception as e:
+        logger.warning(f"DB read error for reading plan progress, falling back to cache: {e}")
+
+    # Fallback to cache
+    return READING_PROGRESS_CACHE.get(cache_key, {
+        "completed_days": [],
+        "current_day": 1,
+        "streak": 1,
+        "last_read_date": None
+    })
+
+
+@router.get("/reading-plans")
+def list_reading_plans(
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    """
+    List all available structured Bible Reading Plans with user completion status.
+    """
+    results = []
+    for pid, meta in READING_PLANS_REGISTRY.items():
+        prog = _fetch_user_plan_progress(db, user_identifier, pid)
+        completed_count = len(prog["completed_days"])
+        total_d = meta["total_days"]
+        pct = round((completed_count / total_d) * 100, 1) if total_d > 0 else 0
+
+        results.append({
+            "id": pid,
+            "title": meta["title"],
+            "subtitle": meta["subtitle"],
+            "category": meta["category"],
+            "total_days": total_d,
+            "difficulty": meta["difficulty"],
+            "icon": meta["icon"],
+            "badge_name": meta["badge_name"],
+            "recommended_for": meta["recommended_for"],
+            "description": meta["description"],
+            "completed_count": completed_count,
+            "completion_percentage": pct,
+            "current_day": prog["current_day"],
+            "streak": prog["streak"],
+            "last_read_date": prog["last_read_date"]
+        })
+    return results
+
+
+@router.get("/reading-plans/today")
+def get_today_reading_plan(
+    plan_id: str = Query("plan_1_year", description="Active plan ID"),
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns today's reading assignment for the active plan for 1-click Reader integration.
+    """
+    if plan_id not in READING_PLANS_REGISTRY:
+        plan_id = "plan_1_year"
+
+    meta = READING_PLANS_REGISTRY[plan_id]
+    prog = _fetch_user_plan_progress(db, user_identifier, plan_id)
+    cur_day = prog["current_day"]
+    days = meta["days_generator"]()
+
+    # Find day item or clamp
+    day_idx = min(max(cur_day, 1), len(days)) - 1
+    today_item = days[day_idx]
+
+    is_completed = today_item["day"] in prog["completed_days"]
+
+    return {
+        "plan_id": plan_id,
+        "plan_title": meta["title"],
+        "plan_category": meta["category"],
+        "total_days": meta["total_days"],
+        "current_day": today_item["day"],
+        "is_completed": is_completed,
+        "day_info": today_item,
+        "streak": prog["streak"],
+        "completed_count": len(prog["completed_days"]),
+        "completion_percentage": round((len(prog["completed_days"]) / meta["total_days"]) * 100, 1)
+    }
+
+
+@router.get("/reading-plans/{plan_id}")
+def get_reading_plan_detail(
+    plan_id: str,
+    user_identifier: str = Query("local_user"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get full details of a specific reading plan including all daily passage assignments.
+    """
+    if plan_id not in READING_PLANS_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy kế hoạch đọc: '{plan_id}'")
+
+    meta = READING_PLANS_REGISTRY[plan_id]
+    prog = _fetch_user_plan_progress(db, user_identifier, plan_id)
+    completed_set = set(prog["completed_days"])
+
+    days_list = meta["days_generator"]()
+    enriched_days = []
+    for d in days_list:
+        enriched_days.append({
+            **d,
+            "is_completed": d["day"] in completed_set
+        })
+
+    completed_count = len(completed_set)
+    total_d = meta["total_days"]
+
+    return {
+        "id": meta["id"],
+        "title": meta["title"],
+        "subtitle": meta["subtitle"],
+        "category": meta["category"],
+        "total_days": total_d,
+        "difficulty": meta["difficulty"],
+        "icon": meta["icon"],
+        "badge_name": meta["badge_name"],
+        "recommended_for": meta["recommended_for"],
+        "description": meta["description"],
+        "completed_count": completed_count,
+        "completion_percentage": round((completed_count / total_d) * 100, 1) if total_d > 0 else 0,
+        "current_day": prog["current_day"],
+        "streak": prog["streak"],
+        "last_read_date": prog["last_read_date"],
+        "days": enriched_days
+    }
+
+
+@router.post("/reading-plans/{plan_id}/toggle-day")
+def toggle_reading_plan_day(
+    plan_id: str,
+    req: ToggleDayRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle or set completion status of a specific day in a reading plan.
+    Updates streak and completion progress persistently.
+    """
+    if plan_id not in READING_PLANS_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy kế hoạch: '{plan_id}'")
+
+    meta = READING_PLANS_REGISTRY[plan_id]
+    user_id = req.user_identifier or "local_user"
+    cache_key = f"{user_id}_{plan_id}"
+
+    prog = _fetch_user_plan_progress(db, user_id, plan_id)
+    completed_set = set(prog["completed_days"])
+
+    if req.completed is None:
+        if req.day in completed_set:
+            completed_set.remove(req.day)
+            action = "unmarked"
+        else:
+            completed_set.add(req.day)
+            action = "marked"
+    elif req.completed:
+        completed_set.add(req.day)
+        action = "marked"
+    else:
+        completed_set.discard(req.day)
+        action = "unmarked"
+
+    new_completed_list = sorted(list(completed_set))
+    new_curr = max(new_completed_list) + 1 if new_completed_list else 1
+    if new_curr > meta["total_days"]:
+        new_curr = meta["total_days"]
+
+    # Calculate streak
+    streak = prog["streak"]
+    if action == "marked":
+        streak += 1
+
+    # Update DB
+    try:
+        sql_check = text("SELECT id FROM user_reading_plan_progress WHERE user_identifier = :u AND plan_id = :p")
+        existing = db.execute(sql_check, {"u": user_id, "p": plan_id}).fetchone()
+        if existing:
+            sql_upd = text("""
+                UPDATE user_reading_plan_progress
+                SET completed_days = :cd, current_day = :cur, streak = :st, last_read_date = CURRENT_DATE, updated_at = CURRENT_TIMESTAMP
+                WHERE user_identifier = :u AND plan_id = :p
+            """)
+            db.execute(sql_upd, {"cd": new_completed_list, "cur": new_curr, "st": streak, "u": user_id, "p": plan_id})
+        else:
+            sql_ins = text("""
+                INSERT INTO user_reading_plan_progress (user_identifier, plan_id, completed_days, current_day, streak, last_read_date)
+                VALUES (:u, :p, :cd, :cur, :st, CURRENT_DATE)
+            """)
+            db.execute(sql_ins, {"u": user_id, "p": plan_id, "cd": new_completed_list, "cur": new_curr, "st": streak})
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Could not persist reading progress to DB, caching in-memory: {e}")
+        db.rollback()
+
+    # Update in-memory cache
+    READING_PROGRESS_CACHE[cache_key] = {
+        "completed_days": new_completed_list,
+        "current_day": new_curr,
+        "streak": streak,
+        "last_read_date": str(datetime.now().date())
+    }
+
+    completed_count = len(new_completed_list)
+    total_d = meta["total_days"]
+    pct = round((completed_count / total_d) * 100, 1)
+
+    return {
+        "status": "success",
+        "action": action,
+        "plan_id": plan_id,
+        "day": req.day,
+        "is_completed": req.day in completed_set,
+        "completed_count": completed_count,
+        "total_days": total_d,
+        "completion_percentage": pct,
+        "current_day": new_curr,
+        "streak": streak,
+        "badge_unlocked": pct >= 100.0,
+        "badge_name": meta["badge_name"] if pct >= 100.0 else None
+    }

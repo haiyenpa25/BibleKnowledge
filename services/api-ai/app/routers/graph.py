@@ -620,6 +620,121 @@ CONNECTIONS_DATA = [
         "theological_synthesis": "Ê-sai 53 là 'Chương Tin Lành thứ năm' chép trước hơn 700 năm, mô tả tường tận sự thương khó, im lặng trước kẻ kết án, chôn cùng người giàu (Giô-sép người A-ri-ma-thê) và sự tôn cao đắc thắng của Chúa Giê-xu.",
         "confidence_score": 1.0,
         "scholarly_source": "Bài Hát Về Người Đầy Tớ (Servant Songs) & Luận đề Chuộc Tội"
+    },
+    {
+        "id": "prophecy-virgin-birth",
+        "connection_type": "explicit",
+        "title": "Sinh Bởi Nữ Đồng Trinh (Em-ma-nu-ên) → Giáng Sinh Siêu Nhiên Của Đấng Christ",
+        "typology_theme": "Sự Giáng Sinh Siêu Nhiên Của Đấng Cứu Thế",
+        "ot_anchor_ref": "Ê-sai 7:14",
+        "ot_anchor_text": "Vậy nên, chính Chúa sẽ ban một điềm cho các ngươi: Nầy, một gái đồng trinh sẽ chịu thai, sanh một con trai, và đặt tên là Em-ma-nu-ên.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 1:22-23; Lu-ca 1:31-35",
+        "nt_fulfillment_text": "Mọi việc nầy đã xảy ra để cho ứng nghiệm lời Chúa đã phán bởi đấng tiên tri rằng: Nầy, một gái đồng trinh sẽ chịu thai, sanh một con trai, rồi người ta sẽ đặt tên con trai đó là Em-ma-nu-ên, nghĩa là: Đức Chúa Trời ở cùng chúng ta.",
+        "revelation_chain": [
+            "Sáng-thế Ký 3:15 (Lời hứa dòng dõi người nữ)",
+            "Ê-sai 7:14 (Nữ đồng trinh chịu thai sinh con trai Em-ma-nu-ên)",
+            "Ma-thi-ơ 1:18-25 (Ma-ri chịu thai bởi Đức Thánh Linh)",
+            "Lu-ca 1:34-35 (Thánh Linh sẽ ngự trên ngươi và quyền phép Đấng Rất Cao che phủ)"
+        ],
+        "theological_synthesis": "Đấng Cứu Thế phải hoàn toàn vô tội và siêu việt khỏi di truyền tội tổ tông A-đam, đồng thời là Đức Chúa Trời đích thân ngự giữa loài người để cứu rỗi nhân loại.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Khảo Luận Tiên Tri Ê-sai & Thần Học Nhục Thể Incarnation"
+    },
+    {
+        "id": "prophecy-birthplace-bethlehem",
+        "connection_type": "explicit",
+        "title": "Nơi Giáng Sinh Tại Bết-lê-hem Ép-ra-ta → Chúa Sinh Tại Thành Đa-vít",
+        "typology_theme": "Địa Điểm Giáng Sinh Theo Biên Niên Tiên Tri",
+        "ot_anchor_ref": "Mi-chê 5:2",
+        "ot_anchor_text": "Hỡi Bết-lê-hem Ép-ra-ta, ngươi ở trong hàng ngàn Giu-đa là nhỏ lắm, song từ nơi ngươi sẽ ra cho ta một Đấng cai trị trong Y-sơ-ra-ên, gốc tích của Ngài bởi từ đời xưa, từ trước vô cùng.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 2:1-6; Lu-ca 2:4-7",
+        "nt_fulfillment_text": "Khi Đức Chúa Giê-xu đã sanh tại thành Bết-lê-hem, xứ Giu-đê... Vì có lời của đấng tiên tri chép rằng: Hỡi Bết-lê-hem, đất Giu-đa, thật ngươi chẳng kém gì các thành lớn của xứ Giu-đa đâu; vì từ nơi ngươi sẽ ra một tướng, là Đấng chăn dân Y-sơ-ra-ên của ta.",
+        "revelation_chain": [
+            "Sáng-thế Ký 35:19 (Ê-phơ-rát tức là Bết-lê-hem)",
+            "Ru-tơ 4:11 (Nổi danh tại Bết-lê-hem)",
+            "Mi-chê 5:2 (Đấng cai trị đời xưa xuất thân từ Bết-lê-hem)",
+            "Lu-ca 2:4-7 (Giô-sép và Ma-ri từ Na-xa-rét về thành Bết-lê-hem làm kiểm tra dân số)",
+            "Ma-thi-ơ 2:5-6 (Các thầy thông giáo trích dẫn Mi-chê 5:2 ứng nghiệm)"
+        ],
+        "theological_synthesis": "Đấng Cai Trị Đời Đời giáng sinh tại 'Nhà Bánh' (Beth-lehem), một ngôi làng nhỏ bé khiêm nhường, làm trọn lời hứa quân vương đời đời dòng dõi Đa-vít.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Tiên Tri Nhỏ Mi-chê & Khảo Cứu Lịch Sử Giáng Sinh Tân Ước"
+    },
+    {
+        "id": "prophecy-triumphal-entry",
+        "connection_type": "explicit",
+        "title": "Vua Nhu Mì Cỡi Lừa Con Vào Giê-ru-sa-lem → Chúa Nhật Lễ Lá Khải Hoàn",
+        "typology_theme": "Vua Khiêm Nhường Của Sự Bình An",
+        "ot_anchor_ref": "Xa-cha-ri 9:9",
+        "ot_anchor_text": "Hỡi con gái Si-ôn, hãy mừng rỡ cả thể! Hỡi con gái Giê-ru-sa-lem, hãy trỗi tiếng reo vui! Nầy, Vua ngươi đến cùng ngươi. Ngài là công bình và ban sự cứu rỗi, nhu mì và cỡi lừa, tức là lừa con của lừa cái.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 21:4-9; Giăng 12:12-16",
+        "nt_fulfillment_text": "Mọi việc nầy xảy ra để ứng nghiệm lời đấng tiên tri: Hãy nói với con gái Si-ôn rằng: Nầy, Vua ngươi đến cùng ngươi, nhu mì, cỡi lừa, và lừa con của một con vật mang ách... Đoàn dân hô lớn: Hô-sa-na Con vua Đa-vít!",
+        "revelation_chain": [
+            "Sáng-thế Ký 49:11 (Buộc lừa con mình vào gốc nho)",
+            "Xa-cha-ri 9:9 (Vua công bình, nhu mì cỡi lừa con)",
+            "Thi-thiên 118:25-26 (Chúc tụng Đấng nhân danh Đức Giê-hô-va mà đến)",
+            "Ma-thi-ơ 21:4-9 (Chúa Giê-xu vào Giê-ru-sa-lem giữa tiếng reo Hô-sa-na)"
+        ],
+        "theological_synthesis": "Không như các hoàng đế trần gian cỡi chiến mã đại diện cho gươm giáo và áp bức, Đấng Mê-si-a vào đô thành thánh trên lưng lừa con hiền hòa, mang lại hòa bình và sự cứu chuộc cho toàn nhân loại.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Tiên Tri Xa-cha-ri & Tuần Lễ Thương Khó"
+    },
+    {
+        "id": "prophecy-pierced-crucifixion",
+        "connection_type": "explicit",
+        "title": "Bị Đâm Thủng Tay Chân & Bắt Thăm Áo → Thập Tự Giá Gô-gô-tha",
+        "typology_theme": "Chi Tiết Sự Đóng Đinh Được Báo Trước Hơn 1000 Năm",
+        "ot_anchor_ref": "Thi-thiên 22:1, 16-18; Xa-cha-ri 12:10",
+        "ot_anchor_text": "Đức Chúa Trời tôi ôi! Đức Chúa Trời tôi ôi! sao Ngài lìa bỏ tôi?... Chúng nó đã đâm lủng tay và chân tôi. Tôi có thể đếm các xương tôi. Chúng nó chia nhau áo xống tôi, và bắt thăm lấy áo dài tôi.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 27:35, 46; Giăng 19:23-24, 34-37",
+        "nt_fulfillment_text": "Đến giờ thứ chín, Đức Chúa Giê-xu kêu tiếng lớn rằng: Ê-li, Ê-li, lam-ma sa-bách-tha-ni? nghĩa là: Đức Chúa Trời tôi ôi, Đức Chúa Trời tôi ôi, sao Ngài lìa bỏ tôi?... Quân lính bắt thăm lấy áo Ngài để ứng nghiệm lời Kinh Thánh.",
+        "revelation_chain": [
+            "Thi-thiên 22:1-18 (Lời tiên tri tường tận về cái chết đóng đinh)",
+            "Xa-cha-ri 12:10 (Họ sẽ nhìn xem Ta là Đấng họ đã đâm)",
+            "Ma-thi-ơ 27:35-46 (Lời kêu trên thập tự và lính la-mã bắt thăm áo)",
+            "Giăng 19:34-37 (Lính lấy giáo đâm sườn Ngài chảy huyết và nước)"
+        ],
+        "theological_synthesis": "Thi Thiên 22 được Đa-vít viết khi hình phạt đóng đinh trên thập tự giá thậm chí chưa hề xuất hiện trong lịch sử nhân loại, là bằng chứng tiên tri chấn động về cái chết cứu chuộc của Đấng Christ.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Thi Thiên Đấng Mê-si & Khảo Chứng Thập Tự Giá"
+    },
+    {
+        "id": "prophecy-resurrection-incorruptible",
+        "connection_type": "explicit",
+        "title": "Thân Thể Không Thấy Sự Hư Nát → Sự Phục Sinh Ngày Thứ Ba",
+        "typology_theme": "Đắc Thắng Tử Thần & Sự Phục Sinh Thân Thể",
+        "ot_anchor_ref": "Thi-thiên 16:9-10; Hô-sê 6:2",
+        "ot_anchor_text": "Vì Chúa sẽ chẳng bỏ linh hồn tôi nơi âm phủ, cũng không để cho người thánh Chúa thấy sự hư nát.",
+        "nt_fulfillment_ref": "Công-vụ 2:25-32; 13:34-37; 1 Cô-rinh-tô 15:3-4",
+        "nt_fulfillment_text": "Đa-vít đã thấy trước và nói về sự sống lại của Đấng Christ rằng: Ngài không bị bỏ nơi âm phủ, và xác thịt Ngài chẳng thấy sự hư nát. Đức Chúa Giê-xu nầy, Đức Chúa Trời đã khiến sống lại, và chúng tôi thảy đều làm chứng về điều đó.",
+        "revelation_chain": [
+            "Thi-thiên 16:10 (Chẳng để người thánh thấy sự hư nát)",
+            "Hô-sê 6:2 (Đến ngày thứ ba Ngài sẽ dựng chúng ta dậy)",
+            "Ma-thi-ơ 28:5-6 (Ngài sống lại rồi như lời Ngài đã phán)",
+            "Công-vụ 2:27-31 (Bài giảng Ngũ Tuần của Phi-e-rơ luận chứng sự phục sinh)"
+        ],
+        "theological_synthesis": "Sự phục sinh không phải là một ý tưởng biểu tượng mà là biến cố lịch sử có bằng cớ không thể chối cãi. Đa-vít đã qua đời, chôn và mả ông còn lại, nhưng Chúa Giê-xu đã phục sinh thân thể khải hoàn để ban sự sống đời đời cho nhân loại.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Luận Chứng Phục Sinh & Bài Giảng Ngũ Tuần Công Vụ 2"
+    },
+    {
+        "id": "prophecy-betrayal-thirty-silver",
+        "connection_type": "explicit",
+        "title": "Bị Bán Với Giá Ba Mươi Miếng Bạc → Sự Phản Bội & Ruộng Thợ Gốm",
+        "typology_theme": "Giá Bán Của Nô Lệ & Ruộng Huyết",
+        "ot_anchor_ref": "Xa-cha-ri 11:12-13; Thi-thiên 41:9",
+        "ot_anchor_text": "Họ bèn cân ba mươi miếng bạc làm tiền công cho ta. Đức Giê-hô-va phán cùng ta rằng: Hãy ném giá sang trọng ấy... cho thợ gốm. Ta bèn lấy ba mươi miếng bạc ném vào nhà Đức Giê-hô-va cho thợ gốm.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 26:14-16; 27:3-10",
+        "nt_fulfillment_text": "Giu-đa hỏi: Các thầy bằng lòng trả cho tôi bao nhiêu để tôi nộp người?... Họ cân cho ba mươi miếng bạc... Khi ăn năn, Giu-đa ném bạc vào đền thờ rồi đi thắt cổ. Các thầy tế lễ bèn dùng bạc ấy mua Ruộng Thợ Gốm làm nơi chôn người ngụ cư.",
+        "revelation_chain": [
+            "Thi-thiên 41:9 (Người bạn quen thân cùng ăn bánh giở gót nghịch cùng tôi)",
+            "Xa-cha-ri 11:12-13 (Giá ba mươi miếng bạc ném cho thợ gốm trong nhà Đức Chúa Trời)",
+            "Ma-thi-ơ 26:14-15 (Giu-đa ngã giá 30 miếng bạc)",
+            "Ma-thi-ơ 27:3-10 (Ứng nghiệm sự mua ruộng thợ gốm)"
+        ],
+        "theological_synthesis": "30 miếng bạc là giá tiền bồi thường cho một người nô lệ bị bò húc theo luật Môi-se (Xuất 21:32). Sự ứng nghiệm kinh ngạc từ số lượng tiền bạc, việc ném vào đền thờ đến việc dùng tiền mua ruộng người thợ gốm chứng minh quyền tể trị tuyệt đối của Đức Chúa Trời trên lịch sử.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Khảo Cứu Tiên Tri Xa-cha-ri & Bi Kịch Giu-đa"
     }
 ]
 
@@ -652,4 +767,48 @@ def get_cross_bible_connections(
         ]
 
     return results[:limit]
+
+
+@router.get("/prophecies")
+def get_messianic_prophecies_matrix(
+    theme: Optional[str] = Query(None, description="Theme filter keyword, e.g. 'Giáng Sinh', 'Thương Khó', 'Phục Sinh'"),
+    search: Optional[str] = Query(None, description="Search keyword"),
+    limit: int = Query(30, ge=1, le=100)
+):
+    """
+    §18, §45 — Returns the comprehensive Old Testament Prophecy ↔ New Testament Fulfillment Matrix.
+    Provides structured comparative data between prophetic foretelling and historical apostolic fulfillment.
+    """
+    results = CONNECTIONS_DATA
+
+    if theme and theme != "all":
+        t = theme.lower()
+        results = [c for c in results if t in c["typology_theme"].lower() or t in c["title"].lower()]
+
+    if search:
+        s = search.lower()
+        results = [
+            c for c in results
+            if s in c["title"].lower()
+            or s in c["typology_theme"].lower()
+            or s in c["ot_anchor_ref"].lower()
+            or s in c["nt_fulfillment_ref"].lower()
+            or s in c["ot_anchor_text"].lower()
+            or s in c["nt_fulfillment_text"].lower()
+            or s in c["theological_synthesis"].lower()
+        ]
+
+    return {
+        "total_connections": len(results),
+        "categories": [
+            "Tất Cả",
+            "Giáng Sinh & Nhập Thể",
+            "Chức Vụ & Đấng Chăn Chiên",
+            "Thương Khó & Thập Tự Giá",
+            "Phục Sinh & Vinh Hiển",
+            "Giao Ước & Thầy Tế Lễ"
+        ],
+        "prophecies": results[:limit]
+    }
+
 

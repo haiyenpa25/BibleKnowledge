@@ -281,15 +281,21 @@ async function main() {
   let flashcardsExportOk = false;
   let sermonPresetsCount = 0;
   let studyBundleExportOk = false;
+  let readingPlansCount = 0;
+  let memorizeVersesCount = 0;
+  let propheciesCount = 0;
 
   try {
-    const [hRes, jRes, cpRes, feRes, spRes, sbRes] = await Promise.all([
+    const [hRes, jRes, cpRes, feRes, spRes, sbRes, rpRes, mvRes, prRes] = await Promise.all([
       fetch('http://localhost:8000/api/bible/harmony-events', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/graph/journeys', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/learn/challenge-packs', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/learn/flashcards/export?format=anki', { signal: AbortSignal.timeout(4000) }),
       fetch('http://localhost:8000/api/study/sermon-presets', { signal: AbortSignal.timeout(4000) }),
-      fetch('http://localhost:8000/api/study/export-bundle', { signal: AbortSignal.timeout(4000) })
+      fetch('http://localhost:8000/api/study/export-bundle', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/bible/reading-plans', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/learn/memorize-verses', { signal: AbortSignal.timeout(4000) }),
+      fetch('http://localhost:8000/api/graph/prophecies', { signal: AbortSignal.timeout(4000) })
     ]);
     if (hRes.ok) {
       const hData = await hRes.json();
@@ -316,8 +322,20 @@ async function main() {
     if (sbRes.ok) {
       studyBundleExportOk = true;
     }
+    if (rpRes.ok) {
+      const rpData = await rpRes.json();
+      readingPlansCount = Array.isArray(rpData) ? rpData.length : 0;
+    }
+    if (mvRes.ok) {
+      const mvData = await mvRes.json();
+      memorizeVersesCount = Array.isArray(mvData) ? mvData.length : 0;
+    }
+    if (prRes.ok) {
+      const prData = await prRes.json();
+      propheciesCount = prData.total_connections || (Array.isArray(prData.prophecies) ? prData.prophecies.length : 0);
+    }
   } catch (e) {
-    warnings.push(`Không thể kiểm tra /api/bible/harmony-events hoặc study/sermon endpoints: ${e.message}`);
+    warnings.push(`Không thể kiểm tra một số endpoints mở rộng: ${e.message}`);
   }
 
   if (journeysCount < 9) {
@@ -328,6 +346,15 @@ async function main() {
   }
   if (sermonPresetsCount < 4) {
     warnings.push(`Số mẫu bài giảng giải kinh là ${sermonPresetsCount} (kỳ vọng ít nhất 4 mẫu).`);
+  }
+  if (readingPlansCount < 5) {
+    warnings.push(`Số kế hoạch đọc Kinh Thánh là ${readingPlansCount} (kỳ vọng ít nhất 5 kế hoạch).`);
+  }
+  if (memorizeVersesCount < 12) {
+    warnings.push(`Số câu ghi nhớ Kinh Thánh là ${memorizeVersesCount} (kỳ vọng ít nhất 12 câu).`);
+  }
+  if (propheciesCount < 14) {
+    warnings.push(`Số lời tiên tri Đấng Mê-si-a là ${propheciesCount} (kỳ vọng ít nhất 14 mục).`);
   }
 
   try {
@@ -472,11 +499,14 @@ async function main() {
   console.log(`   • Xuất Sổ tay nghiên cứu:  ${studyBundleExportOk ? '✔ Sẵn sàng (.MD / Bundle)' : '✖ Lỗi'} (§48, §50)`);
   console.log(`   • Từ vựng Strong Hy-Hê:    ${strongCount} mục từ nguyên ngữ`);
   console.log(`   • Hồ sơ Nghiên Cứu Lớn:    ${studyProjectsCount} dự án chuyên sâu`);
+  console.log(`   • Kế hoạch đọc Kinh Thánh: ${readingPlansCount} lộ trình có hệ thống (§3, §46) ${readingPlansCount >= 5 ? '✔' : '⚠'}`);
+  console.log(`   • Học thuộc lòng câu gốc:  ${memorizeVersesCount} câu có che chữ & tính điểm (§3, §4) ${memorizeVersesCount >= 12 ? '✔' : '⚠'}`);
   console.log('');
 
   // 6. Gospel Harmony, Citations & Journeys
   console.log('6. ĐỐI CHIẾU SONG SONG & HÀNH TRÌNH ĐỊA LÝ (HARMONY, CARTOGRAPHY & CITATIONS)');
   console.log(`   • Sự kiện đối chiếu:      ${harmonyEventsCount} đại sự kiện (${totalHarmonyPassages} phân đoạn song song) ✔`);
+  console.log(`   • Ma trận tiên tri Mê-si: ${propheciesCount} lời tiên tri & ứng nghiệm Tân Ước (§18, §45) ${propheciesCount >= 14 ? '✔' : '⚠'}`);
   console.log(`   • Hành trình Kinh Thánh:  ${journeysCount} tuyến hành trình tương tác (§9) ${journeysCount >= 9 ? '✔' : '⚠'}`);
   console.log(`   • Tuyển tập tác giả:      ${authorsCount} tác giả thần học kinh điển ✔`);
   console.log(`   • Bộ ấn phẩm đa tập:      ${seriesCount} bộ sách lớn (TOTC, TNTC, Wiersbe, IVP...) ✔`);
