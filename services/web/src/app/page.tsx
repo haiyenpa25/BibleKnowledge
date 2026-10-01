@@ -186,7 +186,13 @@ export default function Home() {
               href="/bible"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30"
             >
-              <BookOpen className="w-4 h-4" /> Đọc Kinh Thánh 1925 (66 Sách) →
+              <BookOpen className="w-4 h-4" /> Đọc Kinh Thánh (66 Sách) →
+            </a>
+            <a 
+              href="/research"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
+            >
+              <BrainCircuit className="w-4 h-4" /> Nghiên Cứu Thần Học AI (RAG) →
             </a>
             <a 
               href="http://localhost:8000/docs" 
@@ -196,10 +202,6 @@ export default function Home() {
             >
               <Server className="w-4 h-4" /> FastAPI Swagger Docs <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </a>
-            <div className="px-4 py-2.5 rounded-xl glass-card text-xs text-slate-300 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              31.081 câu kinh văn trong PostgreSQL + pgvector
-            </div>
           </div>
         </div>
       </section>
@@ -232,21 +234,23 @@ export default function Home() {
           </div>
 
           {/* Layer 2: Explore */}
-          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-blue-500">
+          <a href="/bible" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-blue-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3">
                 <BookOpen className="w-5 h-5" />
               </div>
               <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Tầng 2</div>
-              <h4 className="text-lg font-bold text-white mt-1">Khám Phá (Explore)</h4>
+              <h4 className="text-lg font-bold text-white mt-1 group-hover:text-blue-300 transition-colors flex items-center justify-between">
+                Khám Phá (Explore) <span>→</span>
+              </h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Trình đọc Kinh Thánh Bản dịch 1925, Bản đồ không gian Thánh địa, Dòng thời gian lịch sử đa tầng từ Cựu Ước đến Tân Ước.
               </p>
             </div>
-            <div className="pt-3 border-t border-slate-800 text-xs text-slate-400 font-medium">
-              66 Sách • 1.189 Đoạn • 31.081 Câu
+            <div className="pt-3 border-t border-slate-800 text-xs text-blue-400/80 font-medium">
+              66 Sách • 1.189 Đoạn • 31.081 Câu →
             </div>
-          </div>
+          </a>
 
           {/* Layer 3: Connect */}
           <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-indigo-500">
@@ -266,21 +270,23 @@ export default function Home() {
           </div>
 
           {/* Layer 4: Research */}
-          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500">
+          <a href="/research" className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500 hover:border-slate-600 transition-all hover:translate-y-[-2px] group">
             <div>
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
                 <BrainCircuit className="w-5 h-5" />
               </div>
               <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Tầng 4</div>
-              <h4 className="text-lg font-bold text-white mt-1">Nghiên Cứu (Research)</h4>
+              <h4 className="text-lg font-bold text-white mt-1 group-hover:text-emerald-300 transition-colors flex items-center justify-between">
+                Nghiên Cứu (Research) <span>→</span>
+              </h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Trợ lý AI RAG bản địa với mô hình Qwen, Embeddings BGE-M3 1024D, tra cứu ngữ nghĩa sâu sắc từ 275 nguồn thần học đáng tin cậy.
               </p>
             </div>
-            <div className="pt-3 border-t border-slate-800 text-xs text-slate-400 font-medium">
-              Grounded AI • Không ảo giác
+            <div className="pt-3 border-t border-slate-800 text-xs text-emerald-400/80 font-medium">
+              Grounded AI • 275 Nguồn Sách →
             </div>
-          </div>
+          </a>
         </div>
       </section>
 
