@@ -1446,6 +1446,7 @@ SERMON_PRESETS: List[SermonPreset] = [
 
 
 @router.get("/sermon-presets", response_model=List[SermonPreset])
+@router.get("/sermon-templates", response_model=List[SermonPreset])
 def get_sermon_presets():
     """Retrieve pre-configured classical expository sermon blueprints (§50)."""
     return SERMON_PRESETS
@@ -1861,5 +1862,38 @@ def export_project_as_sermon(project_id: str, db: Session = Depends(get_db)):
         "title": r.title,
         "markdown_manuscript": "\n".join(lines)
     }
+
+
+# ==============================================================================
+# ALIASES FOR ROADMAP COMPATIBILITY (§9, §18, §45, §50)
+# ==============================================================================
+
+@router.get("/harmony")
+def get_gospel_harmony(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None)
+):
+    """Parallel Gospels & OT/NT synopsis matrix."""
+    from app.routers.bible import list_harmony_events
+    return list_harmony_events(category=category, search=search)
+
+
+@router.get("/prophecies")
+def get_messianic_prophecies(
+    theme: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(30)
+):
+    """Typology & Messianic Prophecy Fulfillment Matrix."""
+    from app.routers.graph import get_messianic_prophecies_matrix
+    return get_messianic_prophecies_matrix(theme=theme, search=search, limit=limit)
+
+
+@router.get("/journeys")
+def get_biblical_journeys():
+    """Interactive biblical cartography and geospatial expeditions."""
+    from app.routers.graph import list_biblical_journeys
+    return list_biblical_journeys()
+
 
 

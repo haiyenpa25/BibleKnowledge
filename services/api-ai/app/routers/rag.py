@@ -2008,6 +2008,7 @@ CONTEXT_PRESETS_DATA = [
 
 
 @router.get("/context-preset-options", response_model=List[ContextPresetOption])
+@router.get("/context-presets", response_model=List[ContextPresetOption])
 def get_context_preset_options():
     """
     Returns available pre-configured deep multi-dimensional context studies (§15).

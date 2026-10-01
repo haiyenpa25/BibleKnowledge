@@ -74,6 +74,37 @@ def list_books(db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/books/{code}")
+def get_book_details(code: str, db: Session = Depends(get_db)):
+    """Get metadata for a specific book by code, osis or name."""
+    clean = code.strip().lower()
+    sql_book = text("""
+        SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+        FROM bible_books
+        WHERE LOWER(code) = :c OR LOWER(osis) = :c OR LOWER(name_vi) = :c OR LOWER(name_en) = :c
+        LIMIT 1
+    """)
+    book_row = db.execute(sql_book, {"c": clean}).fetchone()
+    if not book_row:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy sách: '{code}'")
+    return {
+        "id": book_row.id,
+        "testament": book_row.testament,
+        "order": book_row.book_order,
+        "code": book_row.code,
+        "osis": book_row.osis,
+        "name_vi": book_row.name_vi,
+        "name_en": book_row.name_en,
+        "total_chapters": book_row.total_chapters
+    }
+
+
+@router.get("/books/{code}/chapters/{chapter}")
+def get_chapter_by_path(code: str, chapter: int, db: Session = Depends(get_db)):
+    """RESTful path endpoint to get all verses for a book chapter."""
+    return get_chapter(book=code, chapter=chapter, db=db)
+
+
 @router.get("/chapter")
 def get_chapter(
     book: str = Query(..., description="Book code, OSIS, or name (e.g. 'sa', 'Gen', 'Sáng-thế Ký')"),
@@ -143,6 +174,7 @@ def get_chapter(
 
 
 @router.get("/verse-range")
+@router.get("/passage")
 def get_verse_range(
     ref: str = Query(..., description="Scripture reference (e.g. 'Giăng 3:16', 'Giăng 3:16-18', 'Ma-thi-ơ 14:22 - 15:5')"),
     db: Session = Depends(get_db)
