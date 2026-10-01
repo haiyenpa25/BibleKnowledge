@@ -845,6 +845,56 @@ def get_concordance(
     ot_count = next((r.cnt for r in count_rows if r.testament == "OT"), 0)
     nt_count = next((r.cnt for r in count_rows if r.testament == "NT"), 0)
 
+    # Get distribution across individual books
+    book_sql = text("""
+        SELECT b.name_vi, count(v.id) as cnt
+        FROM bible_verses v
+        JOIN bible_books b ON v.book_id = b.id
+        WHERE v.text ILIKE :pat
+        GROUP BY b.book_order, b.name_vi
+        ORDER BY cnt DESC
+        LIMIT 6;
+    """)
+    book_rows = db.execute(book_sql, {"pat": f"%{clean_kw}%"}).fetchall()
+    book_distribution = [{"book": r.name_vi, "count": r.cnt} for r in book_rows]
+
+    # Related Strong words map (§14)
+    RELATED_LEXICON_MAP = {
+        "G4102": [
+            {"strong_number": "G4100", "lemma": "πιστεύω", "transliteration": "pisteuo", "definition": "Tin, phó thác, nương cậy"},
+            {"strong_number": "G4103", "lemma": "πιστός", "transliteration": "pistos", "definition": "Trung tín, đáng tin cậy"},
+            {"strong_number": "H0539", "lemma": "אָמַן", "transliteration": "aman", "definition": "Vững bền, xác quyết (A-men)"}
+        ],
+        "G0026": [
+            {"strong_number": "G0025", "lemma": "ἀγαπάω", "transliteration": "agapao", "definition": "Yêu thương bằng ý chí và sự hy sinh"},
+            {"strong_number": "G5368", "lemma": "φιλέω", "transliteration": "phileo", "definition": "Yêu mến, tình bằng hữu trìu mến"},
+            {"strong_number": "H2617", "lemma": "חֶסֶד", "transliteration": "chesed", "definition": "Tình yêu thành tín giao ước"}
+        ],
+        "G5485": [
+            {"strong_number": "G5463", "lemma": "χαίρω", "transliteration": "chairo", "definition": "Vui mừng, hân hoan"},
+            {"strong_number": "H2580", "lemma": "חֵן", "transliteration": "chen", "definition": "Ơn huệ, sự đoái hoài dịu dàng"}
+        ],
+        "H7965": [
+            {"strong_number": "H7999", "lemma": "שָׁלַם", "transliteration": "shalam", "definition": "Làm cho trọn vẹn, hòa giải, đền bù"},
+            {"strong_number": "G1515", "lemma": "εἰρήνη", "transliteration": "eirene", "definition": "Sự bình an, hòa thuận thiêng liêng"}
+        ],
+        "G4991": [
+            {"strong_number": "G4982", "lemma": "σῴζω", "transliteration": "sozo", "definition": "Cứu rỗi, giải cứu, chữa lành"},
+            {"strong_number": "H3444", "lemma": "יְשׁוּעָה", "transliteration": "yeshuah", "definition": "Sự cứu rỗi (Gốc tên Chúa Giê-xu)"}
+        ]
+    }
+
+    sn_key = lex_info.get("strong_number", "") if lex_info else ""
+    related_words = RELATED_LEXICON_MAP.get(sn_key, [])
+
+    theological_summary = ""
+    if sn_key == "G4102":
+        theological_summary = "Pistis (Đức tin) trong Tân Ước không đơn thuần là sự đồng thuận lý trí mà là sự dâng hiến trọn vẹn của con người bề trong đối với Đấng Christ. Trọng tâm của sự cứu rỗi duy bởi đức tin (Sola Fide)."
+    elif sn_key == "G0026":
+        theological_summary = "Agapē là tình yêu tự nguyện, vô điều kiện và hy sinh tối thượng, bắt nguồn từ chính bản tính thánh khiết của Đức Chúa Trời và được bày tỏ trọn vẹn nơi thập tự giá."
+    elif sn_key == "H7965":
+        theological_summary = "Shalom trong tư tưởng Kinh Thánh Cựu Ước vượt xa sự vắng bóng xung đột; đó là sự trọn vẹn, thịnh vượng tâm linh, công bình và hòa thuận hoàn hảo trong mối quan hệ với Đức Chúa Trời."
+
     # Get sample verses
     verses_sql = text(f"""
         SELECT v.id, v.verse_code, b.name_vi as book_name, b.code as book_code,
@@ -861,11 +911,14 @@ def get_concordance(
         "search_term": search_term,
         "clean_keyword": clean_kw,
         "lexicon_info": lex_info,
+        "related_words": related_words,
+        "theological_summary": theological_summary,
         "distribution": {
             "old_testament": ot_count,
             "new_testament": nt_count,
             "total_matches": ot_count + nt_count
         },
+        "book_distribution": book_distribution,
         "verses": [
             {
                 "global_id": r.id,

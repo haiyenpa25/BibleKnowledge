@@ -260,11 +260,22 @@ interface ConcordanceData {
     transliteration: string;
     definition: string;
   };
+  related_words?: Array<{
+    strong_number: string;
+    lemma: string;
+    transliteration: string;
+    definition: string;
+  }>;
+  theological_summary?: string;
   distribution: {
     old_testament: number;
     new_testament: number;
     total_matches: number;
   };
+  book_distribution?: Array<{
+    book: string;
+    count: number;
+  }>;
   verses: ConcordanceVerse[];
 }
 
@@ -1553,26 +1564,94 @@ export default function ResearchPage() {
                     </div>
                   ) : concordanceData ? (
                     <div className="flex flex-col gap-6">
-                      {/* Distribution Stat */}
-                      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <BarChart3 className="w-5 h-5 text-cyan-400" />
-                          <div>
-                            <span className="text-xs font-bold text-slate-200">Phân Phối Toàn Cảnh Trong Kinh Thánh</span>
-                            <p className="text-[11px] text-slate-400">Từ khóa đối chiếu: &ldquo;{concordanceData.clean_keyword}&rdquo;</p>
+                      {/* Theological Semantic Summary (§14) */}
+                      {concordanceData.theological_summary && (
+                        <div className="p-5 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 flex flex-col gap-2 shadow-md">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-cyan-400" />
+                            <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                              Ý Nghĩa Thần Học Toàn Cảnh (Theological Semantic Range §14)
+                            </span>
+                          </div>
+                          <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                            {concordanceData.theological_summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Related Strong Roots Cluster (§14) */}
+                      {concordanceData.related_words && concordanceData.related_words.length > 0 && (
+                        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2.5">
+                          <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5" /> Các Căn Ngữ Liên Hệ Trọng Yếu (Related Roots):
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {concordanceData.related_words.map((rw) => (
+                              <button
+                                key={rw.strong_number}
+                                type="button"
+                                onClick={() => {
+                                  handleLookupConcordance(rw.strong_number, rw.lemma, rw.definition);
+                                }}
+                                className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/40 text-left transition-all flex flex-col gap-0.5 group"
+                              >
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="font-mono font-bold text-cyan-400 group-hover:text-cyan-300">
+                                    {rw.strong_number}
+                                  </span>
+                                  <span className="text-slate-500 italic">{rw.transliteration}</span>
+                                </div>
+                                <span className="font-serif text-sm font-bold text-white group-hover:text-cyan-200">
+                                  {rw.lemma}
+                                </span>
+                                <span className="text-[10px] text-slate-400 line-clamp-1">{rw.definition}</span>
+                              </button>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-bold">
-                          <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            Cựu Ước (OT): {concordanceData.distribution.old_testament} câu
-                          </span>
-                          <span className="px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                            Tân Ước (NT): {concordanceData.distribution.new_testament} câu
-                          </span>
-                          <span className="px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                            Tổng cộng: {concordanceData.distribution.total_matches}
-                          </span>
+                      )}
+
+                      {/* Distribution Stat & Book Breakdown */}
+                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <BarChart3 className="w-5 h-5 text-cyan-400" />
+                            <div>
+                              <span className="text-xs font-bold text-slate-200">Phân Phối Toàn Cảnh Trong Kinh Thánh</span>
+                              <p className="text-[11px] text-slate-400">Từ khóa đối chiếu: &ldquo;{concordanceData.clean_keyword}&rdquo;</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                            <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Cựu Ước (OT): {concordanceData.distribution.old_testament} câu
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              Tân Ước (NT): {concordanceData.distribution.new_testament} câu
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                              Tổng cộng: {concordanceData.distribution.total_matches}
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Top Books Distribution */}
+                        {concordanceData.book_distribution && concordanceData.book_distribution.length > 0 && (
+                          <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
+                            <span className="text-[11px] text-slate-400 font-medium">Xuất hiện nhiều nhất trong các sách:</span>
+                            <div className="flex flex-wrap gap-2">
+                              {concordanceData.book_distribution.map((b, bIdx) => (
+                                <span
+                                  key={bIdx}
+                                  className="px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-center gap-1.5"
+                                >
+                                  <span className="text-cyan-400 font-bold">•</span>
+                                  <span>{b.book}:</span>
+                                  <span className="font-mono text-cyan-300 font-bold">{b.count} câu</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Matching Verses List */}
