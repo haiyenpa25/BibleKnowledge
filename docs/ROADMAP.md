@@ -115,4 +115,5 @@
 - [x] Bidirectional Entity Pinning into Study Projects (§50) bridging Knowledge Graph nodes into research workspaces.
 - [x] Interactive Cross-Reference Network Visualizer & Redemptive History Chains (§18) with SVG graph, concentric OT/NT orbits, node inspector, and 8 redemptive trajectories.
 - [x] Community Sermon Sharing & 3-Dimensional Peer Review Workflows (Roadmap Horizon Item 4) with hermeneutical fidelity, homiletical clarity, and pastoral application scoring.
-- [ ] Collaborative real-time multi-pastor study group notes.
+- [x] Collaborative Multi-Pastor Study Groups & Cohorts (Roadmap Horizon Item 5) with ministerial cohorts, exegesis insight threads, threaded comments, upvoting, and Markdown minutes export.
+

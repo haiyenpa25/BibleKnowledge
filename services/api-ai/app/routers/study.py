@@ -263,6 +263,73 @@ class CommunitySermonDetail(BaseModel):
     reviews: List[PeerReviewItem]
 
 
+class StudyGroupCreate(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = ""
+    leader_name: str = Field(..., max_length=120)
+    leader_role: Optional[str] = Field("Mục sư Quản nhiệm", max_length=100)
+    scripture_focus: Optional[str] = Field("Rô-ma 8:1-39", max_length=100)
+    meeting_schedule: Optional[str] = Field("Tối Thứ Tư 19:30", max_length=150)
+    tags: Optional[List[str]] = []
+
+
+class StudyGroupSummary(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    leader_name: str
+    leader_role: str
+    scripture_focus: Optional[str]
+    meeting_schedule: Optional[str]
+    members_count: int
+    notes_count: int
+    tags: List[str]
+    created_at: str
+
+
+class StudyGroupCommentCreate(BaseModel):
+    author_name: str = Field(..., max_length=120)
+    author_role: Optional[str] = Field("Thành viên", max_length=100)
+    text: str = Field(..., min_length=1)
+
+
+class StudyGroupNoteCreate(BaseModel):
+    author_name: str = Field(..., max_length=120)
+    author_role: Optional[str] = Field("Thành viên", max_length=100)
+    title: str = Field(..., max_length=255)
+    scripture_ref: Optional[str] = ""
+    content: str
+    insight_type: Optional[str] = "exegesis"
+
+
+class StudyGroupNoteItem(BaseModel):
+    id: str
+    group_id: str
+    author_name: str
+    author_role: str
+    title: str
+    scripture_ref: Optional[str]
+    content: str
+    insight_type: str
+    likes_count: int
+    comments: List[Dict[str, Any]]
+    created_at: str
+
+
+class StudyGroupDetail(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    leader_name: str
+    leader_role: str
+    scripture_focus: Optional[str]
+    meeting_schedule: Optional[str]
+    members_count: int
+    tags: List[str]
+    created_at: str
+    notes: List[StudyGroupNoteItem]
+
+
 # ==============================================================================
 # 1. Strong Lexicon Endpoints (Original Languages)
 # ==============================================================================
@@ -2236,6 +2303,365 @@ def submit_sermon_peer_review(
         review_comment=req.review_comment,
         created_at=now.isoformat()
     )
+
+
+# ==============================================================================
+# 9. Collaborative Multi-Pastor Study Groups & Notes (Horizon Item 5)
+# ==============================================================================
+
+@router.get("/groups", response_model=List[StudyGroupSummary])
+def list_study_groups(
+    search: Optional[str] = Query(None, description="Search by name, leader, or scripture focus"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    List collaborative study groups / cohorts with note counts.
+    """
+    query_str = """
+        SELECT 
+            g.id, g.name, g.description, g.leader_name, g.leader_role,
+            g.scripture_focus, g.meeting_schedule, g.members_count,
+            g.tags, g.created_at,
+            COUNT(n.id) as notes_count
+        FROM study_groups g
+        LEFT JOIN study_group_notes n ON g.id = n.group_id
+        WHERE 1=1
+    """
+    params: dict = {"limit": limit, "offset": offset}
+
+    if search:
+        query_str += " AND (g.name ILIKE :search OR g.leader_name ILIKE :search OR g.scripture_focus ILIKE :search)"
+        params["search"] = f"%{search.strip()}%"
+
+    if tag:
+        query_str += " AND CAST(g.tags AS text) ILIKE :tag"
+        params["tag"] = f"%{tag.strip()}%"
+
+    query_str += " GROUP BY g.id ORDER BY g.created_at DESC LIMIT :limit OFFSET :offset"
+
+    rows = db.execute(text(query_str), params).fetchall()
+    results = []
+    for r in rows:
+        tags = r[8] if isinstance(r[8], list) else (json.loads(r[8]) if isinstance(r[8], str) else [])
+        results.append(StudyGroupSummary(
+            id=r[0],
+            name=r[1],
+            description=r[2],
+            leader_name=r[3],
+            leader_role=r[4] or "Mục sư Quản nhiệm",
+            scripture_focus=r[5],
+            meeting_schedule=r[6],
+            members_count=r[7] or 1,
+            notes_count=int(r[10] or 0),
+            tags=tags,
+            created_at=r[9].isoformat() if hasattr(r[9], 'isoformat') else str(r[9])
+        ))
+    return results
+
+
+@router.post("/groups", response_model=StudyGroupSummary)
+def create_study_group(
+    req: StudyGroupCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new collaborative study group.
+    """
+    new_id = f"group-{uuid4().hex[:10]}"
+    now = datetime.utcnow()
+    tags_json = json.dumps(req.tags or [])
+
+    db.execute(
+        text("""
+            INSERT INTO study_groups (
+                id, name, description, leader_name, leader_role,
+                scripture_focus, meeting_schedule, members_count, tags,
+                created_at, updated_at
+            ) VALUES (
+                :id, :name, :description, :leader_name, :leader_role,
+                :scripture_focus, :meeting_schedule, 1, CAST(:tags AS jsonb),
+                :created_at, :updated_at
+            )
+        """),
+        {
+            "id": new_id,
+            "name": req.name,
+            "description": req.description or "",
+            "leader_name": req.leader_name,
+            "leader_role": req.leader_role or "Mục sư Quản nhiệm",
+            "scripture_focus": req.scripture_focus or "",
+            "meeting_schedule": req.meeting_schedule or "",
+            "tags": tags_json,
+            "created_at": now,
+            "updated_at": now
+        }
+    )
+    db.commit()
+
+    return StudyGroupSummary(
+        id=new_id,
+        name=req.name,
+        description=req.description,
+        leader_name=req.leader_name,
+        leader_role=req.leader_role or "Mục sư Quản nhiệm",
+        scripture_focus=req.scripture_focus,
+        meeting_schedule=req.meeting_schedule,
+        members_count=1,
+        notes_count=0,
+        tags=req.tags or [],
+        created_at=now.isoformat()
+    )
+
+
+@router.get("/groups/{group_id}", response_model=StudyGroupDetail)
+def get_study_group_detail(
+    group_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get full study group profile and collaborative notes.
+    """
+    g = db.execute(
+        text("SELECT id, name, description, leader_name, leader_role, scripture_focus, meeting_schedule, members_count, tags, created_at FROM study_groups WHERE id = :id"),
+        {"id": group_id}
+    ).fetchone()
+
+    if not g:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nhóm học Kinh Thánh.")
+
+    tags = g[8] if isinstance(g[8], list) else (json.loads(g[8]) if isinstance(g[8], str) else [])
+
+    note_rows = db.execute(
+        text("""
+            SELECT id, group_id, author_name, author_role, title, scripture_ref,
+                   content, insight_type, likes_count, comments, created_at
+            FROM study_group_notes
+            WHERE group_id = :gid
+            ORDER BY created_at DESC
+        """),
+        {"gid": group_id}
+    ).fetchall()
+
+    notes = []
+    for nr in note_rows:
+        comments = nr[9] if isinstance(nr[9], list) else (json.loads(nr[9]) if isinstance(nr[9], str) else [])
+        notes.append(StudyGroupNoteItem(
+            id=nr[0],
+            group_id=nr[1],
+            author_name=nr[2],
+            author_role=nr[3] or "Thành viên",
+            title=nr[4],
+            scripture_ref=nr[5],
+            content=nr[6],
+            insight_type=nr[7] or "exegesis",
+            likes_count=nr[8] or 0,
+            comments=comments,
+            created_at=nr[10].isoformat() if hasattr(nr[10], 'isoformat') else str(nr[10])
+        ))
+
+    return StudyGroupDetail(
+        id=g[0],
+        name=g[1],
+        description=g[2],
+        leader_name=g[3],
+        leader_role=g[4] or "Mục sư Quản nhiệm",
+        scripture_focus=g[5],
+        meeting_schedule=g[6],
+        members_count=g[7] or 1,
+        tags=tags,
+        created_at=g[9].isoformat() if hasattr(g[9], 'isoformat') else str(g[9]),
+        notes=notes
+    )
+
+
+@router.post("/groups/{group_id}/notes", response_model=StudyGroupNoteItem)
+def create_study_group_note(
+    group_id: str,
+    req: StudyGroupNoteCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Contribute a collaborative study note to the group.
+    """
+    g_exists = db.execute(text("SELECT id FROM study_groups WHERE id = :id"), {"id": group_id}).fetchone()
+    if not g_exists:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nhóm học.")
+
+    new_id = f"gnote-{uuid4().hex[:10]}"
+    now = datetime.utcnow()
+
+    db.execute(
+        text("""
+            INSERT INTO study_group_notes (
+                id, group_id, author_name, author_role, title,
+                scripture_ref, content, insight_type, likes_count,
+                comments, created_at, updated_at
+            ) VALUES (
+                :id, :gid, :author, :role, :title,
+                :ref, :content, :itype, 0,
+                CAST('[]' AS jsonb), :created_at, :updated_at
+            )
+        """),
+        {
+            "id": new_id,
+            "gid": group_id,
+            "author": req.author_name,
+            "role": req.author_role or "Thành viên",
+            "title": req.title,
+            "ref": req.scripture_ref or "",
+            "content": req.content,
+            "itype": req.insight_type or "exegesis",
+            "created_at": now,
+            "updated_at": now
+        }
+    )
+    db.commit()
+
+    return StudyGroupNoteItem(
+        id=new_id,
+        group_id=group_id,
+        author_name=req.author_name,
+        author_role=req.author_role or "Thành viên",
+        title=req.title,
+        scripture_ref=req.scripture_ref,
+        content=req.content,
+        insight_type=req.insight_type or "exegesis",
+        likes_count=0,
+        comments=[],
+        created_at=now.isoformat()
+    )
+
+
+@router.post("/groups/{group_id}/notes/{note_id}/comments")
+def add_note_comment(
+    group_id: str,
+    note_id: str,
+    req: StudyGroupCommentCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Add a comment to a collaborative note.
+    """
+    row = db.execute(
+        text("SELECT comments FROM study_group_notes WHERE id = :nid AND group_id = :gid"),
+        {"nid": note_id, "gid": group_id}
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú.")
+
+    raw_comments = row[0]
+    comments_list = raw_comments if isinstance(raw_comments, list) else (json.loads(raw_comments) if isinstance(raw_comments, str) else [])
+
+    new_comment = {
+        "id": f"comm-{uuid4().hex[:8]}",
+        "author_name": req.author_name,
+        "author_role": req.author_role or "Thành viên",
+        "text": req.text,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    comments_list.append(new_comment)
+
+    db.execute(
+        text("UPDATE study_group_notes SET comments = CAST(:c AS jsonb), updated_at = NOW() WHERE id = :nid"),
+        {"c": json.dumps(comments_list), "nid": note_id}
+    )
+    db.commit()
+
+    return {"success": True, "comment": new_comment}
+
+
+@router.post("/groups/{group_id}/notes/{note_id}/like")
+def like_study_group_note(
+    group_id: str,
+    note_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Upvote / like a collaborative note.
+    """
+    res = db.execute(
+        text("UPDATE study_group_notes SET likes_count = likes_count + 1 WHERE id = :nid AND group_id = :gid RETURNING likes_count"),
+        {"nid": note_id, "gid": group_id}
+    ).fetchone()
+
+    if not res:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú.")
+
+    db.commit()
+    return {"success": True, "likes_count": res[0]}
+
+
+@router.get("/groups/{group_id}/export")
+def export_study_group_bundle(
+    group_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Export the entire group study minutes and notes as a Markdown dossier.
+    """
+    g = db.execute(
+        text("SELECT name, description, leader_name, leader_role, scripture_focus, meeting_schedule FROM study_groups WHERE id = :id"),
+        {"id": group_id}
+    ).fetchone()
+
+    if not g:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nhóm học.")
+
+    notes = db.execute(
+        text("SELECT author_name, author_role, title, scripture_ref, content, insight_type, comments, created_at FROM study_group_notes WHERE group_id = :gid ORDER BY created_at ASC"),
+        {"gid": group_id}
+    ).fetchall()
+
+    lines = [
+        f"# HỒ SƠ BIÊN BẢN HỌC KINH THÁNH — {g[0].upper()}",
+        f"> **Trọng tâm Lời Chúa**: {g[4] or 'Chung'}  ",
+        f"> **Trưởng nhóm / Điều phối**: {g[2]} ({g[3]})  ",
+        f"> **Lịch sinh hoạt**: {g[5] or 'Định kỳ'}  ",
+        f"> **Thời gian xuất**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ",
+        "",
+        "## MỤC TIÊU & MÔ TẢ NHÓM",
+        f"{g[1] or 'Không có mô tả chi tiết.'}",
+        "",
+        "---",
+        "",
+        f"## CÁC GHI CHÚ NGHIÊN CỨU & SUY NGẪM CỘNG TÁC ({len(notes)} Ghi Chú)",
+        ""
+    ]
+
+    type_labels = {
+        "exegesis": "Khảo Luận Giải Kinh",
+        "pastoral": "Ứng Dụng Mục Vụ",
+        "discussion_question": "Câu Hỏi Thảo Luận",
+        "prayer": "Lời Cầu Nguyện & Tạ Ơn"
+    }
+
+    for idx, n in enumerate(notes, 1):
+        type_str = type_labels.get(n[5], n[5])
+        lines.append(f"### {idx}. {n[2]} [{type_str}]")
+        lines.append(f"**Tác giả**: {n[0]} ({n[1]}) • **Phân đoạn**: `{n[3] or 'Toàn văn'}`")
+        lines.append("")
+        lines.append(n[4])
+        lines.append("")
+
+        comments = n[6] if isinstance(n[6], list) else (json.loads(n[6]) if isinstance(n[6], str) else [])
+        if comments:
+            lines.append("**Các ý kiến trao đổi / Phản hồi:**")
+            for c in comments:
+                lines.append(f"- **{c.get('author_name')}** ({c.get('author_role')}): {c.get('text')}")
+            lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    return {
+        "group_id": group_id,
+        "group_name": g[0],
+        "markdown_bundle": "\n".join(lines)
+    }
+
 
 
 

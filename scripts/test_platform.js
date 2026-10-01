@@ -182,6 +182,19 @@ async function main() {
     report('GET /api/study/sermons/community/{id} (Community manuscript & 3D peer reviews)', rSermonDetail.ok, rSermonDetail.error);
   }
 
+  // Collaborative Study Groups & Cohorts Module (Roadmap Horizon Item 5)
+  const rStudyGroups = await testEndpoint('/api/study/groups', d => (!Array.isArray(d) || d.length === 0) && 'No study groups');
+  report(`GET /api/study/groups (${rStudyGroups.data?.length || 0} Collaborative ministerial study cohorts)`, rStudyGroups.ok, rStudyGroups.error);
+
+  if (rStudyGroups.ok && rStudyGroups.data && rStudyGroups.data.length > 0) {
+    const testGroupId = rStudyGroups.data[0].id;
+    const rGroupDetail = await testEndpoint(`/api/study/groups/${testGroupId}`, d => (!d.name || !Array.isArray(d.notes)) && 'Invalid group detail');
+    report('GET /api/study/groups/{id} (Study group dossier with collaborative exegesis notes)', rGroupDetail.ok, rGroupDetail.error);
+
+    const rGroupExport = await testEndpoint(`/api/study/groups/${testGroupId}/export`, d => (!d.markdown_bundle || !d.markdown_bundle.includes('# HỒ SƠ BIÊN BẢN')) && 'Invalid export markdown');
+    report('GET /api/study/groups/{id}/export (Export collaborative study minutes to Markdown)', rGroupExport.ok, rGroupExport.error);
+  }
+
   // Theological Library Module
   const rLibStats = await testEndpoint('/api/library/stats', d => d.total_books !== 275 && `Expected 275 books, got ${d?.total_books}`);
   report('GET /api/library/stats (275 Theological volumes statistics)', rLibStats.ok, rLibStats.error);
@@ -226,6 +239,14 @@ async function main() {
   const peerReviewsRaw = runPsql('SELECT count(*) FROM sermon_peer_reviews;');
   const peerReviewsCount = parseInt(peerReviewsRaw || '0', 10);
   report('Database has 3-dimensional peer reviews recorded', peerReviewsCount >= 4, `Found ${peerReviewsCount}`);
+
+  const studyGroupsRaw = runPsql('SELECT count(*) FROM study_groups;');
+  const studyGroupsCount = parseInt(studyGroupsRaw || '0', 10);
+  report('Database has ministerial study cohorts seeded', studyGroupsCount >= 4, `Found ${studyGroupsCount}`);
+
+  const studyGroupNotesRaw = runPsql('SELECT count(*) FROM study_group_notes;');
+  const studyGroupNotesCount = parseInt(studyGroupNotesRaw || '0', 10);
+  report('Database has collaborative study notes recorded', studyGroupNotesCount >= 4, `Found ${studyGroupNotesCount}`);
 
   console.log('');
 

@@ -41,7 +41,8 @@ import {
   MessageSquare,
   Award,
   ShieldCheck,
-  Heart
+  Heart,
+  Send
 } from "lucide-react";
 
 interface ExpositoryPoint {
@@ -192,8 +193,48 @@ interface CommunitySermonDetail extends CommunitySermonSummary {
   reviews: PeerReviewItem[];
 }
 
+interface StudyGroupSummary {
+  id: string;
+  name: string;
+  description?: string;
+  leader_name: string;
+  leader_role: string;
+  scripture_focus?: string;
+  meeting_schedule?: string;
+  members_count: number;
+  notes_count: number;
+  tags: string[];
+  created_at: string;
+}
+
+interface StudyGroupComment {
+  id: string;
+  author_name: string;
+  author_role: string;
+  text: string;
+  created_at: string;
+}
+
+interface StudyGroupNoteItem {
+  id: string;
+  group_id: string;
+  author_name: string;
+  author_role: string;
+  title: string;
+  scripture_ref?: string;
+  content: string;
+  insight_type: string;
+  likes_count: number;
+  comments: StudyGroupComment[];
+  created_at: string;
+}
+
+interface StudyGroupDetail extends StudyGroupSummary {
+  notes: StudyGroupNoteItem[];
+}
+
 export default function StudyPage() {
-  const [activeTab, setActiveTab] = useState<"projects" | "sermon" | "community" | "lexicon" | "passage" | "notes">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "sermon" | "community" | "groups" | "lexicon" | "passage" | "notes">("projects");
 
   // Sermon Builder State (§50)
   const [sermonPresets, setSermonPresets] = useState<SermonPreset[]>([]);
@@ -298,6 +339,44 @@ export default function StudyPage() {
   const [reviewComment, setReviewComment] = useState<string>("");
   const [submittingReview, setSubmittingReview] = useState<boolean>(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
+
+  // Collaborative Study Groups & Cohorts State (Roadmap Horizon Item 5)
+  const [studyGroups, setStudyGroups] = useState<StudyGroupSummary[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState<boolean>(false);
+  const [selectedGroup, setSelectedGroup] = useState<StudyGroupDetail | null>(null);
+  const [loadingGroupDetail, setLoadingGroupDetail] = useState<boolean>(false);
+  const [groupSearch, setGroupSearch] = useState<string>("");
+  const [groupTagFilter, setGroupTagFilter] = useState<string>("all");
+  const [groupNoteTypeFilter, setGroupNoteTypeFilter] = useState<string>("all");
+  const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState<boolean>(false);
+  const [isNewGroupNoteModalOpen, setIsNewGroupNoteModalOpen] = useState<boolean>(false);
+  const [copiedGroupExport, setCopiedGroupExport] = useState<boolean>(false);
+
+  // New Group Form State
+  const [newGroupName, setNewGroupName] = useState<string>("");
+  const [newGroupDesc, setNewGroupDesc] = useState<string>("");
+  const [newGroupLeader, setNewGroupLeader] = useState<string>("Mục sư Quản nhiệm");
+  const [newGroupRole, setNewGroupRole] = useState<string>("Chủ tọa / Trưởng nhóm");
+  const [newGroupScripture, setNewGroupScripture] = useState<string>("Rô-ma 8:1-39");
+  const [newGroupSchedule, setNewGroupSchedule] = useState<string>("Tối Thứ Tư 19:30");
+  const [newGroupTags, setNewGroupTags] = useState<string>("giải kinh, mục vụ, thần học");
+  const [creatingGroup, setCreatingGroup] = useState<boolean>(false);
+
+  // New Group Note Form State
+  const [newNoteAuthor, setNewNoteAuthor] = useState<string>("");
+  const [newNoteRole, setNewNoteRole] = useState<string>("Mục sư");
+  const [newNoteTitle, setNewNoteTitle] = useState<string>("");
+  const [newNoteScripture, setNewNoteScripture] = useState<string>("");
+  const [newNoteContent, setNewNoteContent] = useState<string>("");
+  const [newNoteType, setNewNoteType] = useState<string>("exegesis");
+  const [creatingGroupNote, setCreatingGroupNote] = useState<boolean>(false);
+
+  // Note Comment Inline Form State
+  const [activeCommentNoteId, setActiveCommentNoteId] = useState<string | null>(null);
+  const [commentAuthor, setCommentAuthor] = useState<string>("");
+  const [commentRole, setCommentRole] = useState<string>("Thành viên");
+  const [commentText, setCommentText] = useState<string>("");
+  const [submittingComment, setSubmittingComment] = useState<boolean>(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -500,12 +579,183 @@ export default function StudyPage() {
     }
   };
 
+  // Fetch Study Groups
+  const fetchStudyGroups = async (search?: string, tag?: string) => {
+    setLoadingGroups(true);
+    try {
+      let url = `${apiUrl}/api/study/groups?limit=30`;
+      const s = search !== undefined ? search : groupSearch;
+      const t = tag !== undefined ? tag : groupTagFilter;
+      if (s.trim()) url += `&search=${encodeURIComponent(s.trim())}`;
+      if (t && t !== "all") url += `&tag=${encodeURIComponent(t)}`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setStudyGroups(data);
+        if (data.length > 0 && !selectedGroup) {
+          fetchGroupDetail(data[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch study groups:", err);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  // Fetch Group Detail
+  const fetchGroupDetail = async (groupId: string) => {
+    setLoadingGroupDetail(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/groups/${groupId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedGroup(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch study group detail:", err);
+    } finally {
+      setLoadingGroupDetail(false);
+    }
+  };
+
+  // Create Study Group
+  const handleCreateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim() || !newGroupLeader.trim()) return;
+    setCreatingGroup(true);
+    try {
+      const tagsList = newGroupTags.split(",").map(t => t.trim()).filter(Boolean);
+      const res = await fetch(`${apiUrl}/api/study/groups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newGroupName.trim(),
+          description: newGroupDesc.trim(),
+          leader_name: newGroupLeader.trim(),
+          leader_role: newGroupRole.trim() || "Mục sư Quản nhiệm",
+          scripture_focus: newGroupScripture.trim() || "Chung",
+          meeting_schedule: newGroupSchedule.trim() || "Định kỳ",
+          tags: tagsList
+        })
+      });
+      if (res.ok) {
+        const newGroup = await res.json();
+        setIsNewGroupModalOpen(false);
+        setNewGroupName("");
+        setNewGroupDesc("");
+        await fetchStudyGroups();
+        fetchGroupDetail(newGroup.id);
+      }
+    } catch (err) {
+      console.error("Failed to create study group:", err);
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
+
+  // Create Group Note
+  const handleCreateGroupNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGroup || !newNoteTitle.trim() || !newNoteContent.trim() || !newNoteAuthor.trim()) return;
+    setCreatingGroupNote(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/groups/${selectedGroup.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author_name: newNoteAuthor.trim(),
+          author_role: newNoteRole.trim() || "Thành viên",
+          title: newNoteTitle.trim(),
+          scripture_ref: newNoteScripture.trim(),
+          content: newNoteContent.trim(),
+          insight_type: newNoteType
+        })
+      });
+      if (res.ok) {
+        setIsNewGroupNoteModalOpen(false);
+        setNewNoteTitle("");
+        setNewNoteContent("");
+        setNewNoteScripture("");
+        fetchGroupDetail(selectedGroup.id);
+        fetchStudyGroups();
+      }
+    } catch (err) {
+      console.error("Failed to create group note:", err);
+    } finally {
+      setCreatingGroupNote(false);
+    }
+  };
+
+  // Add Comment to Note
+  const handleAddComment = async (noteId: string) => {
+    if (!selectedGroup || !commentAuthor.trim() || !commentText.trim()) return;
+    setSubmittingComment(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/groups/${selectedGroup.id}/notes/${noteId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author_name: commentAuthor.trim(),
+          author_role: commentRole.trim() || "Thành viên",
+          text: commentText.trim()
+        })
+      });
+      if (res.ok) {
+        setCommentText("");
+        setActiveCommentNoteId(null);
+        fetchGroupDetail(selectedGroup.id);
+      }
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Like Group Note
+  const handleLikeGroupNote = async (noteId: string) => {
+    if (!selectedGroup) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/study/groups/${selectedGroup.id}/notes/${noteId}/like`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        fetchGroupDetail(selectedGroup.id);
+      }
+    } catch (err) {
+      console.error("Failed to like group note:", err);
+    }
+  };
+
+  // Export Group Dossier Markdown
+  const handleExportGroupDossier = async (groupId: string) => {
+    try {
+      const res = await fetch(`${apiUrl}/api/study/groups/${groupId}/export`);
+      if (res.ok) {
+        const data = await res.json();
+        const blob = new Blob([data.markdown_bundle], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const cleanName = (data.group_name || "Nhom_Hoc").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+        link.download = `${cleanName}_Bien_Ban_Hoc.md`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error("Failed to export group dossier:", err);
+    }
+  };
+
   useEffect(() => {
     fetchLexicon();
     fetchNotes();
     fetchProjects();
     fetchSermonPresets();
     fetchCommunitySermons();
+    fetchStudyGroups();
   }, [apiUrl]);
 
   // Build Sermon
@@ -1124,6 +1374,19 @@ ${sermonResult.introduction_and_hook}
             }`}
           >
             <Users className="w-4 h-4 text-indigo-400" /> Cộng Đồng &amp; Phản Biện ({communitySermons.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("groups");
+              fetchStudyGroups();
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "groups"
+                ? "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
+            }`}
+          >
+            <Users className="w-4 h-4 text-teal-400" /> Nhóm Cộng Tác ({studyGroups.length})
           </button>
           <button
             onClick={() => setActiveTab("lexicon")}
@@ -2284,6 +2547,427 @@ ${sermonResult.introduction_and_hook}
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 2.8. COLLABORATIVE STUDY GROUPS & COHORTS (Roadmap Horizon Item 5)    */}
+      {/* ===================================================================== */}
+      {activeTab === "groups" && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner / Introduction */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-teal-950/50 via-emerald-950/40 to-slate-900/70 p-5 rounded-3xl border border-teal-900/50 shadow-xl">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                  Pastoral Study Cohorts &amp; Working Groups
+                </span>
+                <span className="text-xs text-slate-400">• Không Gian Thảo Luận Mục Vụ</span>
+              </div>
+              <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-teal-400" /> Nhóm Học Kinh Thánh Đa Mục Vụ &amp; Cộng Tác Giải Kinh
+              </h2>
+              <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                Không gian làm việc nhóm cho các Mục sư, Giáo viên Kinh Thánh và Trưởng ban ngành cùng nhau nghiên cứu chuyên sâu,
+                đóng góp các khảo luận ngữ căn, ứng dụng chăn bầy, phản biện thần học và biên soạn hồ sơ thảo luận theo chuẩn mực.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsNewGroupModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-600/30"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thành Lập Nhóm Mới</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Tag Filter Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-slate-400 whitespace-nowrap text-xs font-medium">Chủ đề:</span>
+              {[
+                { id: "all", label: "Tất cả nhóm" },
+                { id: "giải kinh", label: "Giải kinh chuyên sâu" },
+                { id: "thần học", label: "Thần học Giao ước" },
+                { id: "mục vụ gia đình", label: "Mục vụ Gia đình" },
+                { id: "môn đồ hóa", label: "Môn đồ hóa & Truyền giáo" }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setGroupTagFilter(f.id);
+                    fetchStudyGroups(groupSearch, f.id);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                    groupTagFilter === f.id
+                      ? "bg-teal-600 text-white font-bold shadow-md shadow-teal-600/30"
+                      : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={groupSearch}
+                onChange={(e) => {
+                  setGroupSearch(e.target.value);
+                  fetchStudyGroups(e.target.value, groupTagFilter);
+                }}
+                placeholder="Tìm tên nhóm, phân đoạn hoặc trưởng nhóm..."
+                className="pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 w-full sm:w-72"
+              />
+            </div>
+          </div>
+
+          {/* Master-Detail Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Groups List (4 cols) */}
+            <div className="lg:col-span-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Danh Sách Nhóm ({studyGroups.length})
+                </span>
+                {loadingGroups && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />}
+              </div>
+
+              {loadingGroups && studyGroups.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+                  <span>Đang tải các tổ nghiên cứu...</span>
+                </div>
+              ) : studyGroups.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                  Chưa có nhóm nào phù hợp tiêu chí tìm kiếm.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {studyGroups.map(g => {
+                    const isSelected = selectedGroup?.id === g.id;
+                    return (
+                      <div
+                        key={g.id}
+                        onClick={() => fetchGroupDetail(g.id)}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col gap-2.5 text-left ${
+                          isSelected
+                            ? "bg-teal-950/30 border-teal-500/50 shadow-lg shadow-teal-950/40"
+                            : "bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className={`text-xs font-bold leading-snug line-clamp-1 ${isSelected ? "text-teal-200" : "text-white"}`}>
+                            {g.name}
+                          </h4>
+                          {g.scripture_focus && (
+                            <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[10px] font-semibold shrink-0">
+                              {g.scripture_focus}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                          {g.description || "Không có mô tả chi tiết."}
+                        </p>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/60">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                            <span className="text-slate-300 font-medium">{g.leader_name}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                            <span>{g.members_count} TV</span>
+                            <span>•</span>
+                            <span>{g.notes_count} ghi chú</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Selected Cohort Workspace (8 cols) */}
+            <div className="lg:col-span-8 flex flex-col gap-4">
+              {loadingGroupDetail && !selectedGroup ? (
+                <div className="p-16 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col items-center justify-center gap-3 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+                  <div className="text-sm font-bold text-white">Đang tải không gian làm việc nhóm...</div>
+                </div>
+              ) : !selectedGroup ? (
+                <div className="p-16 rounded-3xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                  Vui lòng chọn một nhóm nghiên cứu bên trái để xem nội dung thảo luận.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  {/* Cohort Header Card */}
+                  <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                            {selectedGroup.scripture_focus || "Chung"}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {selectedGroup.members_count} thành viên tham gia
+                          </span>
+                          {selectedGroup.meeting_schedule && (
+                            <span className="text-xs text-amber-400/90 flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" /> {selectedGroup.meeting_schedule}
+                            </span>
+                          )}
+                        </div>
+                        <h2 className="text-lg font-bold text-white mt-1.5">{selectedGroup.name}</h2>
+                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                          {selectedGroup.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleExportGroupDossier(selectedGroup.id)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all hover:text-white"
+                          title="Tải toàn bộ biên bản nghiên cứu và ý kiến thảo luận về máy dạng file Markdown"
+                        >
+                          <FileDown className="w-4 h-4 text-teal-400" />
+                          <span>Xuất Biên Bản (.MD)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsNewGroupNoteModalOpen(true)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all shadow-md shadow-teal-600/30"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Đóng Góp Ý Kiến</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Leader Banner */}
+                    <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-teal-900/60 text-teal-300 font-bold text-xs flex items-center justify-center border border-teal-700/50">
+                          {selectedGroup.leader_name.charAt(0)}
+                        </div>
+                        <div>
+                          <span className="text-slate-200 font-semibold">{selectedGroup.leader_name}</span>
+                          <span className="text-slate-500 text-[11px]"> ({selectedGroup.leader_role})</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {selectedGroup.tags && selectedGroup.tags.map((t, idx) => (
+                          <span key={idx} className="text-[10px] text-teal-400 bg-teal-950/50 px-2 py-0.5 rounded-md border border-teal-800/40">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Insight Type Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    <span className="text-slate-400 whitespace-nowrap text-[11px] font-medium mr-1">Phân loại ghi chú:</span>
+                    {[
+                      { id: "all", label: "Tất cả" },
+                      { id: "exegesis", label: "Khảo luận giải kinh" },
+                      { id: "pastoral", label: "Mục vụ & Chăn bầy" },
+                      { id: "discussion_question", label: "Câu hỏi thảo luận" },
+                      { id: "prayer", label: "Cầu nguyện & Tạ ơn" }
+                    ].map(type => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setGroupNoteTypeFilter(type.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                          groupNoteTypeFilter === type.id
+                            ? "bg-teal-600 text-white shadow-sm"
+                            : "bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800"
+                        }`}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Notes Feed */}
+                  <div className="flex flex-col gap-4">
+                    {selectedGroup.notes
+                      .filter(n => groupNoteTypeFilter === "all" || n.insight_type === groupNoteTypeFilter)
+                      .length === 0 ? (
+                      <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center flex flex-col items-center justify-center gap-2">
+                        <MessageSquare className="w-8 h-8 text-slate-600" />
+                        <p className="text-xs text-slate-400">Chưa có bài đóng góp nào trong mục này.</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsNewGroupNoteModalOpen(true)}
+                          className="mt-2 text-xs text-teal-400 hover:underline font-bold"
+                        >
+                          Hãy là người đầu tiên chia sẻ góc nhìn giải kinh!
+                        </button>
+                      </div>
+                    ) : (
+                      selectedGroup.notes
+                        .filter(n => groupNoteTypeFilter === "all" || n.insight_type === groupNoteTypeFilter)
+                        .map(n => {
+                          const insightTypeMap: Record<string, { label: string; badge: string }> = {
+                            exegesis: { label: "Khảo Luận Giải Kinh", badge: "bg-blue-500/10 text-blue-300 border-blue-500/20" },
+                            pastoral: { label: "Ứng Dụng Mục Vụ", badge: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" },
+                            discussion_question: { label: "Câu Hỏi Thảo Luận", badge: "bg-amber-500/10 text-amber-300 border-amber-500/20" },
+                            prayer: { label: "Cầu Nguyện & Tạ Ơn", badge: "bg-purple-500/10 text-purple-300 border-purple-500/20" }
+                          };
+                          const meta = insightTypeMap[n.insight_type] || { label: n.insight_type, badge: "bg-slate-800 text-slate-300 border-slate-700" };
+                          const isReplying = activeCommentNoteId === n.id;
+
+                          return (
+                            <div
+                              key={n.id}
+                              className="p-5 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-md flex flex-col gap-3 transition-all hover:border-slate-700"
+                            >
+                              {/* Note Header */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-teal-900 text-teal-200 text-xs font-bold flex items-center justify-center border border-teal-700">
+                                    {n.author_name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                                      <span>{n.author_name}</span>
+                                      <span className="text-[10px] text-teal-400/90 font-normal">({n.author_role})</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500">
+                                      {new Date(n.created_at).toLocaleDateString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {n.scripture_ref && (
+                                    <span className="px-2 py-0.5 rounded-full bg-slate-950 text-slate-300 border border-slate-800 text-[10px] font-mono">
+                                      📖 {n.scripture_ref}
+                                    </span>
+                                  )}
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${meta.badge}`}>
+                                    {meta.label}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Note Content */}
+                              <div className="flex flex-col gap-1.5">
+                                <h3 className="text-sm font-bold text-slate-100">{n.title}</h3>
+                                <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line bg-slate-950/50 p-4 rounded-2xl border border-slate-800/60">
+                                  {n.content}
+                                </p>
+                              </div>
+
+                              {/* Note Footer: Likes & Comments Toggle */}
+                              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs text-slate-400">
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLikeGroupNote(n.id)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-teal-300 border border-slate-800 transition-colors"
+                                  >
+                                    <ThumbsUp className="w-3.5 h-3.5 text-teal-400" />
+                                    <span className="font-semibold">{n.likes_count}</span>
+                                    <span className="text-[10px]">Đồng thuận</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveCommentNoteId(isReplying ? null : n.id)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                                    <span>{n.comments.length} phản hồi</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Comments Thread */}
+                              <div className="flex flex-col gap-2 pt-2">
+                                {n.comments.length > 0 && (
+                                  <div className="flex flex-col gap-2 pl-3 border-l-2 border-slate-800">
+                                    {n.comments.map((comm) => (
+                                      <div key={comm.id} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-1 text-xs">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-bold text-slate-200">{comm.author_name}</span>
+                                            <span className="text-[10px] text-slate-500">({comm.author_role})</span>
+                                          </div>
+                                          <span className="text-[10px] text-slate-500">
+                                            {comm.created_at ? new Date(comm.created_at).toLocaleDateString("vi-VN") : ""}
+                                          </span>
+                                        </div>
+                                        <p className="text-slate-300 font-sans leading-relaxed">{comm.text}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Inline Comment Form */}
+                                {isReplying && (
+                                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-teal-900/60 flex flex-col gap-2.5 mt-2 animate-in fade-in duration-200">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <input
+                                        type="text"
+                                        value={commentAuthor}
+                                        onChange={(e) => setCommentAuthor(e.target.value)}
+                                        placeholder="Họ tên của bạn *"
+                                        className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={commentRole}
+                                        onChange={(e) => setCommentRole(e.target.value)}
+                                        placeholder="Chức danh (Mục sư / Giáo viên...)"
+                                        className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={commentText}
+                                        onChange={(e) => setCommentText(e.target.value)}
+                                        placeholder="Đóng góp ý kiến thảo luận, góc nhìn giải kinh..."
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAddComment(n.id);
+                                          }
+                                        }}
+                                        className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={submittingComment || !commentAuthor.trim() || !commentText.trim()}
+                                        onClick={() => handleAddComment(n.id)}
+                                        className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs disabled:opacity-50 flex items-center gap-1 transition-all shadow-md shadow-teal-600/30"
+                                      >
+                                        {submittingComment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                        <span>Gửi</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -3634,6 +4318,252 @@ ${sermonResult.introduction_and_hook}
                 </form>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: CREATE STUDY GROUP                                             */}
+      {/* ===================================================================== */}
+      {isNewGroupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-teal-400" />
+                Thành Lập Nhóm Nghiên Cứu Mục Vụ Mới
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsNewGroupModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateGroup} className="flex flex-col gap-3 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-300 font-semibold">Tên nhóm nghiên cứu *</label>
+                <input
+                  required
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Ví dụ: Ban Mục Vụ & Giảng Luận — Khảo Luận Rô-ma 8"
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-300 font-semibold">Mục tiêu &amp; Mô tả chi tiết</label>
+                <textarea
+                  rows={2}
+                  value={newGroupDesc}
+                  onChange={(e) => setNewGroupDesc(e.target.value)}
+                  placeholder="Mô tả phạm vi thảo luận, bối cảnh các mục sư và mục tiêu kết quả..."
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 resize-none font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Trưởng nhóm / Điều phối *</label>
+                  <input
+                    required
+                    type="text"
+                    value={newGroupLeader}
+                    onChange={(e) => setNewGroupLeader(e.target.value)}
+                    placeholder="Mục sư..."
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Chức vụ / Vai trò</label>
+                  <input
+                    type="text"
+                    value={newGroupRole}
+                    onChange={(e) => setNewGroupRole(e.target.value)}
+                    placeholder="Chủ tọa / Trưởng nhóm"
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Phân đoạn trọng tâm</label>
+                  <input
+                    type="text"
+                    value={newGroupScripture}
+                    onChange={(e) => setNewGroupScripture(e.target.value)}
+                    placeholder="Ví dụ: Rô-ma 8:1-39"
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Lịch sinh hoạt</label>
+                  <input
+                    type="text"
+                    value={newGroupSchedule}
+                    onChange={(e) => setNewGroupSchedule(e.target.value)}
+                    placeholder="Ví dụ: Tối Thứ Tư 19:30"
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-300 font-semibold">Thẻ chủ đề (cách nhau bởi dấu phẩy)</label>
+                <input
+                  type="text"
+                  value={newGroupTags}
+                  onChange={(e) => setNewGroupTags(e.target.value)}
+                  placeholder="giải kinh, thần học, mục vụ..."
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsNewGroupModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingGroup || !newGroupName.trim() || !newGroupLeader.trim()}
+                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-md shadow-teal-600/30"
+                >
+                  {creatingGroup ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Thành Lập Nhóm</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: CREATE GROUP NOTE                                              */}
+      {/* ===================================================================== */}
+      {isNewGroupNoteModalOpen && selectedGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-teal-400" />
+                  Đóng Góp Ý Kiến &amp; Khảo Luận
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  Nhóm: <strong className="text-teal-300">{selectedGroup.name}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewGroupNoteModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateGroupNote} className="flex flex-col gap-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Tên tác giả *</label>
+                  <input
+                    required
+                    type="text"
+                    value={newNoteAuthor}
+                    onChange={(e) => setNewNoteAuthor(e.target.value)}
+                    placeholder="Mục sư..."
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Chức danh / Vai trò</label>
+                  <input
+                    type="text"
+                    value={newNoteRole}
+                    onChange={(e) => setNewNoteRole(e.target.value)}
+                    placeholder="Mục sư / Giảng viên..."
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Phân loại ghi chú</label>
+                  <select
+                    value={newNoteType}
+                    onChange={(e) => setNewNoteType(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="exegesis">Khảo Luận Giải Kinh</option>
+                    <option value="pastoral">Ứng Dụng Mục Vụ</option>
+                    <option value="discussion_question">Câu Hỏi Thảo Luận</option>
+                    <option value="prayer">Cầu Nguyện &amp; Tạ Ơn</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-300 font-semibold">Phân đoạn câu gốc</label>
+                  <input
+                    type="text"
+                    value={newNoteScripture}
+                    onChange={(e) => setNewNoteScripture(e.target.value)}
+                    placeholder="Ví dụ: Rô-ma 8:31"
+                    className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-300 font-semibold">Tiêu đề ghi chú *</label>
+                <input
+                  required
+                  type="text"
+                  value={newNoteTitle}
+                  onChange={(e) => setNewNoteTitle(e.target.value)}
+                  placeholder="Tiêu đề tóm lược nội dung..."
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-300 font-semibold">Nội dung chi tiết *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  placeholder="Ghi nhận giải kinh, liên hệ văn mạch, bài học thuộc linh hoặc câu hỏi mở..."
+                  className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 resize-none font-sans"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsNewGroupNoteModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingGroupNote || !newNoteAuthor.trim() || !newNoteTitle.trim() || !newNoteContent.trim()}
+                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-md shadow-teal-600/30"
+                >
+                  {creatingGroupNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Đăng Ghi Chú</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

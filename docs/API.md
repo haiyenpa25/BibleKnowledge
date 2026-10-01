@@ -342,6 +342,16 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
     2. **Bố Cục Sư Phạm (Homiletical Clarity - 1..5 stars)**: Sharp Big Idea, logical progression, transitions, and memorable illustrations.
     3. **Ứng Dụng Thực Tiễn (Pastoral Application - 1..5 stars)**: Relevance to daily Christian walk, spiritual discipline, and clear call to repentance/action.
 
+### 6.11 Collaborative Multi-Pastor Study Groups & Cohorts (Roadmap Horizon Item 5)
+- **Endpoints**:
+  - `GET /api/study/groups`: Lists ministerial study cohorts with filtering by `search` (name, scripture focus, leader) and `tag`, returning member counts and note counts.
+  - `POST /api/study/groups`: Establishes a new ministerial cohort with target scripture focus, leader role, schedule, and thematic tags.
+  - `GET /api/study/groups/{group_id}`: Retrieves complete cohort details including all collaborative study notes and threaded comments.
+  - `POST /api/study/groups/{group_id}/notes`: Contributes a collaborative study note classified by insight type (`exegesis`, `pastoral`, `discussion_question`, `prayer`).
+  - `POST /api/study/groups/{group_id}/notes/{note_id}/comments`: Appends an inline threaded comment or theological critique to a study note.
+  - `POST /api/study/groups/{group_id}/notes/{note_id}/like`: Upvotes/endorses a collaborative note.
+  - `GET /api/study/groups/{group_id}/export`: Exports the complete cohort minutes, exegesis dossier, and discussion transcript as formatted Markdown.
+
 ---
 
 ## 7. Theological Library & Document Engine (`/api/library`)
