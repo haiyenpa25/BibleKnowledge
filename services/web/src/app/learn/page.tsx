@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   XCircle, 
   RotateCw, 
-  ChevronRight, 
+  ChevronRight,
+  ChevronLeft, 
   ArrowLeft,
   Flame,
   Award,
@@ -900,7 +901,7 @@ export default function LearnPage() {
     setIsFlipped(false);
 
     try {
-      let url = `${apiUrl}/api/learn/flashcards?limit=30`;
+      let url = `${apiUrl}/api/learn/flashcards?limit=60`;
       if (type && type !== "all") {
         url += `&card_type=${encodeURIComponent(type)}`;
       }
@@ -1266,6 +1267,51 @@ export default function LearnPage() {
       fetchFlashcards(cardFilter);
     }
   };
+
+
+  // Keyboard Shortcuts for Flashcards SM-2 Review
+  useEffect(() => {
+    if (activeTab !== "flashcards" || flashcards.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        setIsFlipped((prev) => !prev);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (cardIndex > 0) {
+          setCardIndex((prev) => prev - 1);
+          setIsFlipped(false);
+        }
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (cardIndex + 1 < flashcards.length) {
+          setCardIndex((prev) => prev + 1);
+          setIsFlipped(false);
+        }
+      } else if (isFlipped) {
+        if (e.key === "1") {
+          e.preventDefault();
+          handleReviewCard(1);
+        } else if (e.key === "2") {
+          e.preventDefault();
+          handleReviewCard(2);
+        } else if (e.key === "3") {
+          e.preventDefault();
+          handleReviewCard(3);
+        } else if (e.key === "4") {
+          e.preventDefault();
+          handleReviewCard(4);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, flashcards, cardIndex, isFlipped]);
 
   // --- Fill in the Blank Handlers ---
   const currentFib = fibList[fibIndex];
@@ -2848,18 +2894,21 @@ export default function LearnPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* 2. FLASHCARDS MODE (SM-2 Spaced Repetition)                          */}
+      {/* 2. FLASHCARDS MODE (SM-2 Spaced Repetition & 5 Canonical Types §4, §5) */}
       {/* ===================================================================== */}
       {activeTab === "flashcards" && (
         <div className="flex flex-col gap-6 items-center">
+          {/* Top Filter and Action Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full pb-1 text-xs">
-            <div className="flex items-center gap-2 overflow-x-auto">
-              <span className="text-slate-400 whitespace-nowrap">Lọc loại thẻ:</span>
+            <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
+              <span className="text-slate-400 whitespace-nowrap font-medium">Lọc loại thẻ:</span>
               {[
-                { id: "all", label: "Tất cả" },
-                { id: "person", label: "Nhân vật" },
-                { id: "verse", label: "Câu gốc" },
-                { id: "word", label: "Từ ngữ gốc" }
+                { id: "all", label: "Tất Cả Thể Loại", icon: "✨" },
+                { id: "person", label: "Nhân Vật", icon: "👤" },
+                { id: "verse", label: "Câu Gốc", icon: "📖" },
+                { id: "event", label: "Biến Cố", icon: "⚡" },
+                { id: "timeline", label: "Niên Đại (§4)", icon: "⏳" },
+                { id: "word", label: "Căn Từ Gốc", icon: "🔤" }
               ].map((f) => (
                 <button
                   key={f.id}
@@ -2867,20 +2916,21 @@ export default function LearnPage() {
                     setCardFilter(f.id);
                     fetchFlashcards(f.id);
                   }}
-                  className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                     cardFilter === f.id
-                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 font-medium"
-                      : "bg-slate-800/80 text-slate-400 hover:text-white"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                      : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/80 border border-slate-700/50"
                   }`}
                 >
-                  {f.label}
+                  <span>{f.icon}</span>
+                  <span>{f.label}</span>
                 </button>
               ))}
             </div>
 
             <button
               onClick={() => openExportModal("anki")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-semibold transition-all shadow-sm shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-semibold transition-all shadow-sm shrink-0"
               title="Xuất thẻ ra định dạng Anki TSV, CSV hoặc JSON"
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />
@@ -2891,81 +2941,228 @@ export default function LearnPage() {
           {loadingCards ? (
             <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400 w-full">
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-              <p className="text-sm">Đang tải thẻ học lặp lại ngắt quãng...</p>
+              <p className="text-sm">Đang tải bộ thẻ học lặp lại ngắt quãng SM-2...</p>
             </div>
           ) : currentCard ? (
-            <div className="w-full max-w-xl flex flex-col gap-5">
+            <div className="w-full max-w-2xl flex flex-col gap-5">
+              {/* Card Meta Bar */}
               <div className="flex justify-between items-center text-xs text-slate-400 px-1">
-                <span>Thẻ {cardIndex + 1} / {flashcards.length}</span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-blue-400 font-mono text-[11px]">
-                  Khoảng cách: {currentCard.interval_days} ngày
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-white">Thẻ {cardIndex + 1} / {flashcards.length}</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase ${
+                    currentCard.card_type === "person"
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                      : currentCard.card_type === "verse"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      : currentCard.card_type === "event"
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                      : currentCard.card_type === "timeline"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                      : "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
+                  }`}>
+                    {currentCard.card_type === "person" && "👤 Thẻ Nhân Vật"}
+                    {currentCard.card_type === "verse" && "📖 Thẻ Câu Gốc"}
+                    {currentCard.card_type === "event" && "⚡ Thẻ Biến Cố"}
+                    {currentCard.card_type === "timeline" && "⏳ So Sánh Niên Đại (§4)"}
+                    {currentCard.card_type === "word" && "🔤 Căn Từ Ngữ Gốc"}
+                    {!["person", "verse", "event", "timeline", "word"].includes(currentCard.card_type) && "✨ Thần Học"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSpeechSpeak(isFlipped ? currentCard.back_text : currentCard.front_text, currentCard.id);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors"
+                    title="Nghe phát âm nội dung thẻ"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-[11px]">{speakingVerseId === currentCard.id ? "Đang đọc..." : "Nghe"}</span>
+                  </button>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-blue-400 font-mono text-[11px]">
+                    Chu kỳ: {currentCard.interval_days} ngày
+                  </span>
+                </div>
               </div>
 
-              {/* Flashcard container */}
+              {/* 3D Flip Flashcard Interactive Container */}
               <div
                 onClick={() => setIsFlipped(!isFlipped)}
-                className={`min-h-[260px] p-8 rounded-3xl cursor-pointer select-none transition-all duration-300 flex flex-col justify-between items-center text-center shadow-xl border ${
+                className={`min-h-[300px] p-8 rounded-3xl cursor-pointer select-none transition-all duration-300 flex flex-col justify-between items-center text-center shadow-2xl border relative overflow-hidden group ${
                   isFlipped
-                    ? "bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 border-blue-500/50"
-                    : "bg-slate-900/90 border-slate-700/80 hover:border-slate-600"
+                    ? "bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 border-blue-500/60 shadow-blue-950/30"
+                    : "bg-slate-900/90 border-slate-700/80 hover:border-blue-500/40 hover:bg-slate-850"
                 }`}
               >
-                <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                  {isFlipped ? "✨ Mặt Sau • Lời Giải & Câu Gốc" : "❓ Mặt Trước • Câu Hỏi / Khái Niệm"}
+                {/* Decorative Top Pill */}
+                <div className="flex items-center justify-between w-full text-[11px] uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
+                  <span className="flex items-center gap-1.5 text-blue-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{isFlipped ? "Mặt Sau • Lời Giải & Minh Chứng" : "Mặt Trước • Thử Thách Ghi Nhớ"}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">Bấm [Space] hoặc nhấp để lật</span>
                 </div>
 
-                <div className="my-auto py-4">
-                  <p className="text-base md:text-lg font-bold text-white leading-relaxed font-sans">
-                    {isFlipped ? currentCard.back_text : currentCard.front_text}
-                  </p>
+                {/* Card Content Body */}
+                <div className="my-auto py-6 w-full text-left">
+                  {isFlipped ? (
+                    <div className="flex flex-col gap-2.5 text-sm sm:text-base text-slate-100 font-sans leading-relaxed">
+                      {currentCard.back_text.split('\n').map((line, idx) => {
+                        const trimmed = line.trim();
+                        if (!trimmed) return <div key={idx} className="h-1.5" />;
+                        if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('⏳')) {
+                          return (
+                            <div key={idx} className="flex items-start gap-2 text-slate-200">
+                              <span className="text-blue-400 shrink-0 mt-0.5">•</span>
+                              <span className="leading-relaxed">{trimmed.replace(/^[•-⏳]s*/, '')}</span>
+                            </div>
+                          );
+                        }
+                        if (trimmed.startsWith('📖')) {
+                          return (
+                            <div key={idx} className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 font-serif italic my-1 leading-relaxed">
+                              {trimmed}
+                            </div>
+                          );
+                        }
+                        return (
+                          <p key={idx} className="leading-relaxed text-slate-300">
+                            {trimmed}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-lg sm:text-xl font-bold text-white leading-relaxed font-sans">
+                        {currentCard.front_text}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                  <RotateCw className="w-3 h-3" /> Nhấn để lật thẻ
+                {/* Bottom Flip Indicator */}
+                <div className="w-full flex items-center justify-between pt-3 border-t border-slate-800/80 text-[11px] text-slate-500">
+                  <span className="font-mono text-[10px]">Độ khó: {currentCard.difficulty_level}/5</span>
+                  <span className="flex items-center gap-1.5 text-cyan-400 group-hover:text-cyan-300 font-semibold transition-colors">
+                    <RotateCw className="w-3.5 h-3.5 animate-spin-slow" />
+                    <span>{isFlipped ? "Lật lại mặt trước" : "Lật xem đáp án"}</span>
+                  </span>
+                  <span className="font-mono text-[10px]">Ôn: {currentCard.repetition_count} lần</span>
                 </div>
               </div>
 
-              {/* SM-2 Review Quality Rating Buttons */}
+              {/* Navigation and Flip Controls */}
+              <div className="flex items-center justify-between gap-3 px-2">
+                <button
+                  type="button"
+                  disabled={cardIndex === 0}
+                  onClick={() => {
+                    if (cardIndex > 0) {
+                      setCardIndex((prev) => prev - 1);
+                      setIsFlipped(false);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Thẻ Trước (←)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFlipped(!isFlipped)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 flex items-center gap-1.5 border border-cyan-500/30 transition-colors"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{isFlipped ? "Mặt Trước" : "Lật Thẻ (Space)"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cardIndex + 1 >= flashcards.length}
+                  onClick={() => {
+                    if (cardIndex + 1 < flashcards.length) {
+                      setCardIndex((prev) => prev + 1);
+                      setIsFlipped(false);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition-colors"
+                >
+                  <span>Thẻ Sau (→)</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* SM-2 Review Quality Rating Bar (Visible when card is flipped) */}
               {isFlipped && (
-                <div className="flex flex-col gap-2 pt-2 animate-in fade-in">
-                  <span className="text-center text-xs text-slate-400 font-medium">Bạn nhớ nội dung này thế nào?</span>
-                  <div className="grid grid-cols-4 gap-2">
+                <div className="flex flex-col gap-2.5 p-4 rounded-2xl bg-slate-950/70 border border-slate-800 animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Đánh giá mức độ ghi nhớ (Thuật toán SM-2):</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">Bấm phím 1, 2, 3, hoặc 4</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
+                      type="button"
                       onClick={() => handleReviewCard(1)}
-                      className="py-2.5 px-2 rounded-xl bg-rose-950/80 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs font-bold transition-all"
+                      className="py-3 px-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-800/60 text-rose-200 text-xs font-bold flex flex-col items-center gap-1 transition-all shadow-sm group"
                     >
-                      Lại (1 ngày)
+                      <span className="group-hover:scale-110 transition-transform">Lại (Again)</span>
+                      <span className="text-[10px] opacity-75 font-normal">Ôn lại: 1 ngày [1]</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleReviewCard(2)}
-                      className="py-2.5 px-2 rounded-xl bg-amber-950/80 hover:bg-amber-900/80 border border-amber-800/60 text-amber-300 text-xs font-bold transition-all"
+                      className="py-3 px-2 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-800/60 text-amber-200 text-xs font-bold flex flex-col items-center gap-1 transition-all shadow-sm group"
                     >
-                      Khó (2 ngày)
+                      <span className="group-hover:scale-110 transition-transform">Khó (Hard)</span>
+                      <span className="text-[10px] opacity-75 font-normal">Ôn lại: 2 ngày [2]</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleReviewCard(3)}
-                      className="py-2.5 px-2 rounded-xl bg-blue-950/80 hover:bg-blue-900/80 border border-blue-800/60 text-blue-300 text-xs font-bold transition-all"
+                      className="py-3 px-2 rounded-xl bg-blue-950/80 hover:bg-blue-900 border border-blue-800/60 text-blue-200 text-xs font-bold flex flex-col items-center gap-1 transition-all shadow-sm group"
                     >
-                      Tốt (4 ngày)
+                      <span className="group-hover:scale-110 transition-transform">Tốt (Good)</span>
+                      <span className="text-[10px] opacity-75 font-normal">Ôn lại: 4 ngày [3]</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleReviewCard(4)}
-                      className="py-2.5 px-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-bold transition-all"
+                      className="py-3 px-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-800/60 text-emerald-200 text-xs font-bold flex flex-col items-center gap-1 transition-all shadow-sm group"
                     >
-                      Dễ (7 ngày)
+                      <span className="group-hover:scale-110 transition-transform">Dễ (Easy)</span>
+                      <span className="text-[10px] opacity-75 font-normal">Ôn lại: 7 ngày [4]</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="p-12 text-center text-slate-500">Đã ôn xong tất cả các thẻ!</div>
+            <div className="p-16 rounded-3xl glass-panel text-center flex flex-col items-center gap-4 max-w-md">
+              <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+              <h3 className="text-lg font-bold text-white">Đã Hoàn Thành Phiên Ôn Tập!</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Tất cả các thẻ trong thể loại này đã được ôn tập theo thuật toán SM-2. Hãy quay lại vào ngày mai hoặc chọn thể loại khác để tiếp tục.
+              </p>
+              <button
+                type="button"
+                onClick={() => fetchFlashcards(cardFilter)}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 transition-all"
+              >
+                <RotateCw className="w-4 h-4" />
+                <span>Ôn Lại Bộ Thẻ Này</span>
+              </button>
+            </div>
           )}
         </div>
-      )}
-
-      {/* ===================================================================== */}
+      )}{/* ===================================================================== */}
       {/* 3. FILL IN THE BLANK MODE (Điền Khuyết Câu Gốc - §3)                  */}
       {/* ===================================================================== */}
       {activeTab === "fill_in_blank" && (
@@ -5075,6 +5272,8 @@ export default function LearnPage() {
                 <option value="all">Tất cả các thẻ</option>
                 <option value="person">Thẻ nhân vật</option>
                 <option value="verse">Thẻ câu gốc</option>
+                <option value="event">Thẻ biến cố cứu chuộc</option>
+                <option value="timeline">Thẻ so sánh niên đại (§4)</option>
                 <option value="word">Thẻ từ ngữ gốc</option>
               </select>
             </div>

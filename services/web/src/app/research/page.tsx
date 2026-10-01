@@ -41,7 +41,8 @@ import {
   AlertTriangle,
   Scale,
   Columns3,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Network
 } from "lucide-react";
 
 // --- Context Study Interfaces (§15) ---
@@ -374,6 +375,7 @@ interface AgentResearchData {
 
 // Strong's Lexicon & Concordance Interfaces (§37, §49)
 interface LexiconItem {
+  id?: string;
   strong_number: string;
   language: string;
   lemma: string;

@@ -218,8 +218,29 @@ async function main() {
   const rQuiz = await testEndpoint('/api/learn/quiz', d => (!Array.isArray(d) || d.length === 0) && 'No quiz questions');
   report('GET /api/learn/quiz (Interactive theological quiz)', rQuiz.ok, rQuiz.error);
 
-  const rCards = await testEndpoint('/api/learn/flashcards', d => (!Array.isArray(d) || d.length === 0) && 'No flashcards');
-  report('GET /api/learn/flashcards (SM-2 Spaced repetition flashcards)', rCards.ok, rCards.error);
+  const rCards = await testEndpoint('/api/learn/flashcards?limit=60', d => {
+    if (!Array.isArray(d) || d.length < 50) return `Expected at least 50 flashcards, got ${d?.length}`;
+    const types = new Set(d.map(c => c.card_type));
+    const expectedTypes = ['verse', 'person', 'event', 'timeline', 'word'];
+    for (const t of expectedTypes) {
+      if (!types.has(t)) return `Missing canonical card type: ${t}`;
+    }
+    return false;
+  });
+  report('GET /api/learn/flashcards (Full 5-Type Flashcards Curriculum: Verse, Person, Event, Timeline, Word §4)', rCards.ok, rCards.error);
+
+  const sampleCardId = rCards.data?.[0]?.id || 1;
+  const rCardReview = await testEndpoint(`/api/learn/flashcards/${sampleCardId}/review`, d => {
+    if (!d || typeof d.interval_days !== 'number' || typeof d.repetition_count !== 'number') {
+      return 'Invalid SM-2 review response structure';
+    }
+    return false;
+  }, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating: 3 })
+  });
+  report('POST /api/learn/flashcards/{id}/review (Adaptive SM-2 Spaced Repetition calculation §46, §50)', rCardReview.ok, rCardReview.error);
 
   const rPacks = await testEndpoint('/api/learn/challenge-packs', d => (!Array.isArray(d) || d.length < 8) && `Expected at least 8 challenge packs, got ${d?.length}`);
   report(`GET /api/learn/challenge-packs (${rPacks.data?.length || 8} Thematic curriculum challenge packs)`, rPacks.ok, rPacks.error);
