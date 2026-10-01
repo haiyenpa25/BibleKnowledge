@@ -49,7 +49,7 @@
 
 | Tuyến Web (`Route`) | Module Chức Năng | Chi Tiết Nghiệm Thu Theo ROADMAP1.md |
 |:---|:---|:---|
-| `/` (Home) | Dashboard Tổng Quan | Số liệu thống kê thời gian thực (31.081 câu, 275 sách, 4.673 chunks), câu gốc trong ngày, phím tắt điều hướng nhanh. |
+| `/` (Home) | Dashboard Tổng Quan | Số liệu thống kê thời gian thực (31.081 câu, 275 sách, 4.673 chunks), câu gốc trong ngày. **Trình phát âm thanh Suy ngẫm Lời Chúa hằng ngày (Daily Devotional Audio Player & Reflection Feed §53)** tích hợp thuyết minh giọng đọc tiếng Việt, bài suy ngẫm thần học và lời cầu nguyện cho từng ngày; phím tắt điều hướng nhanh. |
 | `/bible` | Đọc & Tra Cứu Kinh Thánh | Đọc 66 sách theo chương, điều hướng Tân/Cựu Ước, tìm kiếm toàn văn không dấu tiếng Việt, hiển thị tiêu đề và tham chiếu chéo. **Ngăn Kéo Giải Kinh Phân Đoạn Nhanh (Inline Passage Exegesis Quick Drawer)** hiển thị trực tiếp dàn ý La Mã, bối cảnh lịch sử, từ khóa Strong, trích dẫn chú giải 275 cuốn sách và câu hỏi suy ngẫm ngay trong phiên đọc; Hỗ trợ lưu trữ ngoại tuyến tức thì (Offline-First Cache Hydration) cho Bookmark và Ghi chú cá nhân. |
 | `/research` | Nghiên Cứu Thần Học & Giải Kinh | 1. **Giải Kinh Phân Đoạn 11 Chiều (§13)**: Phân tích bối cảnh, tác giả, thể loại, thực thể, dàn ý La Mã, Strong's Lexicon, câu hỏi suy ngẫm, trích dẫn chú giải.<br>2. **Bối Cảnh Đa Chiều 6 Chiều (§15)**: Lịch sử, Văn hóa, Chính trị, Tôn giáo, Địa lý, Văn chương.<br>3. **Nguyên Ngữ & Strong's Morphology (§37, §49)**: Phân tích hình thái học nguyên ngữ (Greek/Hebrew Paradigms, Binyanim, Stems, Cases, Tenses), ngữ pháp, phát âm và đối chiếu Concordance toàn văn 31.081 câu.<br>4. **Hỏi Đáp Thần Học RAG**: Hỏi đáp có trích dẫn nguồn.<br>5. **Nhân Vật Kinh Thánh**: Nghiên cứu tiểu sử & hình bóng.<br>6. **Tác Nhân Nghiên Cứu AI**: Nghiên cứu sâu đa góc nhìn, ma trận đối chiếu. |
 | `/explore` | Khám Phá & Đối Chiếu Học Thuật | 1. **Đồ Thị Tri Thức (§17)**: Trực quan hóa Cytoscape.js mạng lưới giao ước, địa danh, nhân vật.<br>2. **Dòng Thời Gian Lịch Sử Cứu Chuộc Toàn Diện (§6, §44)**: 22 mốc biến cố then chốt từ Sáng tạo đến Khải Huyền, bộ lọc kỷ nguyên tương tác, tìm kiếm tức thì và bảng khảo sát ý nghĩa thần học/hình bóng Đấng Christ chuyên sâu.<br>3. **Bản Đồ Hành Trình Địa Lý (§9)**: 9 tuyến hành trình tương tác kèm mô phỏng tour tự động.<br>4. **Đối Chiếu Tin Lành Song Song**: 16 biến cố, 54 phân đoạn.<br>5. **Ma Trận Tiên Tri Mê-si (§18, §45)**: 14 lời tiên tri Cựu Ước & ứng nghiệm Tân Ước.<br>6. **Thư Viện 275 Tác Giả & Bộ Chú Giải**: Tra cứu danh mục và chuẩn trích dẫn. |
@@ -68,7 +68,7 @@
   2. **Suite 2 - Canonical Text Integrity & Database Validation**: 66 sách chính kinh, 31.081 câu BTT 1925, 0 câu rỗng, 275 sách thần học, 4.673 vector chunks với độ phủ nhúng 100%.
   3. **Suite 3 - Knowledge Graph Topology & Integrity**: 30 nodes, 35 edges, 0 broken edges, 0 orphan nodes.
   4. **Suite 4 - Web Application Routes**: 8 tuyến URL chính (`/`, `/bible`, `/explore`, `/learn`, `/research`, `/study`, `/library`, `/manifest.json`) trả về HTTP 200 OK.
-  5. **Suite 5 - Resource & Performance Guardrail**: Tổng RAM các container ứng dụng Non-Ollama duy trì nghiêm ngặt dưới 2.0 GB (~965.4 MiB / 2048 MiB).
+  5. **Suite 5 - Resource & Performance Guardrail**: Tổng RAM các container ứng dụng Non-Ollama duy trì nghiêm ngặt dưới 2.0 GB (~986.5 MiB / 2048 MiB).
 
 ---
 
@@ -78,6 +78,7 @@
 2. [x] **Mở rộng ngân hàng câu hỏi trắc nghiệm**: Bổ sung 18 câu hỏi thần học chuyên sâu (tổng cộng 48 câu hỏi) bao quát Giao ước Áp-ra-ham, Huyết chiên Lễ Vượt Qua, Mười Điều Răn, Con rắn đồng, Đại Mạng Lệnh Shema, Xưng công bình bởi đức tin (Rô-ma 3), Giải phóng khỏi sự đoán phạt (Rô-ma 8), Thân thể Đấng Christ (1 Cô-rinh-tô 12), Kinh tín phục sinh (1 Cô-rinh-tô 15), Thọ tạo mới (2 Cô-rinh-tô 5), Sự rỗng mình (Phi-líp 2), Tối thượng tính của Đấng Christ (Cô-lô-se 1), và Sự soi dẫn của Kinh Thánh (2 Ti-mô-thê 3).
 3. [x] **Kiến trúc bền bỉ ngoại tuyến (Offline-First Persistence)**: Cơ chế đồng bộ hóa hai chiều và phục hồi tức thì từ `localStorage` cho Bookmark và Ghi chú cá nhân trong giao diện đọc Kinh Thánh khi mất kết nối mạng.
 4. [x] **Dòng Thời Gian Cứu Chuộc Toàn Diện (Expanded 22-Milestone Biblical Timeline, §6, §44)**: Mở rộng dòng thời gian từ 11 lên 22 biến cố bao quát toàn diện lịch sử cứu chuộc từ Sáng Tạo đến Khải Huyền Bát-mô; bổ sung bộ lọc kỷ nguyên, thanh tìm kiếm tức thì, thẻ nhân vật/địa danh và cửa sổ khảo cứu thần học chi tiết cho từng biến cố.
+5. [x] **Trình Phát Âm Thanh Suy Ngẫm Lời Chúa Hằng Ngày (Daily Devotional Audio Player & Exegetical Reflection Feed, §53)**: Tích hợp bài suy ngẫm giải kinh, chủ đề thần học và lời cầu nguyện cho từng câu gốc trong ngày (`GET /api/bible/daily-insight`). Hỗ trợ phát giọng đọc tự nhiên (Web Speech API tiếng Việt), nút sao chép trọn bộ suy ngẫm và bảng mở rộng trực tiếp ngay trên Dashboard Trang Chủ.
 
 ---
 
@@ -85,4 +86,4 @@
 
 1. **Advanced Cross-Reference Graph Viewer**: Mở rộng trực quan hóa đồ thị tham chiếu chéo tương tác giữa các câu Kinh Thánh có liên hệ mật thiết.
 2. **Multi-Version Bible Alignment**: Chuẩn bị cấu trúc dữ liệu để mở rộng thêm các bản dịch tiếng Việt công cộng khác (như Bản Dịch Mới, KJV tiếng Anh) khi được cấp phép.
-3. **Daily Audio Devotional Podcast Feed**: Tự động phát âm thanh tóm tắt giải kinh và câu gốc suy ngẫm mỗi ngày.
+3. **Automated Theological Study Deck Exporter**: Xuất trọn bộ chuyên đề thành tập slide bài giảng hoặc tài liệu hướng dẫn nhóm nhỏ.

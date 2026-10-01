@@ -78,6 +78,17 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Integration**: Directly invokes `POST /api/rag/passage-study` with the currently selected chapter/passage range, delivering 11-dimension exegesis (Roman numeral outlines, historical context, Strong keywords, commentary citations, and reflection questions) without navigating away from the reader.
 - **Offline Resilience**: Bookmarks and user notes are backed by local cache (`localStorage`) hydration with graceful fallback when working offline.
 
+### 2.7 Daily Insight & Audio Devotional Meditation Feed (§53)
+- **Endpoint**: `GET /api/bible/daily-insight`
+- **Description**: Returns daily spiritual nourishment for the home dashboard:
+  - `verse_of_the_day`: Curated canonical golden verse with Vietnamese text, reference, and chapter/verse codes.
+  - `devotional_meditation`: Daily exegetical devotional including theological theme, title, spiritual reflection paragraph, and personalized daily prayer.
+  - `person_of_the_day`: Biographical overview and key verse of a prominent biblical figure.
+  - `event_of_the_day`: Landmark historical event from the redemptive timeline.
+  - `daily_quiz`: Spaced practice question with immediate explanation and Scripture reference.
+  - `featured_sermon`, `featured_challenge_pack`, `featured_journey`: Recommended daily learning pathways.
+  - `metrics`: Real-time system statistics (verses, chunks, flashcards, notes, nodes).
+
 ---
 
 ## 3. Theological RAG & AI Exegesis Engine (`/api/rag`)

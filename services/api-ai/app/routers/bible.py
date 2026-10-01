@@ -346,16 +346,53 @@ def get_daily_insight(db: Session = Depends(get_db)):
     Get Daily Verse, Person of the Day, Event of the Day, and system overview metrics.
     Reference: ROADMAP1.md Section 53
     """
-    # 1. Verse of the Day (Curated pool)
-    curated_refs = [
-        "Giăng 3:16",
-        "Thi-thiên 23:1",
-        "Rô-ma 8:28",
-        "Phi-líp 4:13",
-        "Châm-ngôn 3:5-6",
-        "Ê-sai 40:31",
-        "Giê-rê-mi 29:11"
-    ]
+    # 1. Verse of the Day (Curated pool & Theological Meditations)
+    MEDITATIONS_MAP = {
+        "Giăng 3:16": {
+            "title": "Tình Yêu Đời Đời Của Cha Thiên Thượng",
+            "theme": "Sự Sống Đời Đời & Ân Điển Cứu Chuộc",
+            "reflection": "Giăng 3:16 là trọng tâm của Phúc Âm. Đức Chúa Trời không chỉ bày tỏ tình yêu bằng lời phán mà bằng hành động dâng hiến tột bậc: Ngài đã ban Con Một là Chúa Cứu Thế Giê-xu để gánh tội thay cho nhân loại. Khi chúng ta đặt trọn đức tin nơi Đấng Christ, chúng ta không còn bị đoán phạt mà nhận lãnh sự sống vĩnh cửu ngay trong hiện tại.",
+            "prayer": "Lạy Cha từ ái, con tạ ơn Chúa vì tình yêu thương vô đối đã cứu chuộc cuộc đời con. Xin giúp con sống xứng đáng với ơn cứu rỗi và trở nên ngọn đèn chiếu tỏa tình yêu Ngài cho những người xung quanh hôm nay. Trong danh Chúa Giê-xu Christ. Amen."
+        },
+        "Thi-thiên 23:1": {
+            "title": "Đấng Chăn Chiên Nhân Lành Vẹn Toàn",
+            "theme": "Sự Nuôi Dưỡng & Bình An Trọn Vẹn",
+            "reflection": "Khi Đức Giê-hô-va là Đấng Chăn giữ cuộc đời mình, chúng ta sẽ chẳng thiếu thốn gì về nhu cầu tâm linh lẫn thể xác. Ngài dẫn chúng ta đến mé nước bình tịnh, bổ lại linh hồn và dắt lối công bình vì cớ danh Ngài.",
+            "prayer": "Lạy Chúa là Đấng Chăn giữ con, con xin trao phó mọi lo toan, dự định hôm nay vào bàn tay dịu dàng của Ngài. Xin ban cho con sự bình an sâu nhiệm giữa mọi biến động cuộc sống. Amen."
+        },
+        "Rô-ma 8:28": {
+            "title": "Mọi Sự Hiệp Lại Làm Ích",
+            "theme": "Chủ Quyền Tối Thượng Của Đức Chúa Trời",
+            "reflection": "Dù hoàn cảnh hiện tại có thể đầy thách thức hay khó hiểu, Lời Chúa bảo chứng rằng muôn sự đều đang vận hành dưới sự tể trị của Đấng Thành Tín để đem lại ích lợi tối hậu cho những kẻ yêu mến Ngài và được gọi theo ý định Ngài.",
+            "prayer": "Lạy Chúa, ngay cả trong những điều con chưa hiểu thấu, con xin hết lòng nương cậy vào sự khôn ngoan và lòng nhân từ của Ngài. Xin biến đổi thử thách hôm nay thành cơ hội để đức tin con thêm vững vàng. Amen."
+        },
+        "Phi-líp 4:13": {
+            "title": "Năng Lực Đắc Thắng Trong Đấng Christ",
+            "theme": "Năng Quyền Thuộc Linh & Sự Thỏa Lòng",
+            "reflection": "Sứ đồ Phao-lô không tự hào về sức riêng, mà kinh nghiệm năng lực siêu nhiên của Đấng Christ tuôn tràn khi ông ở trong Ngài. Bất kể khi dư dật hay thiếu thốn, người theo Chúa luôn có thể làm được mọi sự nhờ sức Chúa ban.",
+            "prayer": "Lạy Đấng Cứu Thế Giê-xu, con cầu xin Ngài đổ đầy Thánh Linh và sức lực tươi mới trên con trong ngày hôm nay, để con hoàn tất mọi trách nhiệm với lòng trung tín và vinh hiển Danh Ngài. Amen."
+        },
+        "Châm-ngôn 3:5-6": {
+            "title": "Hết Lòng Tin Cậy Đấng Dẫn Đường",
+            "theme": "Sự Khôn Ngoan & Định Hướng Đời Sống",
+            "reflection": "Khôn ngoan của con người là hữu hạn, nhưng sự chỉ dẫn của Chúa là hoàn hảo. Khi chúng ta từ bỏ sự tự phụ, nhận biết Chúa trong mọi bước đường, chính Ngài sẽ san bằng các nẻo chông gai phía trước.",
+            "prayer": "Lạy Chúa, xin dẫn dắt từng quyết định, lời nói và hành vi của con hôm nay. Con xin hạ mình đầu phục trước ý chỉ thánh khiết của Ngài. Amen."
+        },
+        "Ê-sai 40:31": {
+            "title": "Cất Cánh Bay Cao Như Chim Ưng",
+            "theme": "Sự Trông Đợi & Sức Mới Tươi Mát",
+            "reflection": "Kẻ trông đợi Đức Giê-hô-va sẽ được đổi mới sức lực. Như chim ưng giương cánh lướt trên bão gió, đức tin trông cậy nơi Chúa nâng đỡ tâm hồn vượt lên trên những mỏi mệt của trần gian.",
+            "prayer": "Lạy Chúa, khi con cảm thấy kiệt sức, xin phục hồi linh lực cho con. Xin nhắc nhở con rằng nguồn năng lực đời đời thuộc về Ngài. Amen."
+        },
+        "Giê-rê-mi 29:11": {
+            "title": "Ý Tưởng Bình An & Hy Vọng Tương Lai",
+            "theme": "Kế Hoạch Cứu Rỗi & Tương Lai Đầy Hứa Hẹn",
+            "reflection": "Đức Giê-hô-va có chương trình tốt lành định sẵn cho đời sống chúng ta: ý tưởng bình an chứ không phải tai họa, để ban cho chúng ta một sự trông cậy và một kết cục phước hạnh.",
+            "prayer": "Lạy Chúa, con an nghỉ trong lời hứa thành tín của Ngài. Xin gìn giữ lòng con hướng về hy vọng sống động mà Chúa đã sắm sẵn cho con. Amen."
+        }
+    }
+
+    curated_refs = list(MEDITATIONS_MAP.keys())
     import random
     selected_ref = random.choice(curated_refs)
 
@@ -390,6 +427,13 @@ def get_daily_insight(db: Session = Depends(get_db)):
             "text": "Vì Đức Chúa Trời yêu thương thế gian, đến nỗi đã ban Con một của Ngài, hầu cho hễ ai tin Con ấy không bị hư mất mà được sự sống đời đời.",
             "verse_code": 43003016
         }
+
+    devotional_meditation = MEDITATIONS_MAP.get(verse_data["reference"]) or {
+        "title": f"Suy Ngẫm Lời Chúa: {verse_data['reference']}",
+        "theme": "Nuôi Dưỡng Đời Sống Thuộc Linh",
+        "reflection": f"Lời Chúa trong {verse_data['reference']} là kim chỉ nam soi sáng đường lối chúng ta: '{verse_data['text']}'. Hãy dành thời gian suy ngẫm chân lý này và áp dụng vào đời sống hôm nay.",
+        "prayer": "Lạy Cha Thiên Thượng, xin Lời Chúa hôm nay ngự trị trong lòng con, biến đổi tâm trí con và dẫn dắt con bước đi trong sự công bình của Ngài. Amen."
+    }
 
     # 2. Person of the Day
     p_row = db.execute(
@@ -483,6 +527,7 @@ def get_daily_insight(db: Session = Depends(get_db)):
 
     return {
         "verse_of_the_day": verse_data,
+        "devotional_meditation": devotional_meditation,
         "person_of_the_day": person_data,
         "event_of_the_day": event_data,
         "daily_quiz": daily_quiz,

@@ -32,7 +32,13 @@ import {
   Compass,
   FileText,
   GitCompare,
-  Flame
+  Flame,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  Headphones,
+  X
 } from "lucide-react";
 
 interface HealthStatus {
@@ -69,6 +75,12 @@ interface DailyInsight {
     verse: number;
     text: string;
     verse_code: number;
+  };
+  devotional_meditation?: {
+    title: string;
+    theme: string;
+    reflection: string;
+    prayer: string;
   };
   person_of_the_day: {
     slug: string;
@@ -160,6 +172,55 @@ export default function Home() {
   const [todayPlan, setTodayPlan] = useState<TodayReadingPlanData | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(true);
   const [copiedVerse, setCopiedVerse] = useState(false);
+  const [isDevotionalSpeaking, setIsDevotionalSpeaking] = useState(false);
+  const [isDevotionalExpanded, setIsDevotionalExpanded] = useState(false);
+  const [copiedDevotional, setCopiedDevotional] = useState(false);
+
+  function toggleDevotionalSpeech() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !dailyInsight) return;
+
+    if (isDevotionalSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsDevotionalSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const v = dailyInsight.verse_of_the_day;
+    const m = dailyInsight.devotional_meditation;
+    
+    let textToSpeak = `Linh lực hằng ngày. Câu gốc suy ngẫm trong ${v.reference}: "${v.text}". `;
+    if (m) {
+      textToSpeak += `Chủ đề suy ngẫm: ${m.title}. ${m.reflection}. Lời cầu nguyện: ${m.prayer}`;
+    }
+
+    const utt = new SpeechSynthesisUtterance(textToSpeak);
+    utt.lang = "vi-VN";
+    utt.rate = 0.95;
+
+    utt.onend = () => {
+      setIsDevotionalSpeaking(false);
+    };
+    utt.onerror = () => {
+      setIsDevotionalSpeaking(false);
+    };
+
+    setIsDevotionalSpeaking(true);
+    window.speechSynthesis.speak(utt);
+  }
+
+  function handleCopyDevotional() {
+    if (!dailyInsight) return;
+    const v = dailyInsight.verse_of_the_day;
+    const m = dailyInsight.devotional_meditation;
+    let fullText = `[CÂU GỐC TRONG NGÀY - ${v.reference}]\n"${v.text}"\n\n`;
+    if (m) {
+      fullText += `[SUY NGẪM: ${m.title}]\nChủ đề: ${m.theme}\n${m.reflection}\n\n[CẦU NGUYỆN]\n${m.prayer}\n\n(Nền tảng Kinh Thánh BibleKnowledge)`;
+    }
+    navigator.clipboard.writeText(fullText);
+    setCopiedDevotional(true);
+    setTimeout(() => setCopiedDevotional(false), 2500);
+  }
 
   // Daily Quiz Interactive State (§53)
   const [selectedQuizIdx, setSelectedQuizIdx] = useState<number | null>(null);
@@ -222,7 +283,12 @@ export default function Home() {
     checkHealth();
     fetchDaily();
     const interval = setInterval(checkHealth, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, [apiUrl]);
 
   async function handleFetchVerses(refToFetch?: string) {
@@ -390,13 +456,36 @@ export default function Home() {
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     Câu Gốc Trong Ngày
                   </span>
-                  <button
-                    onClick={() => handleCopyVerse(`${dailyInsight.verse_of_the_day.reference} - "${dailyInsight.verse_of_the_day.text}"`)}
-                    className="text-slate-400 hover:text-white transition-colors"
-                    title="Sao chép câu gốc"
-                  >
-                    {copiedVerse ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={toggleDevotionalSpeech}
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
+                        isDevotionalSpeaking
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse shadow-sm shadow-rose-900/40"
+                          : "bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30"
+                      }`}
+                      title={isDevotionalSpeaking ? "Dừng đọc suy ngẫm" : "Nghe đọc suy ngẫm Lời Chúa hằng ngày"}
+                    >
+                      {isDevotionalSpeaking ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Đang đọc</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Nghe suy ngẫm</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleCopyVerse(`${dailyInsight.verse_of_the_day.reference} - "${dailyInsight.verse_of_the_day.text}"`)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      title="Sao chép câu gốc"
+                    >
+                      {copiedVerse ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <h4 className="text-base font-bold text-white">
                   {dailyInsight.verse_of_the_day.reference}
@@ -404,6 +493,49 @@ export default function Home() {
                 <p className="text-xs text-slate-200 leading-relaxed font-serif italic pt-1">
                   "{dailyInsight.verse_of_the_day.text}"
                 </p>
+
+                {/* Devotional Reflection Expandable Card */}
+                {dailyInsight.devotional_meditation && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-800/60 mt-1">
+                    <button
+                      onClick={() => setIsDevotionalExpanded(!isDevotionalExpanded)}
+                      className="text-[11px] font-semibold text-amber-300/90 hover:text-amber-200 flex items-center gap-1.5 w-fit transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isDevotionalExpanded ? "Thu gọn bài suy ngẫm ▲" : "Xem bài suy ngẫm & cầu nguyện ▼"}</span>
+                    </button>
+
+                    {isDevotionalExpanded && (
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col gap-2.5 text-xs animate-in fade-in">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                              {dailyInsight.devotional_meditation.theme}
+                            </span>
+                            <h5 className="font-bold text-white text-xs mt-0.5">
+                              {dailyInsight.devotional_meditation.title}
+                            </h5>
+                          </div>
+                          <button
+                            onClick={handleCopyDevotional}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 shrink-0 transition-colors"
+                            title="Sao chép toàn bộ bài suy ngẫm"
+                          >
+                            {copiedDevotional ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedDevotional ? "Đã chép!" : "Chép"}</span>
+                          </button>
+                        </div>
+                        <p className="text-slate-300 font-sans leading-relaxed text-[11px]">
+                          {dailyInsight.devotional_meditation.reflection}
+                        </p>
+                        <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-[11px] text-amber-100/90 italic font-serif">
+                          <span className="font-bold not-italic text-amber-400 font-sans">Lời cầu nguyện: </span>
+                          {dailyInsight.devotional_meditation.prayer}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
