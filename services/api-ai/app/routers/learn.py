@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel, Field
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import httpx
 import json
 import logging
@@ -447,3 +447,141 @@ YÊU CẦU:
         logger.error(f"Error generating flashcards: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Không thể tạo thẻ ghi nhớ: {str(e)}")
+
+
+# ==============================================================================
+# User Mastery & Progress System (ROADMAP1 Section 5, 46)
+# ==============================================================================
+
+class UserProfileResponse(BaseModel):
+    user_identifier: str
+    total_score: int
+    daily_streak: int
+    level_title: str
+    total_quizzes_completed: int
+    total_flashcards_reviewed: int
+    mastery_by_topic: Dict[str, int]
+
+
+class QuizSubmitRequest(BaseModel):
+    correct_count: int
+    total_questions: int
+    topic: Optional[str] = "Gospels"
+
+
+def get_level_title(score: int) -> str:
+    if score < 200:
+        return "Người Tìm Kiếm Chân Lý"
+    elif score < 500:
+        return "Môn Đồ Bước Đầu"
+    elif score < 1000:
+        return "Người Học Lời Chúa Chăm Chỉ"
+    elif score < 2500:
+        return "Học Giả Kinh Thánh"
+    else:
+        return "Bậc Thầy Nghiên Cứu Lời Chúa"
+
+
+@router.get("/profile", response_model=UserProfileResponse)
+def get_user_profile(db: Session = Depends(get_db)):
+    """Fetch user's gamified learning stats, streak, score, and topic mastery."""
+    row = db.execute(
+        text("SELECT user_identifier, total_score, daily_streak, total_quizzes_completed, total_flashcards_reviewed, mastery_by_topic FROM user_learning_profiles WHERE user_identifier = 'local_user' LIMIT 1")
+    ).fetchone()
+
+    if not row:
+        return UserProfileResponse(
+            user_identifier="local_user",
+            total_score=0,
+            daily_streak=1,
+            level_title="Người Tìm Kiếm Chân Lý",
+            total_quizzes_completed=0,
+            total_flashcards_reviewed=0,
+            mastery_by_topic={"Gospels": 50, "Pentateuch": 40, "Pauline": 45}
+        )
+
+    mastery = row.mastery_by_topic
+    if isinstance(mastery, str):
+        try:
+            mastery = json.loads(mastery)
+        except Exception:
+            mastery = {}
+
+    return UserProfileResponse(
+        user_identifier=row.user_identifier,
+        total_score=row.total_score,
+        daily_streak=row.daily_streak,
+        level_title=get_level_title(row.total_score),
+        total_quizzes_completed=row.total_quizzes_completed,
+        total_flashcards_reviewed=row.total_flashcards_reviewed,
+        mastery_by_topic=mastery or {}
+    )
+
+
+@router.post("/quiz/submit", response_model=UserProfileResponse)
+def submit_quiz_score(req: QuizSubmitRequest, db: Session = Depends(get_db)):
+    """Record quiz completion, award points, and increase streak/mastery."""
+    earned_points = req.correct_count * 20
+    topic = req.topic or "Gospels"
+
+    # Fetch current profile
+    row = db.execute(
+        text("SELECT id, total_score, daily_streak, total_quizzes_completed, total_flashcards_reviewed, mastery_by_topic FROM user_learning_profiles WHERE user_identifier = 'local_user'")
+    ).fetchone()
+
+    if row:
+        new_score = row.total_score + earned_points
+        new_quizzes = row.total_quizzes_completed + 1
+        mastery = row.mastery_by_topic
+        if isinstance(mastery, str):
+            try:
+                mastery = json.loads(mastery)
+            except Exception:
+                mastery = {}
+        if not isinstance(mastery, dict):
+            mastery = {}
+
+        # Increment topic mastery percentage slightly
+        curr_mastery = mastery.get(topic, 50)
+        boost = int((req.correct_count / max(1, req.total_questions)) * 5)
+        mastery[topic] = min(100, curr_mastery + boost)
+
+        db.execute(
+            text("""
+            UPDATE user_learning_profiles
+            SET total_score = :score,
+                total_quizzes_completed = :quizzes,
+                mastery_by_topic = :mastery,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+            """),
+            {
+                "score": new_score,
+                "quizzes": new_quizzes,
+                "mastery": json.dumps(mastery),
+                "id": row.id
+            }
+        )
+        db.commit()
+
+        return UserProfileResponse(
+            user_identifier="local_user",
+            total_score=new_score,
+            daily_streak=row.daily_streak,
+            level_title=get_level_title(new_score),
+            total_quizzes_completed=new_quizzes,
+            total_flashcards_reviewed=row.total_flashcards_reviewed,
+            mastery_by_topic=mastery
+        )
+    else:
+        # Create profile
+        db.execute(
+            text("""
+            INSERT INTO user_learning_profiles (user_identifier, total_score, daily_streak, total_quizzes_completed, total_flashcards_reviewed, mastery_by_topic)
+            VALUES ('local_user', :score, 1, 1, 0, :mastery)
+            """),
+            {"score": earned_points, "mastery": json.dumps({topic: 60})}
+        )
+        db.commit()
+        return get_user_profile(db=db)
+

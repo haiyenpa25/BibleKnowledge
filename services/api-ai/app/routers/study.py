@@ -81,6 +81,38 @@ class BookmarkItem(BaseModel):
     created_at: str
 
 
+class StudyProjectCreate(BaseModel):
+    title: str = Field(..., max_length=255)
+    description: Optional[str] = ""
+    category: str = "theology"
+    pinned_verses: List[Dict[str, Any]] = []
+    pinned_entities: List[Dict[str, Any]] = []
+    study_questions: List[str] = []
+
+
+class StudyProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    pinned_verses: Optional[List[Dict[str, Any]]] = None
+    pinned_entities: Optional[List[Dict[str, Any]]] = None
+    study_questions: Optional[List[str]] = None
+    ai_outline: Optional[List[Dict[str, Any]]] = None
+
+
+class StudyProjectItem(BaseModel):
+    id: str
+    title: str
+    description: Optional[str]
+    category: str
+    pinned_verses: List[Dict[str, Any]]
+    pinned_entities: List[Dict[str, Any]]
+    study_questions: List[str]
+    ai_outline: List[Dict[str, Any]]
+    created_at: str
+    updated_at: str
+
+
 # ==============================================================================
 # 1. Strong Lexicon Endpoints (Original Languages)
 # ==============================================================================
@@ -377,3 +409,273 @@ def delete_bookmark(bm_id: str, db: Session = Depends(get_db)):
     db.execute(text("DELETE FROM user_bookmarks WHERE id = :id"), {"id": bm_id})
     db.commit()
     return {"message": "Đã gỡ bookmark thành công."}
+
+
+# ==============================================================================
+# 5. Study Projects Workspace (ROADMAP1 Section 50)
+# ==============================================================================
+
+def parse_json_field(val: Any) -> list:
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return []
+    return []
+
+
+@router.get("/projects", response_model=List[StudyProjectItem])
+def list_study_projects(db: Session = Depends(get_db)):
+    """List all study projects with pinned elements and outline."""
+    rows = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, pinned_entities, study_questions, ai_outline, created_at, updated_at FROM study_projects ORDER BY updated_at DESC")
+    ).fetchall()
+
+    results = []
+    for r in rows:
+        results.append(StudyProjectItem(
+            id=str(r.id),
+            title=r.title,
+            description=r.description or "",
+            category=r.category or "theology",
+            pinned_verses=parse_json_field(r.pinned_verses),
+            pinned_entities=parse_json_field(r.pinned_entities),
+            study_questions=parse_json_field(r.study_questions),
+            ai_outline=parse_json_field(r.ai_outline),
+            created_at=r.created_at.isoformat() if r.created_at else "",
+            updated_at=r.updated_at.isoformat() if r.updated_at else ""
+        ))
+    return results
+
+
+@router.post("/projects", response_model=StudyProjectItem)
+def create_study_project(req: StudyProjectCreate, db: Session = Depends(get_db)):
+    """Create a new research study project."""
+    res = db.execute(
+        text("""
+        INSERT INTO study_projects (title, description, category, pinned_verses, pinned_entities, study_questions, created_at, updated_at)
+        VALUES (:title, :desc, :cat, :verses, :entities, :questions, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING id, created_at, updated_at
+        """),
+        {
+            "title": req.title,
+            "desc": req.description,
+            "cat": req.category,
+            "verses": json.dumps(req.pinned_verses, ensure_ascii=False),
+            "entities": json.dumps(req.pinned_entities, ensure_ascii=False),
+            "questions": json.dumps(req.study_questions, ensure_ascii=False)
+        }
+    ).fetchone()
+    db.commit()
+
+    return StudyProjectItem(
+        id=str(res.id),
+        title=req.title,
+        description=req.description,
+        category=req.category,
+        pinned_verses=req.pinned_verses,
+        pinned_entities=req.pinned_entities,
+        study_questions=req.study_questions,
+        ai_outline=[],
+        created_at=res.created_at.isoformat(),
+        updated_at=res.updated_at.isoformat()
+    )
+
+
+@router.get("/projects/{project_id}", response_model=StudyProjectItem)
+def get_study_project(project_id: str, db: Session = Depends(get_db)):
+    """Fetch single study project by ID."""
+    r = db.execute(
+        text("SELECT id, title, description, category, pinned_verses, pinned_entities, study_questions, ai_outline, created_at, updated_at FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    return StudyProjectItem(
+        id=str(r.id),
+        title=r.title,
+        description=r.description or "",
+        category=r.category or "theology",
+        pinned_verses=parse_json_field(r.pinned_verses),
+        pinned_entities=parse_json_field(r.pinned_entities),
+        study_questions=parse_json_field(r.study_questions),
+        ai_outline=parse_json_field(r.ai_outline),
+        created_at=r.created_at.isoformat() if r.created_at else "",
+        updated_at=r.updated_at.isoformat() if r.updated_at else ""
+    )
+
+
+@router.put("/projects/{project_id}", response_model=StudyProjectItem)
+def update_study_project(project_id: str, req: StudyProjectUpdate, db: Session = Depends(get_db)):
+    """Update study project elements."""
+    curr = db.execute(text("SELECT id FROM study_projects WHERE id = :id"), {"id": project_id}).fetchone()
+    if not curr:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    updates = []
+    params: dict = {"id": project_id}
+
+    if req.title is not None:
+        updates.append("title = :title")
+        params["title"] = req.title
+    if req.description is not None:
+        updates.append("description = :desc")
+        params["desc"] = req.description
+    if req.category is not None:
+        updates.append("category = :cat")
+        params["cat"] = req.category
+    if req.pinned_verses is not None:
+        updates.append("pinned_verses = :verses")
+        params["verses"] = json.dumps(req.pinned_verses, ensure_ascii=False)
+    if req.pinned_entities is not None:
+        updates.append("pinned_entities = :entities")
+        params["entities"] = json.dumps(req.pinned_entities, ensure_ascii=False)
+    if req.study_questions is not None:
+        updates.append("study_questions = :questions")
+        params["questions"] = json.dumps(req.study_questions, ensure_ascii=False)
+    if req.ai_outline is not None:
+        updates.append("ai_outline = :outline")
+        params["outline"] = json.dumps(req.ai_outline, ensure_ascii=False)
+
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    sql = f"UPDATE study_projects SET {', '.join(updates)} WHERE id = :id"
+    db.execute(text(sql), params)
+    db.commit()
+
+    return get_study_project(project_id, db=db)
+
+
+@router.delete("/projects/{project_id}")
+def delete_study_project(project_id: str, db: Session = Depends(get_db)):
+    """Delete a study project."""
+    db.execute(text("DELETE FROM study_projects WHERE id = :id"), {"id": project_id})
+    db.commit()
+    return {"message": "Đã xóa dự án nghiên cứu thành công."}
+
+
+@router.post("/projects/{project_id}/generate-outline", response_model=StudyProjectItem)
+async def generate_project_outline(project_id: str, db: Session = Depends(get_db)):
+    """Use Ollama local LLM to generate structured study outline for the project."""
+    r = db.execute(
+        text("SELECT id, title, description, category, pinned_verses FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    verses_list = parse_json_field(r.pinned_verses)
+    verses_context = "\n".join(f"- {v.get('reference', '')}: {v.get('text', '')}" for v in verses_list)
+
+    prompt = f"""Bạn là nhà thần học Kinh Thánh. Hãy lập dàn ý nghiên cứu có cấu trúc chuẩn mực cho đề tài sau:
+Đề tài: {r.title}
+Mô tả: {r.description}
+Các câu Kinh Thánh trọng tâm:
+{verses_context if verses_context else "(Chưa ghim câu Kinh Thánh)"}
+
+Yêu cầu trả về định dạng JSON array hợp lệ, KHÔNG thêm bất kỳ giải thích ngoài:
+[
+  {{"section": "I. Tên Phân Đoạn 1", "content": "Nội dung tóm tắt nghiên cứu 1-2 câu"}},
+  {{"section": "II. Tên Phân Đoạn 2", "content": "Nội dung tóm tắt nghiên cứu 1-2 câu"}},
+  {{"section": "III. Tên Phân Đoạn 3", "content": "Nội dung tóm tắt nghiên cứu 1-2 câu"}}
+]
+"""
+    outline_data = []
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": settings.OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False
+                }
+            )
+            if resp.status_code == 200:
+                raw_text = resp.json().get("response", "").strip()
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                elif raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+                raw_text = raw_text.strip()
+                parsed = json.loads(raw_text)
+                if isinstance(parsed, list):
+                    outline_data = parsed
+    except Exception as e:
+        logger.warning(f"Failed to generate outline with Ollama: {e}")
+
+    if not outline_data:
+        # Fallback outline
+        outline_data = [
+            {"section": f"I. Khảo Luận Bối Cảnh Lịch Sử & Tác Giả", "content": f"Tìm hiểu thời điểm, tác giả và hoàn cảnh lịch sử liên quan đến đề tài {r.title}."},
+            {"section": f"II. Căn Cứ Thần Học Cốt Lõi", "content": f"Phân tích các phân đoạn Kinh Thánh trọng tâm làm nền tảng đức tin."},
+            {"section": f"III. Bài Học Thuộc Linh & Thực Tiễn", "content": f"Ý nghĩa áp dụng cho đời sống thờ phượng và bước đi cùng Chúa hôm nay."}
+        ]
+
+    db.execute(
+        text("""
+        UPDATE study_projects
+        SET ai_outline = :outline,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+        """),
+        {"outline": json.dumps(outline_data, ensure_ascii=False), "id": project_id}
+    )
+    db.commit()
+
+    return get_study_project(project_id, db=db)
+
+
+@router.post("/projects/{project_id}/export-flashcards")
+def export_project_to_flashcards(project_id: str, db: Session = Depends(get_db)):
+    """Export project outline and verses into SM-2 spaced repetition flashcards."""
+    r = db.execute(
+        text("SELECT id, title, ai_outline, pinned_verses FROM study_projects WHERE id = :id"),
+        {"id": project_id}
+    ).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án nghiên cứu.")
+
+    outline = parse_json_field(r.ai_outline)
+    verses = parse_json_field(r.pinned_verses)
+
+    created_count = 0
+
+    # Create flashcards from outline
+    for sec in outline:
+        front = f"[{r.title}] {sec.get('section', '')} có ý nghĩa gì?"
+        back = sec.get('content', '')
+        if front and back:
+            db.execute(
+                text("""
+                INSERT INTO flashcards (card_type, front_text, back_text, difficulty_level, repetition_count, interval_days, next_review_at)
+                VALUES ('doctrine', :front, :back, 1, 0, 1, CURRENT_TIMESTAMP)
+                """),
+                {"front": front, "back": back}
+            )
+            created_count += 1
+
+    # Create flashcards from verses
+    for v in verses:
+        front = f"Câu Kinh Thánh nào nói về: {r.title} ({v.get('reference', '')})?"
+        back = v.get('text', '')
+        if front and back:
+            db.execute(
+                text("""
+                INSERT INTO flashcards (card_type, front_text, back_text, difficulty_level, repetition_count, interval_days, next_review_at)
+                VALUES ('verse', :front, :back, 2, 0, 1, CURRENT_TIMESTAMP)
+                """),
+                {"front": front, "back": back}
+            )
+            created_count += 1
+
+    db.commit()
+    return {"message": f"Đã xuất thành công {created_count} thẻ ghi nhớ Flashcard vào hệ thống Học Tập!", "created_count": created_count}
+

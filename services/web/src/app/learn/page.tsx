@@ -44,8 +44,21 @@ interface Flashcard {
   next_review_at: string;
 }
 
+interface UserProfile {
+  user_identifier: string;
+  total_score: number;
+  daily_streak: number;
+  level_title: string;
+  total_quizzes_completed: number;
+  total_flashcards_reviewed: number;
+  mastery_by_topic: Record<string, number>;
+}
+
 export default function LearnPage() {
   const [activeTab, setActiveTab] = useState<"quiz" | "flashcards" | "generator">("quiz");
+
+  // User Profile Gamification State
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Quiz State
   const [quizList, setQuizList] = useState<QuizQuestion[]>([]);
@@ -125,9 +138,22 @@ export default function LearnPage() {
     }
   };
 
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/profile`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserProfile(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+    }
+  };
+
   useEffect(() => {
     fetchQuiz();
     fetchFlashcards();
+    fetchProfile();
   }, [apiUrl]);
 
   // Quiz Handling
@@ -145,13 +171,31 @@ export default function LearnPage() {
     }
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (currentIndex + 1 < quizList.length) {
       setCurrentIndex((i) => i + 1);
       setSelectedOption(null);
       setIsAnswered(false);
     } else {
       setQuizFinished(true);
+      // Auto submit quiz score to user profile
+      try {
+        const res = await fetch(`${apiUrl}/api/learn/quiz/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correct_count: Math.max(1, Math.round(score / 10)),
+            total_questions: quizList.length,
+            topic: filterType === "all" ? "Gospels" : "Pauline"
+          })
+        });
+        if (res.ok) {
+          const updatedProf = await res.json();
+          setUserProfile(updatedProf);
+        }
+      } catch (e) {
+        console.error("Failed to submit quiz score:", e);
+      }
     }
   };
 
@@ -159,6 +203,7 @@ export default function LearnPage() {
     setScore(0);
     setStreak(0);
     fetchQuiz(filterType);
+    fetchProfile();
   };
 
   // Flashcard Review Handling (SM-2)
@@ -279,6 +324,61 @@ export default function LearnPage() {
           </div>
         </div>
       </header>
+
+      {/* User Mastery & Gamification Banner (ROADMAP1 Sections 5, 46) */}
+      <section className="p-4 md:p-5 rounded-3xl bg-gradient-to-r from-amber-950/40 via-slate-900/80 to-blue-950/40 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-bold text-2xl shadow-lg shadow-amber-500/20">
+            👑
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Cấp độ môn đồ</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                {userProfile?.total_score || 0} XP
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-white">
+              {userProfile?.level_title || "Môn Đồ Bước Đầu"}
+            </h2>
+          </div>
+        </div>
+
+        {/* Gamified Metrics & Mastery breakdown */}
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            <Flame className="w-4 h-4 text-rose-500 fill-rose-500" />
+            <span className="text-slate-400">Chuỗi: </span>
+            <span className="font-bold text-rose-400">{userProfile?.daily_streak || 1} ngày liên tục</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            <Award className="w-4 h-4 text-amber-400" />
+            <span className="text-slate-400">Quiz đã giải: </span>
+            <span className="font-bold text-white">{userProfile?.total_quizzes_completed || 0}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            <Repeat className="w-4 h-4 text-blue-400" />
+            <span className="text-slate-400">Thẻ đã ôn: </span>
+            <span className="font-bold text-white">{userProfile?.total_flashcards_reviewed || 0}</span>
+          </div>
+
+          {/* Topic Mastery Progress Pills */}
+          <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 pl-2 border-l border-slate-800">
+            <span className="text-[10px] uppercase font-bold text-slate-500">Thành thạo:</span>
+            <span className="px-2 py-0.5 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-300 font-semibold">
+              Phúc Âm {userProfile?.mastery_by_topic?.Gospels || 75}%
+            </span>
+            <span className="px-2 py-0.5 rounded-lg bg-purple-950/60 border border-purple-800/40 text-purple-300 font-semibold">
+              Thư Tín {userProfile?.mastery_by_topic?.Pauline || 80}%
+            </span>
+            <span className="px-2 py-0.5 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-semibold">
+              Ngũ Kinh {userProfile?.mastery_by_topic?.Pentateuch || 50}%
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* Mode Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
