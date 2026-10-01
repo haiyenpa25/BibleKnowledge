@@ -41,7 +41,11 @@ import {
   AlignLeft,
   AlignJustify,
   Layers,
-  BrainCircuit
+  BrainCircuit,
+  Network,
+  GitBranch,
+  Filter,
+  Info
 } from "lucide-react";
 
 interface BookMeta {
@@ -332,6 +336,13 @@ export default function BibleReaderPage() {
   const [previewRef, setPreviewRef] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CrossRefPreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Cross-Reference Network Visualizer & Redemptive Chains State (§18)
+  const [networkData, setNetworkData] = useState<any | null>(null);
+  const [networkLoading, setNetworkLoading] = useState(false);
+  const [networkViewMode, setNetworkViewMode] = useState<"graph" | "verses" | "chain">("graph");
+  const [selectedNetworkNode, setSelectedNetworkNode] = useState<any | null>(null);
+  const [networkFilter, setNetworkFilter] = useState<string>("all");
 
   // Web Speech API Audio Narration State
   const [isAudioActive, setIsAudioActive] = useState(false);
@@ -760,21 +771,42 @@ export default function BibleReaderPage() {
     }
   }
 
-  // Cross-reference preview popover
-  async function handleOpenCrossReference(ref: string) {
+  // Cross-reference preview popover & network visualizer (§18)
+  async function handleOpenCrossReference(ref: string, chainId?: string) {
     setPreviewRef(ref);
     setPreviewLoading(true);
+    setNetworkLoading(true);
     setPreviewData(null);
+    setNetworkData(null);
+    setSelectedNetworkNode(null);
+
+    // 1. Fetch verse-range for quick text preview
+    fetch(`${apiUrl}/api/bible/verse-range?ref=${encodeURIComponent(ref)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setPreviewData(data);
+      })
+      .catch(e => console.error("Verse range load error:", e))
+      .finally(() => setPreviewLoading(false));
+
+    // 2. Fetch full cross-references network & typological chains (§18)
+    const netUrl = chainId 
+      ? `${apiUrl}/api/bible/cross-references/network?chain_id=${encodeURIComponent(chainId)}`
+      : `${apiUrl}/api/bible/cross-references/network?ref=${encodeURIComponent(ref)}`;
+
     try {
-      const res = await fetch(`${apiUrl}/api/bible/verse-range?ref=${encodeURIComponent(ref)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPreviewData(data);
+      const netRes = await fetch(netUrl);
+      if (netRes.ok) {
+        const netJson = await netRes.json();
+        setNetworkData(netJson);
+        if (netJson.root) {
+          setSelectedNetworkNode(netJson.root);
+        }
       }
     } catch (e) {
-      console.error("Failed to load cross-reference preview:", e);
+      console.error("Network visualizer load error:", e);
     } finally {
-      setPreviewLoading(false);
+      setNetworkLoading(false);
     }
   }
 
@@ -3065,77 +3097,596 @@ export default function BibleReaderPage() {
         </div>
       )}
 
-      {/* MODAL 4: CROSS-REFERENCE QUICK PREVIEW MODAL */}
+      {/* MODAL 4: INTERACTIVE CROSS-REFERENCE NETWORK VISUALIZER & REDEMPTIVE CHAIN MODAL (§18) */}
       {previewRef && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e1424] border border-blue-500/40 rounded-3xl max-w-xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-blue-950/30">
-              <div className="flex items-center gap-2">
-                <span className="text-blue-400 font-bold text-sm flex items-center gap-1.5">
-                  ⚓ Tham Chiếu Chéo: {previewRef}
-                </span>
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0b1120] border border-blue-500/40 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
+                  <Network className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <span>Mạng Lưới Tham Chiếu Chéo & Mạch Cứu Chuộc</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wider font-semibold">
+                        §18 Typology
+                      </span>
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-0.5">
+                    <span>Tâm điểm:</span>
+                    <strong className="text-blue-300 font-serif text-xs">{previewRef}</strong>
+                    {networkData?.matched_chain && (
+                      <span className="hidden sm:inline-block text-[10px] text-amber-300/90 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">
+                        🔗 {networkData.matched_chain.title}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewRef(null);
-                  setPreviewData(null);
-                }}
-                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              {/* View Mode Switcher & Close */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-900/90 border border-slate-800 p-1 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setNetworkViewMode("graph")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      networkViewMode === "graph"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Network className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Mạng Lưới Trực Quan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNetworkViewMode("chain")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      networkViewMode === "chain"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <GitBranch className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Mạch Cứu Chuộc</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNetworkViewMode("verses")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      networkViewMode === "verses"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Văn Bản</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewRef(null);
+                    setPreviewData(null);
+                    setNetworkData(null);
+                    setSelectedNetworkNode(null);
+                  }}
+                  className="p-2 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5 text-sm">
-              {previewLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400 text-xs">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                  <span>Đang tải phân đoạn đối chiếu...</span>
+            {/* Modal Body Container */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 text-xs">
+              {networkLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                  <span className="text-sm font-medium">Đang trích xuất mạng lưới tham chiếu và mạch cứu chuộc...</span>
                 </div>
-              ) : previewData?.verses && previewData.verses.length > 0 ? (
-                <div className="flex flex-col gap-3 font-serif leading-relaxed text-slate-200">
-                  {previewData.verses.map(pv => (
-                    <div key={pv.global_id} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start gap-2.5">
-                      <span className="text-xs font-sans font-bold text-blue-400 pt-0.5 min-w-[1.5rem]">
-                        {pv.verse}
-                      </span>
-                      <div className="flex-1">
-                        {pv.section_title && (
-                          <div className="text-[11px] font-sans font-semibold text-blue-300 pb-1">
-                            § {pv.section_title}
-                          </div>
+              ) : networkData ? (
+                <>
+                  {/* TAB 1: INTERACTIVE SVG GRAPH MODE */}
+                  {networkViewMode === "graph" && (
+                    <div className="flex flex-col gap-3">
+                      {/* Filter Pills Bar & Stats */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-2xl bg-slate-900/60 border border-slate-800">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1 pl-1 pr-2">
+                            <Filter className="w-3 h-3" /> Lọc liên kết:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setNetworkFilter("all")}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all ${
+                              networkFilter === "all"
+                                ? "bg-slate-700 text-white font-bold"
+                                : "text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            Tất cả ({networkData.nodes?.length || 0})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNetworkFilter("quotation")}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all ${
+                              networkFilter === "quotation"
+                                ? "bg-amber-600 text-white font-bold"
+                                : "text-amber-400 hover:bg-amber-950/40"
+                            }`}
+                          >
+                            Trích Dẫn Cựu Ước ({networkData.stats?.quotation_count || 0})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNetworkFilter("allusion")}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all ${
+                              networkFilter === "allusion"
+                                ? "bg-emerald-600 text-white font-bold"
+                                : "text-emerald-400 hover:bg-emerald-950/40"
+                            }`}
+                          >
+                            Hình Bóng Tiên Tri ({networkData.stats?.allusion_count || 0})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNetworkFilter("parallel")}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all ${
+                              networkFilter === "parallel"
+                                ? "bg-purple-600 text-white font-bold"
+                                : "text-purple-400 hover:bg-purple-950/40"
+                            }`}
+                          >
+                            Ký Thuật Song Song ({networkData.stats?.parallel_count || 0})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNetworkFilter("explicit")}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all ${
+                              networkFilter === "explicit"
+                                ? "bg-blue-600 text-white font-bold"
+                                : "text-blue-400 hover:bg-blue-950/40"
+                            }`}
+                          >
+                            Liên Chiếu Trực Tiếp ({networkData.stats?.explicit_count || 0})
+                          </button>
+                        </div>
+
+                        {networkData.matched_chain && (
+                          <button
+                            type="button"
+                            onClick={() => setNetworkViewMode("chain")}
+                            className="px-2.5 py-1 rounded-xl bg-indigo-950/60 border border-indigo-500/40 text-indigo-300 text-[11px] font-semibold hover:bg-indigo-900/60 transition-colors flex items-center gap-1"
+                          >
+                            <GitBranch className="w-3 h-3 text-indigo-400" />
+                            <span>Mạch: {networkData.matched_chain.title}</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
                         )}
-                        <p>{pv.text}</p>
                       </div>
+
+                      {/* SVG Canvas Area */}
+                      <div className="relative w-full h-[320px] sm:h-[380px] bg-[#070b14] rounded-2xl border border-slate-800/80 overflow-hidden flex items-center justify-center shadow-inner">
+                        {/* Legend Overlay */}
+                        <div className="absolute top-2.5 left-3 z-10 flex flex-wrap gap-2 text-[10px] pointer-events-none">
+                          <span className="flex items-center gap-1 text-amber-400 bg-black/60 px-2 py-0.5 rounded-lg border border-amber-500/20 backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" /> Cựu Ước (OT Type/Shadow)
+                          </span>
+                          <span className="flex items-center gap-1 text-emerald-400 bg-black/60 px-2 py-0.5 rounded-lg border border-emerald-500/20 backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Tân Ước (NT Antitype/Fulfillment)
+                          </span>
+                          <span className="flex items-center gap-1 text-blue-400 bg-black/60 px-2 py-0.5 rounded-lg border border-blue-500/20 backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" /> Tâm điểm hiện tại
+                          </span>
+                        </div>
+
+                        {/* Interactive SVG Network */}
+                        {(() => {
+                          const nodes = networkData.nodes || [];
+                          const edges = networkData.edges || [];
+                          const root = networkData.root;
+
+                          // Filter nodes according to networkFilter
+                          let visibleNodes = nodes;
+                          if (networkFilter !== "all") {
+                            const matchingEdges = edges.filter((e: any) => e.connection_type === networkFilter);
+                            const matchingIds = new Set<string>([root?.id]);
+                            matchingEdges.forEach((e: any) => {
+                              matchingIds.add(e.source);
+                              matchingIds.add(e.target);
+                            });
+                            visibleNodes = nodes.filter((n: any) => matchingIds.has(n.id) || n.is_root);
+                          }
+
+                          const orbitNodes = visibleNodes.filter((n: any) => !n.is_root);
+                          const totalOrbit = orbitNodes.length || 1;
+
+                          // Compute coordinates
+                          const nodeCoords: Record<string, { x: number; y: number }> = {};
+                          nodeCoords[root?.id || "root"] = { x: 0, y: 0 };
+
+                          orbitNodes.forEach((n: any, idx: number) => {
+                            const angle = (idx / totalOrbit) * 2 * Math.PI - Math.PI / 2;
+                            const radius = n.testament === "OT" ? 115 : 180;
+                            nodeCoords[n.id] = {
+                              x: Math.round(Math.cos(angle) * radius),
+                              y: Math.round(Math.sin(angle) * radius)
+                            };
+                          });
+
+                          return (
+                            <svg
+                              viewBox="-280 -210 560 420"
+                              className="w-full h-full select-none"
+                            >
+                              <defs>
+                                <radialGradient id="rootGlow" cx="50%" cy="50%" r="50%">
+                                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                                </radialGradient>
+                                <radialGradient id="centerGrad" cx="30%" cy="30%" r="70%">
+                                  <stop offset="0%" stopColor="#60a5fa" />
+                                  <stop offset="100%" stopColor="#1e3a8a" />
+                                </radialGradient>
+                                <radialGradient id="otGrad" cx="30%" cy="30%" r="70%">
+                                  <stop offset="0%" stopColor="#fbbf24" />
+                                  <stop offset="100%" stopColor="#78350f" />
+                                </radialGradient>
+                                <radialGradient id="ntGrad" cx="30%" cy="30%" r="70%">
+                                  <stop offset="0%" stopColor="#34d399" />
+                                  <stop offset="100%" stopColor="#064e3b" />
+                                </radialGradient>
+                              </defs>
+
+                              {/* Concentric Guide Orbits */}
+                              <circle cx="0" cy="0" r="115" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+                              <circle cx="0" cy="0" r="180" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.3" />
+
+                              {/* Edges */}
+                              {edges.map((e: any) => {
+                                const p1 = nodeCoords[e.source];
+                                const p2 = nodeCoords[e.target];
+                                if (!p1 || !p2) return null;
+                                const isAllusion = e.connection_type === "allusion";
+                                const isQuotation = e.connection_type === "quotation";
+                                const isParallel = e.connection_type === "parallel";
+                                const strokeColor = isQuotation ? "#f59e0b" : isAllusion ? "#10b981" : isParallel ? "#a855f7" : "#3b82f6";
+                                return (
+                                  <line
+                                    key={e.id}
+                                    x1={p1.x}
+                                    y1={p1.y}
+                                    x2={p2.x}
+                                    y2={p2.y}
+                                    stroke={strokeColor}
+                                    strokeWidth={isQuotation || isAllusion ? 2 : 1.2}
+                                    strokeDasharray={isAllusion ? "4 3" : undefined}
+                                    opacity={0.65}
+                                  />
+                                );
+                              })}
+
+                              {/* Central Root Pulse Halo */}
+                              <circle cx="0" cy="0" r="48" fill="url(#rootGlow)" />
+                              <circle cx="0" cy="0" r="38" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.5" strokeDasharray="3 3" />
+
+                              {/* Central Root Node */}
+                              <g
+                                className="cursor-pointer transition-transform hover:scale-110"
+                                onClick={() => setSelectedNetworkNode(root)}
+                              >
+                                <circle cx="0" cy="0" r="30" fill="url(#centerGrad)" stroke="#93c5fd" strokeWidth="2.5" />
+                                <text
+                                  x="0"
+                                  y="-4"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="9.5"
+                                  fontWeight="bold"
+                                  fontFamily="sans-serif"
+                                >
+                                  {root?.book?.slice(0, 10)}
+                                </text>
+                                <text
+                                  x="0"
+                                  y="8"
+                                  textAnchor="middle"
+                                  fill="#93c5fd"
+                                  fontSize="9"
+                                  fontFamily="sans-serif"
+                                >
+                                  {root?.chapter}:{root?.verse}
+                                </text>
+                              </g>
+
+                              {/* Orbiting Connected Nodes */}
+                              {orbitNodes.map((n: any) => {
+                                const pt = nodeCoords[n.id];
+                                if (!pt) return null;
+                                const isSelected = selectedNetworkNode?.id === n.id;
+                                const isOT = n.testament === "OT";
+                                return (
+                                  <g
+                                    key={n.id}
+                                    className="cursor-pointer transition-transform hover:scale-125"
+                                    onClick={() => setSelectedNetworkNode(n)}
+                                  >
+                                    {isSelected && (
+                                      <circle cx={pt.x} cy={pt.y} r="28" fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="2 2" />
+                                    )}
+                                    <circle
+                                      cx={pt.x}
+                                      cy={pt.y}
+                                      r="20"
+                                      fill={isOT ? "url(#otGrad)" : "url(#ntGrad)"}
+                                      stroke={isOT ? "#fcd34d" : "#6ee7b7"}
+                                      strokeWidth="2"
+                                    />
+                                    <text
+                                      x={pt.x}
+                                      y={pt.y + 3.5}
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="8.5"
+                                      fontWeight="bold"
+                                      fontFamily="sans-serif"
+                                    >
+                                      {n.reference?.slice(0, 11)}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Selected Node Inspector Bottom Card */}
+                      {selectedNetworkNode && (
+                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-2 shadow-sm animate-in fade-in duration-150">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-white flex items-center gap-1.5">
+                                <span>📖</span>
+                                <span>{selectedNetworkNode.reference}</span>
+                              </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                selectedNetworkNode.testament === 'OT' 
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              }`}>
+                                {selectedNetworkNode.testament === 'OT' ? 'Cựu Ước (OT)' : 'Tân Ước (NT)'}
+                              </span>
+                              {selectedNetworkNode.section_title && (
+                                <span className="text-[11px] text-slate-400">
+                                  § {selectedNetworkNode.section_title}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Actions on Selected Node */}
+                            <div className="flex items-center gap-2">
+                              {!selectedNetworkNode.is_root && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCrossReference(selectedNetworkNode.reference)}
+                                  className="px-2.5 py-1 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 text-[11px] font-semibold flex items-center gap-1 transition-all"
+                                  title="Đặt câu này làm tâm điểm và mở rộng mạng lưới liên chiếu tiếp theo"
+                                >
+                                  <Compass className="w-3 h-3" />
+                                  <span>Đặt làm tâm điểm</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const targetBook = books.find(b => b.name_vi.toLowerCase() === selectedNetworkNode.book.toLowerCase() || b.osis.toLowerCase() === selectedNetworkNode.book.toLowerCase());
+                                  if (targetBook) {
+                                    setCurrentBookCode(targetBook.code);
+                                    setCurrentChapter(selectedNetworkNode.chapter);
+                                    setPreviewRef(null);
+                                    setPreviewData(null);
+                                  }
+                                }}
+                                className="px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold flex items-center gap-1 transition-all shadow-sm"
+                              >
+                                <span>Chuyển tới chương này</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Scripture Text */}
+                          <p className="font-serif text-slate-200 text-xs sm:text-sm leading-relaxed italic pt-1">
+                            &ldquo;{selectedNetworkNode.text}&rdquo;
+                          </p>
+
+                          {/* Hermeneutical Rationale / Note */}
+                          {(() => {
+                            const edge = networkData.edges?.find(
+                              (e: any) => e.target === selectedNetworkNode.id || e.source === selectedNetworkNode.id
+                            );
+                            if (!edge && !selectedNetworkNode.chain_role) return null;
+                            return (
+                              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-2">
+                                <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-bold text-blue-300">Ý nghĩa liên kết: </span>
+                                  <span>{selectedNetworkNode.chain_role || edge?.theological_note}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {/* TAB 2: REDEMPTIVE CHAINS FLOW MODE (§18) */}
+                  {networkViewMode === "chain" && (
+                    <div className="flex flex-col gap-4">
+                      {/* Catalog of 8 Global Redemptive Chains */}
+                      <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">
+                          Khám phá 8 Đại Mạch Cứu Chuộc & Typology (§18):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {networkData.all_chains?.map((ch: any) => {
+                            const isCurrent = networkData.matched_chain?.chain_id === ch.chain_id;
+                            return (
+                              <button
+                                key={ch.chain_id}
+                                type="button"
+                                onClick={() => handleOpenCrossReference(previewRef, ch.chain_id)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                                  isCurrent
+                                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold border border-indigo-500"
+                                    : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                                }`}
+                              >
+                                <GitBranch className="w-3 h-3 text-indigo-300" />
+                                <span>{ch.title}</span>
+                                <span className="text-[10px] text-indigo-200/80">({ch.steps_count} bước)</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Active Chain Details & Vertical Flow */}
+                      {networkData.matched_chain ? (
+                        <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 flex flex-col gap-4">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-400">
+                                {networkData.matched_chain.theme}
+                              </span>
+                              <span className="text-[10px] text-indigo-300 bg-indigo-900/50 px-2 py-0.5 rounded-md border border-indigo-500/30">
+                                Mạch Cứu Chuộc Đã Định Nghĩa
+                              </span>
+                            </div>
+                            <h4 className="text-base font-bold text-white pt-1">
+                              {networkData.matched_chain.title}
+                            </h4>
+                            <p className="text-slate-300 text-xs pt-1 leading-relaxed">
+                              {networkData.matched_chain.description}
+                            </p>
+                          </div>
+
+                          {/* Progression Timeline Steps */}
+                          <div className="flex flex-col gap-3 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-indigo-500/30">
+                            {networkData.matched_chain.steps?.map((st: any, idx: number) => {
+                              const isRootVerse = st.ref.includes(previewRef) || previewRef.includes(st.ref);
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`relative pl-9 flex flex-col gap-1 p-3 rounded-2xl border transition-all ${
+                                    isRootVerse
+                                      ? "bg-blue-950/40 border-blue-500/60 shadow-md shadow-blue-500/10"
+                                      : "bg-slate-900/70 border-slate-800 hover:border-slate-700"
+                                  }`}
+                                >
+                                  {/* Step Circle Indicator */}
+                                  <div className={`absolute left-2.5 top-3.5 w-3.5 h-3.5 rounded-full border-2 transform -translate-x-1/2 flex items-center justify-center ${
+                                    isRootVerse ? "bg-blue-500 border-white" : "bg-slate-900 border-indigo-400"
+                                  }`} />
+
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-white text-xs">{st.ref}</span>
+                                      <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                                        st.testament === 'OT' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                                      }`}>
+                                        {st.stage}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenCrossReference(st.ref)}
+                                      className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                                    >
+                                      <span>Khảo sát câu này</span>
+                                      <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  </div>
+
+                                  <p className="text-slate-300 text-xs italic font-serif leading-relaxed">
+                                    &ldquo;{st.role}&rdquo;
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-8 text-center text-slate-500">
+                          Chọn một đại mạch cứu chuộc bên trên để theo dõi dòng chảy từ bóng mờ Cựu Ước đến sự ứng nghiệm Tân Ước.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: COMPLETE TEXT VERSES MODE */}
+                  {networkViewMode === "verses" && (
+                    <div className="flex flex-col gap-3">
+                      {previewData?.verses && previewData.verses.length > 0 ? (
+                        <div className="flex flex-col gap-2.5 font-serif leading-relaxed text-slate-200">
+                          {previewData.verses.map((pv: any) => (
+                            <div key={pv.global_id} className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
+                              <span className="text-xs font-sans font-bold text-blue-400 pt-0.5 min-w-[1.75rem]">
+                                {pv.verse}
+                              </span>
+                              <div className="flex-1">
+                                {pv.section_title && (
+                                  <div className="text-[11px] font-sans font-semibold text-blue-300 pb-1">
+                                    § {pv.section_title}
+                                  </div>
+                                )}
+                                <p className="text-sm text-slate-200">{pv.text}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 text-center py-8">
+                          Không thể tải nội dung câu tham chiếu. Bạn có thể mở tìm kiếm hoặc chuyển sách thủ công.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="text-xs text-slate-400 text-center py-8">
-                  Không thể tải nội dung câu tham chiếu. Bạn có thể mở tìm kiếm hoặc chuyển sách thủ công.
+                <div className="py-12 text-center text-slate-500">
+                  Không tìm thấy thông tin mạng lưới tham chiếu cho phân đoạn này.
                 </div>
               )}
             </div>
 
-            {/* Footer with direct navigate button */}
-            {previewData?.verses && previewData.verses.length > 0 && (
-              <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  {previewData.verses.length} câu trong phân đoạn
-                </span>
-                <button
-                  type="button"
-                  onClick={() => navigateToCrossReferenceChapter(previewData)}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
-                >
-                  <span>Chuyển tới chương này</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+            {/* Modal Footer */}
+            <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/80 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-slate-400">
+                {networkData?.nodes?.length || 0} nút liên kết • Phân biệt rõ giữa văn bản, tiên tri & đối chiếu song song
+              </span>
+              <div className="flex items-center gap-2">
+                {previewData?.verses && previewData.verses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => navigateToCrossReferenceChapter(previewData)}
+                    className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <span>Mở toàn bộ chương này</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

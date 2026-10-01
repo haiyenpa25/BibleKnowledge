@@ -112,6 +112,9 @@ async function main() {
   const rPassage = await testEndpoint('/api/bible/passage?ref=Gi%C4%83ng%203:16', d => (!d.verses || d.verses.length === 0) && 'No passage verses');
   report('GET /api/bible/passage (Dynamic passage parser)', rPassage.ok, rPassage.error);
 
+  const rCrossNetwork = await testEndpoint(`/api/bible/cross-references/network?reference=${encodeURIComponent('Giăng 3:16')}`, d => (!d.root || !Array.isArray(d.nodes) || d.nodes.length === 0 || !Array.isArray(d.edges)) && 'Invalid cross-reference network graph');
+  report('GET /api/bible/cross-references/network (Interactive Cross-Reference Network Visualizer §18)', rCrossNetwork.ok, rCrossNetwork.error);
+
   const rPlans = await testEndpoint('/api/bible/reading-plans', d => (!Array.isArray(d) || d.length < 8) && `Expected at least 8 reading plans, got ${d?.length}`);
   report(`GET /api/bible/reading-plans (${rPlans.data?.length || 8} Systematic & Seasonal reading tracks)`, rPlans.ok, rPlans.error);
 
@@ -170,6 +173,15 @@ async function main() {
   const rSermonPresets = await testEndpoint('/api/study/sermon-templates', d => (!Array.isArray(d) || d.length !== 4) && `Expected 4 sermon presets, got ${d?.length}`);
   report('GET /api/study/sermon-templates (Classical expository sermon templates)', rSermonPresets.ok, rSermonPresets.error);
 
+  const rCommSermons = await testEndpoint('/api/study/sermons/community', d => (!Array.isArray(d) || d.length === 0) && 'No community sermons');
+  report(`GET /api/study/sermons/community (${rCommSermons.data?.length || 0} Peer-reviewed community sermons)`, rCommSermons.ok, rCommSermons.error);
+
+  if (rCommSermons.ok && rCommSermons.data && rCommSermons.data.length > 0) {
+    const testSermonId = rCommSermons.data[0].id;
+    const rSermonDetail = await testEndpoint(`/api/study/sermons/community/${testSermonId}`, d => (!d.markdown_manuscript || !Array.isArray(d.reviews)) && 'Invalid sermon detail');
+    report('GET /api/study/sermons/community/{id} (Community manuscript & 3D peer reviews)', rSermonDetail.ok, rSermonDetail.error);
+  }
+
   // Theological Library Module
   const rLibStats = await testEndpoint('/api/library/stats', d => d.total_books !== 275 && `Expected 275 books, got ${d?.total_books}`);
   report('GET /api/library/stats (275 Theological volumes statistics)', rLibStats.ok, rLibStats.error);
@@ -206,6 +218,14 @@ async function main() {
   const chunksVectorRaw = runPsql('SELECT count(embedding) FROM document_chunks;');
   const chunksVectorCount = parseInt(chunksVectorRaw || '0', 10);
   report('All 4,673 vector chunks have 1024-dim embeddings (100% coverage)', chunksCount === 4673 && chunksVectorCount === 4673, `Total: ${chunksCount}, Embedded: ${chunksVectorCount}`);
+
+  const communitySermonsRaw = runPsql('SELECT count(*) FROM community_sermons;');
+  const communitySermonsCount = parseInt(communitySermonsRaw || '0', 10);
+  report('Database has community expository sermons seeded', communitySermonsCount >= 4, `Found ${communitySermonsCount}`);
+
+  const peerReviewsRaw = runPsql('SELECT count(*) FROM sermon_peer_reviews;');
+  const peerReviewsCount = parseInt(peerReviewsRaw || '0', 10);
+  report('Database has 3-dimensional peer reviews recorded', peerReviewsCount >= 4, `Found ${peerReviewsCount}`);
 
   console.log('');
 

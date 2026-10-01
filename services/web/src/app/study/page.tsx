@@ -35,7 +35,13 @@ import {
   Scroll,
   Share2,
   MonitorPlay,
-  ChevronLeft
+  ChevronLeft,
+  Star,
+  ThumbsUp,
+  MessageSquare,
+  Award,
+  ShieldCheck,
+  Heart
 } from "lucide-react";
 
 interface ExpositoryPoint {
@@ -151,8 +157,43 @@ interface StudyProject {
   updated_at: string;
 }
 
+interface PeerReviewItem {
+  id: string;
+  reviewer_name: string;
+  reviewer_title: string;
+  hermeneutical_fidelity_rating: number;
+  homiletical_clarity_rating: number;
+  pastoral_application_rating: number;
+  average_score: number;
+  review_comment: string;
+  created_at: string;
+}
+
+interface CommunitySermonSummary {
+  id: string;
+  title: string;
+  passage_ref: string;
+  theme?: string;
+  author_name: string;
+  homiletical_style: string;
+  big_idea?: string;
+  tags: string[];
+  likes_count: number;
+  reviews_count: number;
+  average_rating: number;
+  created_at: string;
+}
+
+interface CommunitySermonDetail extends CommunitySermonSummary {
+  points: ExpositoryPoint[];
+  practical_applications: string[];
+  theological_citations: ExpositoryCitation[];
+  markdown_manuscript: string;
+  reviews: PeerReviewItem[];
+}
+
 export default function StudyPage() {
-  const [activeTab, setActiveTab] = useState<"projects" | "sermon" | "lexicon" | "passage" | "notes">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "sermon" | "community" | "lexicon" | "passage" | "notes">("projects");
 
   // Sermon Builder State (§50)
   const [sermonPresets, setSermonPresets] = useState<SermonPreset[]>([]);
@@ -229,6 +270,35 @@ export default function StudyPage() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [copiedSlides, setCopiedSlides] = useState(false);
 
+  // Community Sermons & Peer Review State (Roadmap Horizon Item 4)
+  const [communitySermons, setCommunitySermons] = useState<CommunitySermonSummary[]>([]);
+  const [loadingCommunity, setLoadingCommunity] = useState<boolean>(false);
+  const [communitySearch, setCommunitySearch] = useState<string>("");
+  const [communityStyleFilter, setCommunityStyleFilter] = useState<string>("all");
+  const [communitySort, setCommunitySort] = useState<string>("popular");
+  const [selectedCommunitySermon, setSelectedCommunitySermon] = useState<CommunitySermonDetail | null>(null);
+  const [loadingSermonDetail, setLoadingSermonDetail] = useState<boolean>(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+  const [likedSermonIds, setLikedSermonIds] = useState<Record<string, boolean>>({});
+
+  // Share Sermon Modal State
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [shareAuthorName, setShareAuthorName] = useState<string>("Mục sư Giảng luận");
+  const [shareHomileticalStyle, setShareHomileticalStyle] = useState<string>("expository");
+  const [shareTags, setShareTags] = useState<string>("bài giảng, giải kinh, đức tin");
+  const [sharingSermon, setSharingSermon] = useState<boolean>(false);
+  const [shareSuccessMsg, setShareSuccessMsg] = useState<string | null>(null);
+
+  // Peer Review Form State
+  const [reviewerName, setReviewerName] = useState<string>("");
+  const [reviewerTitle, setReviewerTitle] = useState<string>("Giáo viên Kinh Thánh");
+  const [fidelityRating, setFidelityRating] = useState<number>(5);
+  const [clarityRating, setClarityRating] = useState<number>(5);
+  const [applicationRating, setApplicationRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>("");
+  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Fetch Lexicon
@@ -299,11 +369,143 @@ export default function StudyPage() {
     }
   };
 
+  // Fetch Community Sermons
+  const fetchCommunitySermons = async (style?: string, search?: string, sort?: string) => {
+    setLoadingCommunity(true);
+    try {
+      let url = `${apiUrl}/api/study/sermons/community?`;
+      const currentStyle = style !== undefined ? style : communityStyleFilter;
+      const currentSearch = search !== undefined ? search : communitySearch;
+      const currentSort = sort !== undefined ? sort : communitySort;
+      if (currentStyle && currentStyle !== "all") url += `style=${encodeURIComponent(currentStyle)}&`;
+      if (currentSearch) url += `search=${encodeURIComponent(currentSearch)}&`;
+      if (currentSort) url += `sort_by=${encodeURIComponent(currentSort)}&`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setCommunitySermons(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch community sermons:", err);
+    } finally {
+      setLoadingCommunity(false);
+    }
+  };
+
+  // Fetch Community Sermon Detail
+  const fetchSermonDetail = async (sermonId: string) => {
+    setLoadingSermonDetail(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermons/community/${sermonId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedCommunitySermon(data);
+        setIsDetailModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sermon detail:", err);
+    } finally {
+      setLoadingSermonDetail(false);
+    }
+  };
+
+  // Like a Community Sermon
+  const handleLikeSermon = async (sermonId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermons/community/${sermonId}/like`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunitySermons(prev => prev.map(s => s.id === sermonId ? { ...s, likes_count: data.likes_count } : s));
+        if (selectedCommunitySermon && selectedCommunitySermon.id === sermonId) {
+          setSelectedCommunitySermon(prev => prev ? { ...prev, likes_count: data.likes_count } : null);
+        }
+        setLikedSermonIds(prev => ({ ...prev, [sermonId]: true }));
+      }
+    } catch (err) {
+      console.error("Failed to like sermon:", err);
+    }
+  };
+
+  // Submit Peer Review
+  const handleSubmitPeerReview = async (e: React.FormEvent, sermonId: string) => {
+    e.preventDefault();
+    if (!reviewerName.trim() || !reviewComment.trim()) return;
+    setSubmittingReview(true);
+    setReviewSuccessMsg(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/sermons/community/${sermonId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reviewer_name: reviewerName.trim(),
+          reviewer_title: reviewerTitle.trim() || "Giáo viên Kinh Thánh",
+          hermeneutical_fidelity_rating: fidelityRating,
+          homiletical_clarity_rating: clarityRating,
+          pastoral_application_rating: applicationRating,
+          review_comment: reviewComment.trim()
+        })
+      });
+      if (res.ok) {
+        setReviewSuccessMsg("Phản biện đồng nghiệp đã được ghi nhận và cập nhật điểm đánh giá!");
+        setReviewComment("");
+        fetchSermonDetail(sermonId);
+        fetchCommunitySermons();
+        setTimeout(() => setReviewSuccessMsg(null), 4000);
+      }
+    } catch (err) {
+      console.error("Failed to submit peer review:", err);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Share Sermon to Community
+  const handleShareSermonToCommunity = async () => {
+    if (!sermonResult) return;
+    setSharingSermon(true);
+    setShareSuccessMsg(null);
+    try {
+      const tagsList = shareTags.split(",").map(t => t.trim()).filter(Boolean);
+      const res = await fetch(`${apiUrl}/api/study/sermons/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sermonResult.title,
+          passage_ref: sermonResult.passage_ref,
+          theme: sermonTheme || sermonResult.title,
+          author_name: shareAuthorName.trim() || "Mục sư Giảng luận",
+          homiletical_style: shareHomileticalStyle,
+          big_idea: sermonResult.big_idea,
+          points: sermonResult.points || [],
+          practical_applications: sermonResult.practical_applications || [],
+          theological_citations: sermonResult.theological_citations || [],
+          markdown_manuscript: sermonResult.markdown_manuscript,
+          tags: tagsList
+        })
+      });
+      if (res.ok) {
+        setShareSuccessMsg("Đã chia sẻ bài giảng lên kho tài liệu cộng đồng thành công!");
+        fetchCommunitySermons();
+        setTimeout(() => {
+          setIsShareModalOpen(false);
+          setShareSuccessMsg(null);
+          setActiveTab("community");
+        }, 1500);
+      }
+    } catch (err) {
+      console.error("Failed to share sermon:", err);
+    } finally {
+      setSharingSermon(false);
+    }
+  };
+
   useEffect(() => {
     fetchLexicon();
     fetchNotes();
     fetchProjects();
     fetchSermonPresets();
+    fetchCommunitySermons();
   }, [apiUrl]);
 
   // Build Sermon
@@ -911,6 +1113,19 @@ ${sermonResult.introduction_and_hook}
             <Sparkles className="w-4 h-4 text-amber-300" /> Soạn Bài Giảng (§50)
           </button>
           <button
+            onClick={() => {
+              setActiveTab("community");
+              fetchCommunitySermons();
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "community"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
+            }`}
+          >
+            <Users className="w-4 h-4 text-indigo-400" /> Cộng Đồng &amp; Phản Biện ({communitySermons.length})
+          </button>
+          <button
             onClick={() => setActiveTab("lexicon")}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "lexicon"
@@ -1434,6 +1649,15 @@ ${sermonResult.introduction_and_hook}
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+                  title="Chia sẻ bản thảo lên kho cộng đồng để nhận phản biện đồng nghiệp"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Chia Sẻ Cộng Đồng</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setCurrentSlideIndex(0);
                     setIsSlideDeckOpen(true);
@@ -1791,6 +2015,273 @@ ${sermonResult.introduction_and_hook}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 2.5. COMMUNITY SERMON SHARING & PEER REVIEW (Roadmap Horizon Item 4) */}
+      {/* ===================================================================== */}
+      {activeTab === "community" && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner / Introduction */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-indigo-950/50 via-purple-950/40 to-slate-900/70 p-5 rounded-3xl border border-indigo-900/50 shadow-xl">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  Peer Review &amp; Homiletics Dossier
+                </span>
+                <span className="text-xs text-slate-400">• Đánh giá 3 Chiều Chuẩn Mực</span>
+              </div>
+              <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-400" /> Kho Bản Thảo Bài Giảng &amp; Diễn Đàn Phản Biện Đồng Nghiệp
+              </h2>
+              <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                Nơi các Mục sư, Giảng viên và Giáo viên Kinh Thánh chia sẻ bản thảo giải kinh, nhận phản biện đồng nghiệp
+                và nâng cao năng lực thuyết giáo dựa trên 3 tiêu chí: Độ Trung Thực Giải Kinh, Bố Cục Sư Phạm, và Ứng Dụng Thực Tiễn.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (sermonResult) {
+                    setIsShareModalOpen(true);
+                  } else {
+                    setActiveTab("sermon");
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Chia Sẻ Bản Thảo Của Bạn</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 3-Dimensional Peer Review Framework Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-blue-300">1. Độ Trung Thực Giải Kinh</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  Bám sát nguyên văn Hy Lạp / Hê-bơ-rơ, văn cảnh lịch sử và 66 sách chính kinh, không bóp méo ý nghĩa tác giả gốc.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-purple-300">2. Bố Cục Sư Phạm (Homiletics)</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  Ý niệm cốt lõi (Big Idea) rõ ràng, dàn ý mạch lạc, minh họa sinh động và chuyển ý hợp lý giúp hội chúng ghi nhớ.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-emerald-300">3. Ứng Dụng Thực Tiễn (Pastoral)</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  Áp dụng thực tế vào đời sống Cơ Đốc hằng ngày, kỷ luật thuộc linh, nâng đỡ bầy chiên và lời kêu gọi đáp ứng rõ ràng.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter, Search, and Sort Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+            {/* Style Filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs">
+              {[
+                { id: "all", label: "Tất Cả Thể Loại" },
+                { id: "expository", label: "Giải Kinh (Expository)" },
+                { id: "topical", label: "Chủ Đề (Topical)" },
+                { id: "textual", label: "Văn Bản (Textual)" },
+                { id: "narrative", label: "Tự Sự (Narrative)" },
+              ].map(st => (
+                <button
+                  key={st.id}
+                  onClick={() => {
+                    setCommunityStyleFilter(st.id);
+                    fetchCommunitySermons(st.id, communitySearch, communitySort);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all ${
+                    communityStyleFilter === st.id
+                      ? "bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30"
+                      : "bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search & Sort Controls */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 md:w-56">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={communitySearch}
+                  onChange={(e) => {
+                    setCommunitySearch(e.target.value);
+                    fetchCommunitySermons(communityStyleFilter, e.target.value, communitySort);
+                  }}
+                  placeholder="Tìm câu gốc, tựa đề, chủ đề..."
+                  className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-full"
+                />
+              </div>
+
+              <select
+                value={communitySort}
+                onChange={(e) => {
+                  setCommunitySort(e.target.value);
+                  fetchCommunitySermons(communityStyleFilter, communitySearch, e.target.value);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="popular">Phổ biến nhất</option>
+                <option value="top_rated">Đánh giá cao nhất</option>
+                <option value="latest">Mới nhất</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Community Sermons Grid */}
+          {loadingCommunity ? (
+            <div className="p-16 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+              <span>Đang tải kho bản thảo bài giảng cộng đồng...</span>
+            </div>
+          ) : communitySermons.length === 0 ? (
+            <div className="p-16 rounded-3xl bg-slate-900/40 border border-slate-800 text-center flex flex-col items-center gap-3">
+              <Users className="w-8 h-8 text-slate-600" />
+              <p className="text-slate-400 text-xs">
+                Chưa có bản thảo bài giảng nào trong thể loại này. Hãy là người đầu tiên chia sẻ bản thảo của bạn!
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab("sermon")}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30"
+              >
+                Mở Bộ Soạn Bài Giảng
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
+              {communitySermons.map((s) => {
+                const isLiked = likedSermonIds[s.id];
+                const styleLabels: Record<string, string> = {
+                  expository: "Giải Kinh",
+                  topical: "Chủ Đề",
+                  textual: "Văn Bản",
+                  narrative: "Tự Sự"
+                };
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => fetchSermonDetail(s.id)}
+                    className="p-5 rounded-3xl bg-slate-900/70 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 flex flex-col justify-between gap-4 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-950/30 cursor-pointer group"
+                  >
+                    <div className="flex flex-col gap-3">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold">
+                            {s.passage_ref}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold">
+                            {styleLabels[s.homiletical_style] || s.homiletical_style}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(s.created_at).toLocaleDateString("vi-VN")}
+                        </span>
+                      </div>
+
+                      {/* Sermon Title */}
+                      <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors leading-snug">
+                        {s.title}
+                      </h3>
+
+                      {/* Author */}
+                      <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <span>Bản thảo bởi: </span>
+                        <span className="font-semibold text-slate-200">{s.author_name}</span>
+                        {s.theme && <span className="text-slate-500">• {s.theme}</span>}
+                      </div>
+
+                      {/* Big Idea Quote */}
+                      {s.big_idea && (
+                        <div className="p-3 rounded-2xl bg-amber-950/20 border border-amber-800/30 text-xs text-amber-200/90 font-serif italic line-clamp-2">
+                          &quot;{s.big_idea}&quot;
+                        </div>
+                      )}
+
+                      {/* Tags */}
+                      {s.tags && s.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {s.tags.map((t, idx) => (
+                            <span key={idx} className="text-[10px] text-slate-400 bg-slate-950/80 px-2 py-0.5 rounded-md border border-slate-800">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer Metrics & Actions */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 mt-1">
+                      {/* Rating Score */}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <div className="flex items-center text-amber-400 font-bold gap-1 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>{s.average_rating > 0 ? s.average_rating.toFixed(1) : "5.0"}</span>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          ({s.reviews_count} phản biện)
+                        </span>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => handleLikeSermon(s.id, e)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+                            isLiked
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                              : "bg-slate-950 text-slate-400 hover:text-rose-400 border-slate-800"
+                          }`}
+                          title="Tán thành / Thích bản thảo"
+                        >
+                          <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? "fill-rose-400 text-rose-400" : ""}`} />
+                          <span>{s.likes_count}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-semibold transition-all group-hover:scale-105"
+                        >
+                          <span>Xem Hồ Sơ</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -2638,6 +3129,515 @@ ${sermonResult.introduction_and_hook}
           </div>
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: SHARE SERMON TO COMMUNITY (Horizon Item 4) */}
+      {/* ===================================================================== */}
+      {isShareModalOpen && sermonResult && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1120] border border-indigo-700/60 max-w-lg w-full rounded-3xl p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-bold text-white">Chia Sẻ Bản Thảo Lên Cộng Đồng</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsShareModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bản thảo bài giảng <strong className="text-indigo-300">{sermonResult.title}</strong> ({sermonResult.passage_ref}) sẽ được chia sẻ vào kho tri thức chung để các đồng nghiệp cùng tham khảo và góp ý phản biện 3 chiều.
+            </p>
+
+            {shareSuccessMsg && (
+              <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>{shareSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-300 font-medium">Tên Mục sư / Giảng viên *</label>
+                <input
+                  type="text"
+                  value={shareAuthorName}
+                  onChange={e => setShareAuthorName(e.target.value)}
+                  placeholder="Ví dụ: Mục sư Giảng luận"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-300 font-medium">Phong cách thuyết giáo (Homiletical Style)</label>
+                <select
+                  value={shareHomileticalStyle}
+                  onChange={e => setShareHomileticalStyle(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="expository">Giải Kinh Trực Diện (Expository)</option>
+                  <option value="topical">Chủ Đề Giáo Lý (Topical)</option>
+                  <option value="textual">Văn Bản (Textual)</option>
+                  <option value="narrative">Tự Sự Lịch Sử (Narrative)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-300 font-medium">Thẻ phân loại (ngăn cách bởi dấu phẩy)</label>
+                <input
+                  type="text"
+                  value={shareTags}
+                  onChange={e => setShareTags(e.target.value)}
+                  placeholder="ví dụ: ân điển, đức tin, roma 8"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-xs text-slate-300 hover:text-white"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={sharingSermon || !shareAuthorName.trim()}
+                  onClick={handleShareSermonToCommunity}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-xs font-bold text-white disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+                >
+                  {sharingSermon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+                  <span>Xuất Bản Lên Cộng Đồng</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: COMMUNITY SERMON DETAIL & PEER REVIEW DOSSIER (Horizon Item 4) */}
+      {/* ===================================================================== */}
+      {isDetailModalOpen && selectedCommunitySermon && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+          <div className="bg-[#0a0f1d] border border-slate-700/80 max-w-6xl w-full rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-b border-slate-800 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold">
+                      {selectedCommunitySermon.passage_ref}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Bởi <strong className="text-slate-200">{selectedCommunitySermon.author_name}</strong> • {new Date(selectedCommunitySermon.created_at).toLocaleDateString("vi-VN")}
+                    </span>
+                  </div>
+                  <h3 className="text-lg md:text-xl font-bold text-white mt-1">
+                    {selectedCommunitySermon.title}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleLikeSermon(selectedCommunitySermon.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    likedSermonIds[selectedCommunitySermon.id]
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      : "bg-slate-800 text-slate-300 hover:text-white border-slate-700"
+                  }`}
+                >
+                  <ThumbsUp className={`w-3.5 h-3.5 ${likedSermonIds[selectedCommunitySermon.id] ? "fill-rose-400 text-rose-400" : ""}`} />
+                  <span>{selectedCommunitySermon.likes_count}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedCommunitySermon.markdown_manuscript);
+                    alert("Đã sao chép bản thảo Markdown vào clipboard!");
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1"
+                  title="Sao chép bản thảo Markdown"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sao Chép</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const blob = new Blob([selectedCommunitySermon.markdown_manuscript], { type: "text/markdown;charset=utf-8" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `${selectedCommunitySermon.title.replace(/\s+/g, "_")}.md`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1"
+                  title="Tải bản thảo .MD"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Tải .MD</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Two-Column Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-y-auto">
+              {/* Left Column: Manuscript & Expository Outline (7 cols) */}
+              <div className="lg:col-span-7 flex flex-col gap-5">
+                {/* Big Idea Banner */}
+                {selectedCommunitySermon.big_idea && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900/60 border border-amber-600/40 shadow-inner flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" /> Ý Niệm Cốt Lõi (Big Idea)
+                    </span>
+                    <p className="text-sm text-slate-100 font-serif italic leading-relaxed">
+                      &quot;{selectedCommunitySermon.big_idea}&quot;
+                    </p>
+                  </div>
+                )}
+
+                {/* Expository Points */}
+                {selectedCommunitySermon.points && selectedCommunitySermon.points.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4 text-purple-400" /> Các Luận Điểm Giảng Giải Kinh ({selectedCommunitySermon.points.length})
+                    </h4>
+                    <div className="flex flex-col gap-3">
+                      {selectedCommunitySermon.points.map((pt, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col gap-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <h5 className="text-xs md:text-sm font-bold text-white flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px]">
+                                {pt.point_number || idx + 1}
+                              </span>
+                              <span>{pt.title}</span>
+                            </h5>
+                            <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-semibold">
+                              {pt.scripture_ref}
+                            </span>
+                          </div>
+
+                          {pt.verse_text && (
+                            <p className="text-xs text-slate-300 italic font-serif bg-black/40 p-2.5 rounded-xl border border-slate-800/80">
+                              &quot;{pt.verse_text}&quot;
+                            </p>
+                          )}
+
+                          {pt.original_language_key && (
+                            <div className="text-[11px] text-blue-300 flex items-center gap-1.5">
+                              <Languages className="w-3.5 h-3.5 text-blue-400" />
+                              <span><strong>Nguyên văn gốc:</strong> {pt.original_language_key}</span>
+                            </div>
+                          )}
+
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                            {pt.exposition}
+                          </p>
+
+                          {pt.illustration && (
+                            <div className="text-[11px] text-emerald-300 bg-emerald-950/20 p-2 rounded-xl border border-emerald-900/30">
+                              <strong>Minh họa: </strong> {pt.illustration}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Practical Applications */}
+                {selectedCommunitySermon.practical_applications && selectedCommunitySermon.practical_applications.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col gap-2.5">
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Ứng Dụng Thực Tiễn Cho Đời Sống
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                      {selectedCommunitySermon.practical_applications.map((app, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-slate-200">
+                          <span className="w-4 h-4 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <span className="leading-relaxed">{app}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Theological Citations */}
+                {selectedCommunitySermon.theological_citations && selectedCommunitySermon.theological_citations.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col gap-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Trích Dẫn Tham Khảo Thần Học:
+                    </h4>
+                    <div className="flex flex-col gap-1.5">
+                      {selectedCommunitySermon.theological_citations.map((c, i) => (
+                        <div key={i} className="text-xs text-slate-300">
+                          <span className="font-semibold text-slate-100">• {c.source_title} {c.author ? `(${c.author})` : ""}: </span>
+                          <span className="italic text-slate-400">{c.quote}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full Markdown Manuscript Viewer */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-amber-400" /> Bản Thảo Đầy Đủ (Markdown Manuscript)
+                  </span>
+                  <div className="p-4 rounded-2xl bg-black/60 border border-slate-800 font-sans text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto select-all">
+                    {selectedCommunitySermon.markdown_manuscript}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: 3D Peer Review Dossier & Submission Form (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col gap-5">
+                {/* 3D Assessment Scorecard */}
+                <div className="p-5 rounded-2xl bg-gradient-to-b from-indigo-950/30 to-slate-900/80 border border-indigo-900/50 flex flex-col gap-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                        Hồ Sơ Đánh Giá Đồng Nghiệp (Peer Dossier)
+                      </span>
+                      <h4 className="text-sm font-bold text-white mt-0.5">Điểm Chất Lượng Thuyết Giáo</h4>
+                    </div>
+                    <div className="flex items-baseline gap-1 text-amber-400 font-extrabold text-xl bg-amber-500/10 px-3 py-1 rounded-2xl border border-amber-500/20">
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400 self-center" />
+                      <span>{selectedCommunitySermon.average_rating > 0 ? selectedCommunitySermon.average_rating.toFixed(1) : "5.0"}</span>
+                      <span className="text-xs text-slate-400 font-normal">/ 5.0</span>
+                    </div>
+                  </div>
+
+                  {/* 3 Criteria Progress Bars */}
+                  {(() => {
+                    const revs = selectedCommunitySermon.reviews || [];
+                    const avgFidelity = revs.length > 0 ? (revs.reduce((a, b) => a + b.hermeneutical_fidelity_rating, 0) / revs.length) : 5.0;
+                    const avgClarity = revs.length > 0 ? (revs.reduce((a, b) => a + b.homiletical_clarity_rating, 0) / revs.length) : 5.0;
+                    const avgApp = revs.length > 0 ? (revs.reduce((a, b) => a + b.pastoral_application_rating, 0) / revs.length) : 5.0;
+
+                    return (
+                      <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-800">
+                        <div>
+                          <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
+                            <span className="flex items-center gap-1 text-blue-300">
+                              <ShieldCheck className="w-3.5 h-3.5" /> Độ Trung Thực Giải Kinh
+                            </span>
+                            <span>{avgFidelity.toFixed(1)} / 5</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(avgFidelity / 5) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
+                            <span className="flex items-center gap-1 text-purple-300">
+                              <Award className="w-3.5 h-3.5" /> Bố Cục Sư Phạm (Homiletics)
+                            </span>
+                            <span>{avgClarity.toFixed(1)} / 5</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+                            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(avgClarity / 5) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
+                            <span className="flex items-center gap-1 text-emerald-300">
+                              <Zap className="w-3.5 h-3.5" /> Ứng Dụng Thực Tiễn (Pastoral)
+                            </span>
+                            <span>{avgApp.toFixed(1)} / 5</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(avgApp / 5) * 100}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Peer Reviews List */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <MessageSquare className="w-4 h-4 text-indigo-400" />
+                      Phản Biện Đồng Nghiệp ({selectedCommunitySermon.reviews?.length || 0})
+                    </h4>
+                  </div>
+
+                  {(!selectedCommunitySermon.reviews || selectedCommunitySermon.reviews.length === 0) ? (
+                    <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-500">
+                      Chưa có phản biện nào. Hãy là người đầu tiên gửi đánh giá bên dưới.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 max-h-72 overflow-y-auto pr-1">
+                      {selectedCommunitySermon.reviews.map((rev) => (
+                        <div key={rev.id} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-indigo-900 text-indigo-200 text-[10px] font-bold flex items-center justify-center">
+                                {rev.reviewer_name.charAt(0)}
+                              </div>
+                              <div>
+                                <h6 className="text-xs font-bold text-slate-200 leading-none">{rev.reviewer_name}</h6>
+                                <span className="text-[10px] text-slate-400">{rev.reviewer_title}</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-slate-500">
+                              {new Date(rev.created_at).toLocaleDateString("vi-VN")}
+                            </span>
+                          </div>
+
+                          {/* Scores Row */}
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400 bg-black/30 p-2 rounded-xl border border-slate-800/60">
+                            <span>Giải Kinh: <strong className="text-blue-400">{rev.hermeneutical_fidelity_rating}★</strong></span>
+                            <span>Bố Cục: <strong className="text-purple-400">{rev.homiletical_clarity_rating}★</strong></span>
+                            <span>Ứng Dụng: <strong className="text-emerald-400">{rev.pastoral_application_rating}★</strong></span>
+                          </div>
+
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                            {rev.review_comment}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Peer Review Form */}
+                <form
+                  onSubmit={(e) => handleSubmitPeerReview(e, selectedCommunitySermon.id)}
+                  className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-3"
+                >
+                  <h4 className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Gửi Đánh Giá &amp; Phản Biện Cho Bài Giảng
+                  </h4>
+
+                  {reviewSuccessMsg && (
+                    <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300">
+                      {reviewSuccessMsg}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      required
+                      type="text"
+                      value={reviewerName}
+                      onChange={e => setReviewerName(e.target.value)}
+                      placeholder="Tên của bạn *"
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      value={reviewerTitle}
+                      onChange={e => setReviewerTitle(e.target.value)}
+                      placeholder="Chức vụ / Giáo viên..."
+                      className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {/* 3 Rating Selectors */}
+                  <div className="flex flex-col gap-2 pt-1 border-t border-slate-800">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-medium">1. Độ Trung Thực Giải Kinh:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setFidelityRating(val)}
+                            className="p-0.5 hover:scale-110 transition-transform"
+                          >
+                            <Star className={`w-4 h-4 ${val <= fidelityRating ? "fill-amber-400 text-amber-400" : "text-slate-600"}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-medium">2. Bố Cục Sư Phạm (Homiletics):</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setClarityRating(val)}
+                            className="p-0.5 hover:scale-110 transition-transform"
+                          >
+                            <Star className={`w-4 h-4 ${val <= clarityRating ? "fill-amber-400 text-amber-400" : "text-slate-600"}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-medium">3. Ứng Dụng Thực Tiễn:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setApplicationRating(val)}
+                            className="p-0.5 hover:scale-110 transition-transform"
+                          >
+                            <Star className={`w-4 h-4 ${val <= applicationRating ? "fill-amber-400 text-amber-400" : "text-slate-600"}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <textarea
+                    required
+                    rows={3}
+                    value={reviewComment}
+                    onChange={e => setReviewComment(e.target.value)}
+                    placeholder="Góp ý xây dựng về thần học, dẫn chứng, ứng dụng đời sống..."
+                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={submittingReview || !reviewerName.trim() || !reviewComment.trim()}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs disabled:opacity-50 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+                  >
+                    {submittingReview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Gửi Nhận Xét Phản Biện</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
+

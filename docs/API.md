@@ -89,6 +89,14 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `featured_sermon`, `featured_challenge_pack`, `featured_journey`: Recommended daily learning pathways.
   - `metrics`: Real-time system statistics (verses, chunks, flashcards, notes, nodes).
 
+### 2.8 Interactive Cross-Reference Network Visualizer & Redemptive History Chains (§18)
+- **Endpoint**: `GET /api/bible/cross-references/network?reference={reference}&chain_id={chain_id}`
+- **Description**: Generates an interactive graph of canonical cross-references and redemptive-historical trajectories for any verse:
+  - **Node Architecture**: Central root node, Old Testament nodes, New Testament nodes, Gospel harmony parallels, and thematic chain steps.
+  - **Edge Classification**: Directed connections typed as `quotation` (OT quotation in NT), `allusion`, `parallel` (synoptic parallels), `explicit` (direct cross-reference), or `theological_connection`.
+  - **Redemptive History Chains**: 8 foundational biblico-theological trajectories (Paschal Lamb, Justification by Faith, Good Shepherd, Suffering Servant, New Covenant, Salvation by Grace, Davidic King, Melchizedek Priesthood) tracing typology from OT shadows through Gospel fulfillment to New Jerusalem consummation.
+  - **Response Payload**: Contains `root`, `nodes`, `edges`, `matched_chain`, `all_chains`, and `stats` (OT/NT connection counts, parallel counts, chain steps).
+
 ---
 
 ## 3. Theological RAG & AI Exegesis Engine (`/api/rag`)
@@ -322,6 +330,17 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - **Slide Architecture**: Slide 0 (Title & Golden Verse), Slide 1 (Big Idea & Expository Setting), Slides 2..N (Expository Points with Scripture Text, Original Language Insights, Exposition, and Illustrations), Slide N+1 (Practical Life Applications), Slide N+2 (Conclusion, Call to Faith & Theological Citations).
   - **Interaction**: Keyboard navigation (`ArrowRight` / `Space` for next, `ArrowLeft` for previous, `Esc` to exit), progress dots, and slide counter.
   - **Slide Deck Markdown Export**: One-click generation and download of Marp / Slidev compliant Markdown files (`.md`) with slide separators (`---`), typography classes, and presenter notes.
+
+### 6.10 Community Sermon Sharing & 3-Dimensional Peer Review Workflows (Roadmap Horizon Item 4)
+- **Endpoints**:
+  - `GET /api/study/sermons/community`: Lists community expository sermon manuscripts with query filtering by keyword (`search`), homiletical style (`style`: `expository`, `topical`, `textual`, `narrative`), and sorting (`sort_by`: `popular`, `top_rated`, `latest`).
+  - `GET /api/study/sermons/community/{id}`: Detailed manuscript, big idea, expository points, practical applications, citations, likes count, and full peer review dossier.
+  - `POST /api/study/sermons/share`: Publishes a sermon from the Homiletical Workspace into the community repository.
+  - `POST /api/study/sermons/community/{id}/like`: Increments community appreciation/like counter.
+  - `POST /api/study/sermons/community/{id}/review`: Submits a peer evaluation assessed across 3 normative dimensions:
+    1. **Độ Trung Thực Giải Kinh (Hermeneutical Fidelity - 1..5 stars)**: Faithfulness to original Greek/Hebrew text, authorial intent, and canonical context.
+    2. **Bố Cục Sư Phạm (Homiletical Clarity - 1..5 stars)**: Sharp Big Idea, logical progression, transitions, and memorable illustrations.
+    3. **Ứng Dụng Thực Tiễn (Pastoral Application - 1..5 stars)**: Relevance to daily Christian walk, spiritual discipline, and clear call to repentance/action.
 
 ---
 

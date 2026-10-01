@@ -113,4 +113,6 @@
 - [x] Extended Hebrew grammatical parsing for Old Testament poetic books (Psalms, Job, Proverbs) covering `H1984` (Halal), `H2451` (Chokmah), `H3374` (Yirah), `H0835` (Ashrei), `H7462` (Ra'ah/Rohi), `H1350` (Go'el), `H0982` (Batach), `H6666` (Tzedakah).
 - [x] Homiletical Slide Deck Exporter & Presentation Engine (§50) with keyboard navigation and Marp/Slidev Markdown downloads.
 - [x] Bidirectional Entity Pinning into Study Projects (§50) bridging Knowledge Graph nodes into research workspaces.
-- [ ] Community sermon sharing and collaborative peer review workflows.
+- [x] Interactive Cross-Reference Network Visualizer & Redemptive History Chains (§18) with SVG graph, concentric OT/NT orbits, node inspector, and 8 redemptive trajectories.
+- [x] Community Sermon Sharing & 3-Dimensional Peer Review Workflows (Roadmap Horizon Item 4) with hermeneutical fidelity, homiletical clarity, and pastoral application scoring.
+- [ ] Collaborative real-time multi-pastor study group notes.

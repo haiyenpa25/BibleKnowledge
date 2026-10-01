@@ -193,6 +193,76 @@ class SermonBuilderResponse(BaseModel):
     saved_project_id: Optional[str] = None
 
 
+class PeerReviewCreate(BaseModel):
+    reviewer_name: str = Field(..., max_length=120)
+    reviewer_title: Optional[str] = Field("Giáo viên Kinh Thánh", max_length=120)
+    hermeneutical_fidelity_rating: int = Field(..., ge=1, le=5)
+    homiletical_clarity_rating: int = Field(..., ge=1, le=5)
+    pastoral_application_rating: int = Field(..., ge=1, le=5)
+    review_comment: str = Field(..., min_length=5)
+
+
+class PeerReviewItem(BaseModel):
+    id: str
+    reviewer_name: str
+    reviewer_title: str
+    hermeneutical_fidelity_rating: int
+    homiletical_clarity_rating: int
+    pastoral_application_rating: int
+    average_score: float
+    review_comment: str
+    created_at: str
+
+
+class CommunitySermonShareRequest(BaseModel):
+    title: str = Field(..., max_length=255)
+    passage_ref: str = Field(..., max_length=100)
+    theme: Optional[str] = ""
+    author_name: Optional[str] = "Mục sư Giảng luận"
+    homiletical_style: Optional[str] = "expository"
+    big_idea: Optional[str] = ""
+    points: Optional[List[Dict[str, Any]]] = []
+    practical_applications: Optional[List[str]] = []
+    theological_citations: Optional[List[Dict[str, Any]]] = []
+    markdown_manuscript: str
+    tags: Optional[List[str]] = []
+
+
+class CommunitySermonSummary(BaseModel):
+    id: str
+    title: str
+    passage_ref: str
+    theme: Optional[str]
+    author_name: str
+    homiletical_style: str
+    big_idea: Optional[str]
+    tags: List[str]
+    likes_count: int
+    reviews_count: int
+    average_rating: float
+    created_at: str
+
+
+class CommunitySermonDetail(BaseModel):
+    id: str
+    title: str
+    passage_ref: str
+    theme: Optional[str]
+    author_name: str
+    homiletical_style: str
+    big_idea: Optional[str]
+    points: List[Dict[str, Any]]
+    practical_applications: List[str]
+    theological_citations: List[Dict[str, Any]]
+    markdown_manuscript: str
+    tags: List[str]
+    likes_count: int
+    reviews_count: int
+    average_rating: float
+    created_at: str
+    reviews: List[PeerReviewItem]
+
+
 # ==============================================================================
 # 1. Strong Lexicon Endpoints (Original Languages)
 # ==============================================================================
@@ -1894,6 +1964,279 @@ def get_biblical_journeys():
     """Interactive biblical cartography and geospatial expeditions."""
     from app.routers.graph import list_biblical_journeys
     return list_biblical_journeys()
+
+
+# ==============================================================================
+# COMMUNITY SERMON SHARING & PEER REVIEW WORKFLOWS (ROADMAP HORIZON ITEM 4)
+# ==============================================================================
+
+@router.get("/sermons/community", response_model=List[CommunitySermonSummary])
+def list_community_sermons(
+    q: Optional[str] = Query(None, description="Search term in title, passage, or theme"),
+    style: Optional[str] = Query(None, description="Filter by homiletical style: expository, thematic, textual, narrative"),
+    tag: Optional[str] = Query(None, description="Filter by tag keyword"),
+    sort_by: Optional[str] = Query("latest", description="Sorting criteria: latest, popular, top_rated"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    Browse shared community expository sermon manuscripts with ministerial peer review metrics.
+    """
+    where_clauses = []
+    params: Dict[str, Any] = {"limit": limit, "offset": offset}
+
+    if q:
+        where_clauses.append("(s.title ILIKE :q OR s.passage_ref ILIKE :q OR s.theme ILIKE :q OR s.author_name ILIKE :q)")
+        params["q"] = f"%{q.strip()}%"
+
+    if style:
+        where_clauses.append("s.homiletical_style = :style")
+        params["style"] = style.strip()
+
+    if tag:
+        where_clauses.append("s.tags::text ILIKE :tag")
+        params["tag"] = f"%{tag.strip()}%"
+
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    order_clause = "ORDER BY s.created_at DESC"
+    if sort_by == "popular":
+        order_clause = "ORDER BY s.likes_count DESC, s.created_at DESC"
+    elif sort_by == "top_rated":
+        order_clause = "ORDER BY avg_rating DESC, s.created_at DESC"
+
+    query_sql = f"""
+        SELECT 
+            s.id, s.title, s.passage_ref, s.theme, s.author_name, s.homiletical_style,
+            s.big_idea, s.tags, s.likes_count, s.created_at,
+            COUNT(r.id) AS reviews_count,
+            COALESCE(AVG((r.hermeneutical_fidelity_rating + r.homiletical_clarity_rating + r.pastoral_application_rating) / 3.0), 5.0) AS avg_rating
+        FROM community_sermons s
+        LEFT JOIN sermon_peer_reviews r ON s.id = r.sermon_id
+        {where_str}
+        GROUP BY s.id, s.title, s.passage_ref, s.theme, s.author_name, s.homiletical_style, s.big_idea, s.tags, s.likes_count, s.created_at
+        {order_clause}
+        LIMIT :limit OFFSET :offset
+    """
+
+    rows = db.execute(text(query_sql), params).fetchall()
+    results = []
+    for r in rows:
+        results.append(CommunitySermonSummary(
+            id=str(r.id),
+            title=r.title,
+            passage_ref=r.passage_ref,
+            theme=r.theme or "",
+            author_name=r.author_name,
+            homiletical_style=r.homiletical_style,
+            big_idea=r.big_idea or "",
+            tags=parse_json_field(r.tags),
+            likes_count=r.likes_count,
+            reviews_count=r.reviews_count,
+            average_rating=round(float(r.avg_rating), 1),
+            created_at=r.created_at.isoformat() if r.created_at else ""
+        ))
+    return results
+
+
+@router.get("/sermons/community/{sermon_id}", response_model=CommunitySermonDetail)
+def get_community_sermon_detail(sermon_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieve single shared community sermon manuscript with full peer reviews dossier.
+    """
+    s = db.execute(
+        text("""
+            SELECT id, title, passage_ref, theme, author_name, homiletical_style,
+                   big_idea, points, practical_applications, theological_citations,
+                   markdown_manuscript, tags, likes_count, created_at
+            FROM community_sermons
+            WHERE id = :id
+        """),
+        {"id": sermon_id}
+    ).fetchone()
+
+    if not s:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài giảng cộng đồng này.")
+
+    rev_rows = db.execute(
+        text("""
+            SELECT id, reviewer_name, reviewer_title,
+                   hermeneutical_fidelity_rating, homiletical_clarity_rating,
+                   pastoral_application_rating, review_comment, created_at
+            FROM sermon_peer_reviews
+            WHERE sermon_id = :sid
+            ORDER BY created_at DESC
+        """),
+        {"sid": sermon_id}
+    ).fetchall()
+
+    reviews = []
+    total_score = 0.0
+    for rv in rev_rows:
+        avg_s = (rv.hermeneutical_fidelity_rating + rv.homiletical_clarity_rating + rv.pastoral_application_rating) / 3.0
+        total_score += avg_s
+        reviews.append(PeerReviewItem(
+            id=str(rv.id),
+            reviewer_name=rv.reviewer_name,
+            reviewer_title=rv.reviewer_title or "Giáo viên Kinh Thánh",
+            hermeneutical_fidelity_rating=rv.hermeneutical_fidelity_rating,
+            homiletical_clarity_rating=rv.homiletical_clarity_rating,
+            pastoral_application_rating=rv.pastoral_application_rating,
+            average_score=round(avg_s, 1),
+            review_comment=rv.review_comment,
+            created_at=rv.created_at.isoformat() if rv.created_at else ""
+        ))
+
+    overall_avg = round(total_score / len(reviews), 1) if reviews else 5.0
+
+    return CommunitySermonDetail(
+        id=str(s.id),
+        title=s.title,
+        passage_ref=s.passage_ref,
+        theme=s.theme or "",
+        author_name=s.author_name,
+        homiletical_style=s.homiletical_style,
+        big_idea=s.big_idea or "",
+        points=parse_json_field(s.points),
+        practical_applications=parse_json_field(s.practical_applications),
+        theological_citations=parse_json_field(s.theological_citations),
+        markdown_manuscript=s.markdown_manuscript or "",
+        tags=parse_json_field(s.tags),
+        likes_count=s.likes_count,
+        reviews_count=len(reviews),
+        average_rating=overall_avg,
+        created_at=s.created_at.isoformat() if s.created_at else "",
+        reviews=reviews
+    )
+
+
+@router.post("/sermons/share", response_model=CommunitySermonSummary)
+def share_sermon_to_community(req: CommunitySermonShareRequest, db: Session = Depends(get_db)):
+    """
+    Share an expository sermon manuscript to the public ministerial community hub.
+    """
+    new_id = f"sermon-{uuid4().hex[:12]}"
+    now = datetime.utcnow()
+
+    db.execute(
+        text("""
+            INSERT INTO community_sermons (
+                id, title, passage_ref, theme, author_name, homiletical_style,
+                big_idea, points, practical_applications, theological_citations,
+                markdown_manuscript, tags, likes_count, created_at, updated_at
+            ) VALUES (
+                :id, :title, :pref, :theme, :author, :style,
+                :big_idea, CAST(:points AS jsonb), CAST(:apps AS jsonb), CAST(:cits AS jsonb),
+                :ms, CAST(:tags AS jsonb), 0, :created_at, :updated_at
+            )
+        """),
+        {
+            "id": new_id,
+            "title": req.title,
+            "pref": req.passage_ref,
+            "theme": req.theme or "",
+            "author": req.author_name or "Mục sư / Giảng viên",
+            "style": req.homiletical_style or "expository",
+            "big_idea": req.big_idea or "",
+            "points": json.dumps(req.points or [], ensure_ascii=False),
+            "apps": json.dumps(req.practical_applications or [], ensure_ascii=False),
+            "cits": json.dumps(req.theological_citations or [], ensure_ascii=False),
+            "ms": req.markdown_manuscript,
+            "tags": json.dumps(req.tags or [], ensure_ascii=False),
+            "created_at": now,
+            "updated_at": now
+        }
+    )
+    db.commit()
+
+    return CommunitySermonSummary(
+        id=new_id,
+        title=req.title,
+        passage_ref=req.passage_ref,
+        theme=req.theme or "",
+        author_name=req.author_name or "Mục sư / Giảng viên",
+        homiletical_style=req.homiletical_style or "expository",
+        big_idea=req.big_idea or "",
+        tags=req.tags or [],
+        likes_count=0,
+        reviews_count=0,
+        average_rating=5.0,
+        created_at=now.isoformat()
+    )
+
+
+@router.post("/sermons/community/{sermon_id}/like")
+def like_community_sermon(sermon_id: str, db: Session = Depends(get_db)):
+    """Upvote / like a community sermon manuscript."""
+    res = db.execute(
+        text("UPDATE community_sermons SET likes_count = likes_count + 1 WHERE id = :id RETURNING likes_count"),
+        {"id": sermon_id}
+    ).fetchone()
+    if not res:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài giảng.")
+    db.commit()
+    return {"id": sermon_id, "likes_count": res.likes_count}
+
+
+@router.post("/sermons/community/{sermon_id}/review", response_model=PeerReviewItem)
+def submit_sermon_peer_review(
+    sermon_id: str,
+    req: PeerReviewCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit a ministerial peer review across 3 dimensions:
+    - Hermeneutical Fidelity (1-5)
+    - Homiletical Clarity (1-5)
+    - Pastoral Application (1-5)
+    """
+    s_exists = db.execute(text("SELECT id FROM community_sermons WHERE id = :id"), {"id": sermon_id}).fetchone()
+    if not s_exists:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài giảng.")
+
+    new_id = f"rev-{uuid4().hex[:12]}"
+    now = datetime.utcnow()
+    avg_score = (req.hermeneutical_fidelity_rating + req.homiletical_clarity_rating + req.pastoral_application_rating) / 3.0
+
+    db.execute(
+        text("""
+            INSERT INTO sermon_peer_reviews (
+                id, sermon_id, reviewer_name, reviewer_title,
+                hermeneutical_fidelity_rating, homiletical_clarity_rating,
+                pastoral_application_rating, review_comment, created_at
+            ) VALUES (
+                :id, :sid, :rname, :rtitle,
+                :hfr, :hcr,
+                :par, :comment, :created_at
+            )
+        """),
+        {
+            "id": new_id,
+            "sid": sermon_id,
+            "rname": req.reviewer_name,
+            "rtitle": req.reviewer_title or "Giáo viên Kinh Thánh",
+            "hfr": req.hermeneutical_fidelity_rating,
+            "hcr": req.homiletical_clarity_rating,
+            "par": req.pastoral_application_rating,
+            "comment": req.review_comment,
+            "created_at": now
+        }
+    )
+    db.commit()
+
+    return PeerReviewItem(
+        id=new_id,
+        reviewer_name=req.reviewer_name,
+        reviewer_title=req.reviewer_title or "Giáo viên Kinh Thánh",
+        hermeneutical_fidelity_rating=req.hermeneutical_fidelity_rating,
+        homiletical_clarity_rating=req.homiletical_clarity_rating,
+        pastoral_application_rating=req.pastoral_application_rating,
+        average_score=round(avg_score, 1),
+        review_comment=req.review_comment,
+        created_at=now.isoformat()
+    )
+
 
 
 

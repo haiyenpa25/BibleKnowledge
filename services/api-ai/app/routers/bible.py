@@ -666,7 +666,331 @@ def find_harmony_event_for_verse(book_code: str, chapter: int, verse: int) -> Op
                             "parallels": parallel_list,
                             "synoptic_distinctives": ev.get("synoptic_distinctives")
                         }
-    return None
+
+THEOLOGICAL_REDEMPTIVE_CHAINS = [
+    {
+        "chain_id": "paschal-lamb",
+        "title": "Chiên Con Lễ Vượt Qua & Sự Cứu Chuộc Đời Đời",
+        "theme": "Cứu Chuộc Luận & Hy Lễ",
+        "description": "Dòng chảy biểu tượng Chiên Con từ huyết bôi mày cửa giải thoát khỏi án phạt Ai-cập đến Chiên Con đắc thắng trên ngai Thiên đàng.",
+        "steps": [
+            {
+                "ref": "Xuất Ê-díp-tô Ký 12:5",
+                "stage": "Cựu Ước: Hình Bóng (OT Shadow)",
+                "role": "Chiên con đực chẳng tì vít chi bôi huyết cứu chuộc",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ê-sai 53:7",
+                "stage": "Tiên Tri (Prophecy)",
+                "role": "Người Tôi Tớ câm lặng như chiên con bị dắt đến hàng làm thịt",
+                "testament": "OT"
+            },
+            {
+                "ref": "Giăng 1:29",
+                "stage": "Phúc Âm: Ứng Nghiệm (Gospel Fulfillment)",
+                "role": "Kìa, Chiên Con của Đức Chúa Trời, là Đấng cất tội lỗi thế gian đi!",
+                "testament": "NT"
+            },
+            {
+                "ref": "1 Cô-rinh-tô 5:7",
+                "stage": "Thư Tín: Giáo Lý (Apostolic Doctrine)",
+                "role": "Đấng Christ là con chiên lễ Vượt Qua của chúng ta, đã chịu làm của tế lễ rồi",
+                "testament": "NT"
+            },
+            {
+                "ref": "1 Phi-e-rơ 1:18-19",
+                "stage": "Thư Tín: Giáo Lý (Apostolic Doctrine)",
+                "role": "Cứu chuộc chẳng phải bởi bạc vàng, bèn là bởi huyết báu Đấng Christ dường như huyết chiên con không lỗi không vít",
+                "testament": "NT"
+            },
+            {
+                "ref": "Khải Huyền 5:6",
+                "stage": "Khải Thị Chung Cuộc (Consummation)",
+                "role": "Chiên Con dường như đã bị giết đứng giữa ngai nhận sự thờ phượng muôn đời",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "justification-faith",
+        "title": "Giao Ước Xưng Công Bình Bởi Đức Tin",
+        "theme": "Giáo Lý Cứu Rỗi",
+        "description": "Nguyên lý cứu rỗi duy nhất xuyên suốt Cựu Ước và Tân Ước: Người công bình sống bởi đức tin.",
+        "steps": [
+            {
+                "ref": "Sáng Thế Ký 15:6",
+                "stage": "Cựu Ước: Hình Bóng (OT Shadow)",
+                "role": "Áp-ram tin Đức Giê-hô-va, thì Ngài kể sự đó là công bình cho người",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ha-ba-cúc 2:4",
+                "stage": "Tiên Tri (Prophecy)",
+                "role": "Người công bình sẽ sống bởi đức tin mình",
+                "testament": "OT"
+            },
+            {
+                "ref": "Rô-ma 1:17",
+                "stage": "Phúc Âm & Thư Tín (Apostolic)",
+                "role": "Sự công bình của Đức Chúa Trời bày tỏ ra trong Tin Lành từ đức tin đến đức tin",
+                "testament": "NT"
+            },
+            {
+                "ref": "Rô-ma 4:3",
+                "stage": "Thư Tín: Giáo Lý (Apostolic Doctrine)",
+                "role": "Kinh Thánh nói chi? Áp-ra-ham tin Đức Chúa Trời, và điều đó kể là công bình cho người",
+                "testament": "NT"
+            },
+            {
+                "ref": "Ga-la-ti 3:6-11",
+                "stage": "Thư Tín: Giáo Lý (Apostolic Doctrine)",
+                "role": "Những kẻ có đức tin là con cháu thật của Áp-ra-ham",
+                "testament": "NT"
+            },
+            {
+                "ref": "Hê-bơ-rơ 11:8",
+                "stage": "Thư Tín: Gương Đức Tin (Faith Hall of Fame)",
+                "role": "Bởi đức tin, Áp-ra-ham vâng lời Chúa gọi, đi đến xứ mình sẽ nhận làm cơ nghiệp",
+                "testament": "NT"
+            },
+            {
+                "ref": "Gia-cơ 2:22-23",
+                "stage": "Hành Động Trọn Vẹn (Living Faith)",
+                "role": "Đức tin cùng làm việc với việc làm, và nhờ việc làm mà đức tin được trọn vẹn",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "good-shepherd",
+        "title": "Đấng Chăn Chiên Lành Đời Đời",
+        "theme": "Cứu Chuộc & Quan Phòng",
+        "description": "Đức Giê-hô-va là Đấng Chăn Chiên trong Thi Thiên được hiện thực hóa trọn vẹn nơi Chúa Giê-xu - Đấng Chăn Chiên Lớn vì bầy phó sự sống.",
+        "steps": [
+            {
+                "ref": "Thi Thiên 23:1",
+                "stage": "Cựu Ước: Ca Vịnh (OT Psalm)",
+                "role": "Đức Giê-hô-va là Đấng chăn giữ tôi; tôi sẽ chẳng thiếu thốn gì",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ê-xê-chi-ên 34:11-15",
+                "stage": "Tiên Tri (Prophecy)",
+                "role": "Chính Ta sẽ tìm chiên Ta và thăm viếng chúng nó... Ta sẽ chăn bầy chiên Ta",
+                "testament": "OT"
+            },
+            {
+                "ref": "Giăng 10:11-14",
+                "stage": "Phúc Âm: Ứng Nghiệm (Gospel Fulfillment)",
+                "role": "Ta là người chăn hiền lành; người chăn hiền lành vì chiên mình phó sự sống",
+                "testament": "NT"
+            },
+            {
+                "ref": "Hê-bơ-rơ 13:20",
+                "stage": "Thư Tín: Giáo Lý (Apostolic)",
+                "role": "Đức Chúa Trời bình an là Đấng đã đem Đấng Chăn Chiên Lớn ra khỏi kẻ chết",
+                "testament": "NT"
+            },
+            {
+                "ref": "1 Phi-e-rơ 5:4",
+                "stage": "Khải Thị & Phần Thưởng (Eschatological)",
+                "role": "Khi Đấng Làm Đầu các kẻ chăn chiên hiện ra, anh em sẽ nhận mão triều thiên vinh hiển",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "suffering-servant",
+        "title": "Người Tôi Tớ Chịu Khổ & Sự Chuộc Tội Thay Thế",
+        "theme": "Đấng Mê-si-a Chịu Khổ",
+        "description": "Các chi tiết tiên tri về sự thương khó và sự phục sinh của Đấng Cứu Thế ứng nghiệm trọn vẹn trong Tân Ước.",
+        "steps": [
+            {
+                "ref": "Thi Thiên 22:1",
+                "stage": "Cựu Ước: Ca Vịnh (OT Psalm)",
+                "role": "Đức Chúa Trời tôi ôi! Đức Chúa Trời tôi ôi! sao Ngài lìa bỏ tôi?",
+                "testament": "OT"
+            },
+            {
+                "ref": "Thi Thiên 22:16-18",
+                "stage": "Cựu Ước: Chi Tiết Thập Tự",
+                "role": "Chúng nó đâm thủng tay và chân tôi... chia nhau áo xống tôi",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ê-sai 53:4-5",
+                "stage": "Tiên Tri (Prophecy)",
+                "role": "Thật Người đã mang sự đau ốm của chúng ta... vì tội lỗi chúng ta mà bị vết",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ma-thi-ơ 27:46",
+                "stage": "Phúc Âm: Ứng Nghiệm (Gospel Fulfillment)",
+                "role": "Ê-li, Ê-li, lam-ma sa-bách-tha-ni? Nghĩa là: Đức Chúa Trời tôi ôi! sao Ngài lìa bỏ tôi?",
+                "testament": "NT"
+            },
+            {
+                "ref": "Công Vụ 8:32-35",
+                "stage": "Hội Thánh Ban Đầu (Early Church)",
+                "role": "Phi-líp giải nghĩa sách tiên tri Ê-sai và giảng Tin Lành về Đức Chúa Jêsus",
+                "testament": "NT"
+            },
+            {
+                "ref": "1 Phi-e-rơ 2:24",
+                "stage": "Thư Tín: Giáo Lý (Apostolic Doctrine)",
+                "role": "Ngài gánh tội lỗi chúng ta trong thân thể Ngài trên cây gỗ... nhân lằn đòn Ngài mà anh em được lành bệnh",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "new-covenant",
+        "title": "Giao Ước Mới & Sự Đổi Mới Của Đức Thánh Linh",
+        "theme": "Giao Ước Luận",
+        "description": "Giao ước ghi tạc trong lòng người thay vì bảng đá, được thiết lập bằng chính huyết Chúa Giê-xu.",
+        "steps": [
+            {
+                "ref": "Giê-rê-mi 31:31-33",
+                "stage": "Tiên Tri Cựu Ước (OT Prophecy)",
+                "role": "Nầy, những ngày đến, Ta sẽ lập một giao ước mới... Ta sẽ đặt luật pháp Ta trong bụng chúng nó",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ê-xê-chi-ên 36:26-27",
+                "stage": "Tiên Tri Đổi Mới Tâm Linh",
+                "role": "Ta sẽ ban lòng mới cho các ngươi... đặt Thần Ta trong các ngươi",
+                "testament": "OT"
+            },
+            {
+                "ref": "Lu-ca 22:20",
+                "stage": "Phúc Âm: Thiết Lập (Gospel Institution)",
+                "role": "Chén này là giao ước mới trong huyết Ta vì các ngươi mà đổ ra",
+                "testament": "NT"
+            },
+            {
+                "ref": "2 Cô-rinh-tô 3:6",
+                "stage": "Thư Tín: Chức Vụ Giao Ước Mới",
+                "role": "Đầy tớ của giao ước mới, chẳng phải của chữ, bèn là của Thánh Linh",
+                "testament": "NT"
+            },
+            {
+                "ref": "Hê-bơ-rơ 8:8-13",
+                "stage": "Thư Tín: Hoàn Tất (Apostolic Fulfillment)",
+                "role": "Khi Ngài phán về Giao ước mới, thì đã xưng giao ước trước là cũ và sắp biến mất",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "salvation-grace",
+        "title": "Tình Yêu Cứu Rỗi & Sự Tái Sinh Bởi Ân Điển",
+        "theme": "Ân Điển & Cứu Rỗi",
+        "description": "Hình bóng con rắn đồng được giương lên nơi đồng vắng ứng nghiệm nơi Con Một bị treo trên Thập Tự Giá để ai tin đều được sự sống đời đời.",
+        "steps": [
+            {
+                "ref": "Dân-số Ký 21:8-9",
+                "stage": "Cựu Ước: Hình Bóng (OT Shadow)",
+                "role": "Môi-se làm con rắn bằng đồng giương lên cây sào; hễ ai bị cắn ngước nhìn thì được sống",
+                "testament": "OT"
+            },
+            {
+                "ref": "Giăng 3:14-16",
+                "stage": "Phúc Âm: Ứng Nghiệm (Gospel Fulfillment)",
+                "role": "Môi-se treo con rắn lên thể nào, Con Người cũng phải bị treo lên dường ấy, hầu cho hễ ai tin Con ấy đều được sự sống đời đời",
+                "testament": "NT"
+            },
+            {
+                "ref": "Rô-ma 5:8",
+                "stage": "Thư Tín: Tình Yêu Chứng Minh",
+                "role": "Đức Chúa Trời tỏ lòng yêu thương Ngài đối với chúng ta, khi chúng ta còn là người có tội, thì Đấng Christ vì chúng ta chịu chết",
+                "testament": "NT"
+            },
+            {
+                "ref": "Ê-phê-sô 2:8-9",
+                "stage": "Thư Tín: Giáo Lý Ân Điển (Sola Gratia)",
+                "role": "Vả, ấy là nhờ ân điển, bởi đức tin mà anh em được cứu, điều đó không phải đến từ anh em, bèn là sự ban cho của Đức Chúa Trời",
+                "testament": "NT"
+            },
+            {
+                "ref": "Tít 3:5",
+                "stage": "Tái Sinh Bởi Thánh Linh (Regeneration)",
+                "role": "Không phải bởi việc công bình chúng ta đã làm, nhưng theo sự thương xót Ngài đã cứu chúng ta bởi sự rửa lại và sự đổi mới của Đức Thánh Linh",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "messianic-king",
+        "title": "Vương Triều Đấng Mê-si-a Dòng Dõi Đa-vít",
+        "theme": "Vương Triều & Đấng Mê-si-a",
+        "description": "Giao ước Đa-vít về ngôi nước đời đời ứng nghiệm nơi Chúa Cứu Thế Giê-xu - Vua muôn vua, Chúa muôn chúa.",
+        "steps": [
+            {
+                "ref": "2 Sa-mu-ên 7:12-16",
+                "stage": "Cựu Ước: Giao Ước Đa-vít (Davidic Covenant)",
+                "role": "Ta sẽ lập dòng giống ngươi kế vị... Ta sẽ làm cho ngôi nước người bền vững đời đời",
+                "testament": "OT"
+            },
+            {
+                "ref": "Thi Thiên 89:3-4",
+                "stage": "Ca Vịnh Thành Tín (Covenant Praise)",
+                "role": "Ta đã lập giao ước cùng kẻ được chọn của Ta... sẽ lập ngôi ngươi đến muôn đời",
+                "testament": "OT"
+            },
+            {
+                "ref": "Ê-sai 9:6-7",
+                "stage": "Tiên Tri Đấng Bình An (Prophecy)",
+                "role": "Quyền cai trị và sự bình an của Ngài sẽ gia thêm mãi trên ngôi Đa-vít và trên nước Ngài",
+                "testament": "OT"
+            },
+            {
+                "ref": "Lu-ca 1:31-33",
+                "stage": "Phúc Âm: Thiên Sứ Truyền Tin (Annunciation)",
+                "role": "Chúa là Đức Chúa Trời sẽ ban cho Ngài ngôi Đa-vít là tổ phụ Ngài... nước Ngài sẽ không bao giờ hết",
+                "testament": "NT"
+            },
+            {
+                "ref": "Khải Huyền 19:16",
+                "stage": "Khải Thị Chung Cuộc (Final Triumph)",
+                "role": "Trên áo tơi và trên đùi Ngài có ghi một danh hiệu: VUA MUÔN VUA VÀ CHÚA MUÔN CHÚA",
+                "testament": "NT"
+            }
+        ]
+    },
+    {
+        "chain_id": "priesthood-melchizedek",
+        "title": "Thầy Tế Lễ Thượng Phẩm Đời Đời Dòng Mên-chi-xê-đéc",
+        "theme": "Tế Lễ & Giao Ước Tối Cao",
+        "description": "Chức vụ thầy tế lễ tối thượng của Đấng Christ vượt trần gian và luật pháp A-rôn, đời đời và toàn hảo.",
+        "steps": [
+            {
+                "ref": "Sáng Thế Ký 14:18-20",
+                "stage": "Cựu Ước: Hình Bóng Bí Nhiệm (OT Mystery)",
+                "role": "Mên-chi-xê-đéc, vua Sa-lem, đem bánh và rượu ra; người là thầy tế lễ của Đức Chúa Trời Chí Cao",
+                "testament": "OT"
+            },
+            {
+                "ref": "Thi Thiên 110:4",
+                "stage": "Tiên Tri Chức Tế Lễ Đời Đời",
+                "role": "Đức Giê-hô-va đã thề: Ngươi là thầy tế lễ đời đời theo ban Mên-chi-xê-đéc",
+                "testament": "OT"
+            },
+            {
+                "ref": "Hê-bơ-rơ 5:5-10",
+                "stage": "Thư Tín: Thiết Lập Thần Học",
+                "role": "Đấng Christ không tự tôn mình làm thầy tế lễ thượng phẩm, nhưng được Đức Chúa Trời xưng là thầy tế lễ theo ban Mên-chi-xê-đéc",
+                "testament": "NT"
+            },
+            {
+                "ref": "Hê-bơ-rơ 7:24-28",
+                "stage": "Thư Tín: Đấng Cứu Toàn Vẹn (Ultimate Intercessor)",
+                "role": "Bởi vì Ngài hằng sống đời đời, nên chức tế lễ không hề chuyển dời; Ngài có thể cứu toàn vẹn những kẻ nhờ Ngài đến cùng Đức Chúa Trời",
+                "testament": "NT"
+            }
+        ]
+    }
+]
 
 
 @router.get("/verse-details")
@@ -956,6 +1280,310 @@ def get_verse_details(
         "cross_references": cross_previews,
         "harmony_event": harmony_match,
         "citations": citations
+    }
+
+
+@router.get("/cross-references/network")
+def get_cross_references_network(
+    ref: Optional[str] = Query(None, description="Scripture reference (e.g. 'Xuất Ê-díp-tô Ký 12:5' or 'Giăng 3:16')"),
+    verse_code: Optional[int] = Query(None, description="Composite verse code integer"),
+    chain_id: Optional[str] = Query(None, description="Filter/focus on a specific theological redemptive chain"),
+    db: Session = Depends(get_db)
+):
+    """
+    Interactive Cross-Reference Network Visualizer (§18).
+    Classifies connective flow between Old Testament type and New Testament antitype
+    with epistemic connection badges:
+    - quotation: Trích dẫn nguyên văn Cựu Ước
+    - explicit: Liên chiếu trực tiếp bản văn
+    - allusion: Ám chỉ / Hình bóng tiên tri (Typology)
+    - parallel: Đối chiếu song song
+    - theological_connection: Kết nối thần học & giáo lý
+    - scholarly_interpretation: Chú giải học thuật
+    - ai_suggested: Gợi ý liên kết ngữ nghĩa từ AI
+    """
+    from app.routers.bible import get_verse_range
+
+    # 1. Resolve Root Verse
+    v_row = None
+    if verse_code:
+        v_row = db.execute(
+            text("""
+                SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                       b.code as book_code, b.name_vi as book_name, b.name_en as book_en, b.testament
+                FROM bible_verses v
+                JOIN bible_books b ON v.book_id = b.id
+                WHERE v.verse_code = :vc
+                LIMIT 1
+            """),
+            {"vc": verse_code}
+        ).fetchone()
+    elif ref:
+        parsed = get_verse_range(ref=ref, db=db)
+        if parsed.get("verses"):
+            first_v = parsed["verses"][0]
+            v_row = db.execute(
+                text("""
+                    SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                           b.code as book_code, b.name_vi as book_name, b.name_en as book_en, b.testament
+                    FROM bible_verses v
+                    JOIN bible_books b ON v.book_id = b.id
+                    WHERE v.id = :gid
+                    LIMIT 1
+                """),
+                {"gid": first_v["global_id"]}
+            ).fetchone()
+    elif chain_id:
+        target_ch = next((c for c in THEOLOGICAL_REDEMPTIVE_CHAINS if c["chain_id"] == chain_id), None)
+        if target_ch and target_ch["steps"]:
+            first_step_ref = target_ch["steps"][0]["ref"]
+            parsed = get_verse_range(ref=first_step_ref, db=db)
+            if parsed.get("verses"):
+                first_v = parsed["verses"][0]
+                v_row = db.execute(
+                    text("""
+                        SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                               b.code as book_code, b.name_vi as book_name, b.name_en as book_en, b.testament
+                        FROM bible_verses v
+                        JOIN bible_books b ON v.book_id = b.id
+                        WHERE v.id = :gid
+                        LIMIT 1
+                    """),
+                    {"gid": first_v["global_id"]}
+                ).fetchone()
+
+    # Fallback to John 3:16 (verse_code = 43003016) if not found
+    if not v_row:
+        v_row = db.execute(
+            text("""
+                SELECT v.id, v.verse_code, v.chapter, v.verse, v.section_title, v.text, v.cross_references,
+                       b.code as book_code, b.name_vi as book_name, b.name_en as book_en, b.testament
+                FROM bible_verses v
+                JOIN bible_books b ON v.book_id = b.id
+                WHERE v.verse_code = 43003016
+                LIMIT 1
+            """)
+        ).fetchone()
+
+    root_ref = f"{v_row.book_name} {v_row.chapter}:{v_row.verse}"
+    root_node = {
+        "id": root_ref,
+        "reference": root_ref,
+        "verse_code": v_row.verse_code,
+        "book": v_row.book_name,
+        "chapter": v_row.chapter,
+        "verse": v_row.verse,
+        "testament": v_row.testament,
+        "text": v_row.text,
+        "section_title": v_row.section_title or "",
+        "is_root": True,
+        "node_type": "root"
+    }
+
+    nodes = [root_node]
+    edges = []
+    seen_node_ids = {root_ref}
+
+    # 2. Parse Canonical Cross References
+    raw_cross = v_row.cross_references or []
+    if isinstance(raw_cross, str):
+        try:
+            raw_cross = json.loads(raw_cross)
+        except Exception:
+            raw_cross = []
+    if not isinstance(raw_cross, list):
+        raw_cross = []
+
+    for cr_str in raw_cross[:12]:
+        try:
+            cr_res = get_verse_range(ref=cr_str, db=db)
+            if cr_res.get("verses"):
+                target_v = cr_res["verses"][0]
+                target_ref = f"{target_v['book']} {target_v['chapter']}:{target_v['verse']}"
+                
+                # Determine testament
+                b_info = db.execute(text("SELECT testament FROM bible_books WHERE name_vi = :name LIMIT 1"), {"name": target_v['book']}).fetchone()
+                target_testament = b_info.testament if b_info else ("NT" if any(g in target_v['book'].lower() for g in ["ma-thi-ơ", "mác", "lu-ca", "giăng", "công", "rô-ma", "cô-rinh", "ga-la", "ê-phê", "phi-líp", "cô-lô", "tê-sa", "ti-mô", "tít", "hê-bơ", "gia-cơ", "phi-e", "khải"]) else "OT")
+                
+                if target_ref not in seen_node_ids:
+                    seen_node_ids.add(target_ref)
+                    nodes.append({
+                        "id": target_ref,
+                        "reference": target_ref,
+                        "verse_code": target_v.get("verse_code"),
+                        "book": target_v["book"],
+                        "chapter": target_v["chapter"],
+                        "verse": target_v["verse"],
+                        "testament": target_testament,
+                        "text": target_v["text"],
+                        "section_title": target_v.get("section_title") or "",
+                        "is_root": False,
+                        "node_type": "cross_reference"
+                    })
+                
+                classification = classify_cross_reference(v_row.book_name, target_ref, v_row.testament)
+                edges.append({
+                    "id": f"{root_ref}->{target_ref}",
+                    "source": root_ref,
+                    "target": target_ref,
+                    "connection_type": classification["type"],
+                    "connection_label": classification["type_label"],
+                    "badge_color": classification["badge_color"],
+                    "epistemic_level": "canonical_text",
+                    "theological_note": f"Liên kết {classification['type_label']} giữa {root_ref} và {target_ref}."
+                })
+        except Exception:
+            continue
+
+    # 3. Gospel Harmony & Parallel Accounts (§8, §18)
+    harmony_match = find_harmony_event_for_verse(v_row.book_code, v_row.chapter, v_row.verse)
+    if harmony_match and harmony_match.get("parallels"):
+        for p_acc in harmony_match["parallels"]:
+            if not p_acc.get("is_current") and p_acc.get("ref"):
+                p_ref = p_acc["ref"]
+                try:
+                    p_res = get_verse_range(ref=p_ref, db=db)
+                    if p_res.get("verses"):
+                        p_v = p_res["verses"][0]
+                        p_canonical_ref = f"{p_v['book']} {p_v['chapter']}:{p_v['verse']}"
+                        if p_canonical_ref not in seen_node_ids:
+                            seen_node_ids.add(p_canonical_ref)
+                            nodes.append({
+                                "id": p_canonical_ref,
+                                "reference": p_canonical_ref,
+                                "verse_code": p_v.get("verse_code"),
+                                "book": p_v["book"],
+                                "chapter": p_v["chapter"],
+                                "verse": p_v["verse"],
+                                "testament": "NT",
+                                "text": p_v["text"],
+                                "section_title": harmony_match["title_vi"],
+                                "is_root": False,
+                                "node_type": "parallel_synoptic",
+                                "harmony_focus": p_acc.get("theological_focus", "")
+                            })
+                        edges.append({
+                            "id": f"harmony:{root_ref}->{p_canonical_ref}",
+                            "source": root_ref,
+                            "target": p_canonical_ref,
+                            "connection_type": "parallel",
+                            "connection_label": "Đối Chiếu Tin Lành Đồng Quan",
+                            "badge_color": "purple",
+                            "epistemic_level": "historical_parallel",
+                            "theological_note": f"{harmony_match['title_vi']}: {p_acc.get('theological_focus', '')}"
+                        })
+                except Exception:
+                    continue
+
+    # 4. Check / Overlay Redemptive Chains (§18)
+    matched_chain = None
+    all_chains_catalog = []
+    
+    for ch in THEOLOGICAL_REDEMPTIVE_CHAINS:
+        all_chains_catalog.append({
+            "chain_id": ch["chain_id"],
+            "title": ch["title"],
+            "theme": ch["theme"],
+            "description": ch["description"],
+            "steps_count": len(ch["steps"])
+        })
+        
+        # Check if root or filter matches
+        if chain_id:
+            chain_matches = (ch["chain_id"] == chain_id)
+        else:
+            chain_matches = False
+            for s in ch["steps"]:
+                norm_step = s["ref"].lower().replace("-", " ").strip()
+                norm_root = root_ref.lower().replace("-", " ").strip()
+                if norm_step in norm_root or norm_root in norm_step:
+                    chain_matches = True
+                    break
+                step_parts = norm_step.split()
+                root_parts = norm_root.split()
+                if len(step_parts) > 1 and len(root_parts) > 1 and step_parts[0] == root_parts[0]:
+                    if step_parts[1].split(":")[0] == root_parts[1].split(":")[0]:
+                        chain_matches = True
+                        break
+        
+        if chain_matches and not matched_chain:
+            matched_chain = ch
+            prev_step_id = None
+            for idx, st in enumerate(ch["steps"]):
+                st_ref = st["ref"]
+                canonical_st_ref = st_ref
+                st_text = ""
+                st_vcode = None
+                st_book = st_ref.split()[0] if " " in st_ref else st_ref
+                st_chapter = 1
+                st_verse = 1
+
+                try:
+                    st_parsed = get_verse_range(ref=st_ref, db=db)
+                    if st_parsed.get("verses"):
+                        fst_v = st_parsed["verses"][0]
+                        canonical_st_ref = f"{fst_v['book']} {fst_v['chapter']}:{fst_v['verse']}"
+                        st_text = fst_v["text"]
+                        st_vcode = fst_v.get("verse_code")
+                        st_book = fst_v["book"]
+                        st_chapter = fst_v["chapter"]
+                        st_verse = fst_v["verse"]
+                except Exception:
+                    pass
+
+                node_id = canonical_st_ref
+                if node_id not in seen_node_ids:
+                    seen_node_ids.add(node_id)
+                    nodes.append({
+                        "id": node_id,
+                        "reference": st_ref,
+                        "verse_code": st_vcode,
+                        "book": st_book,
+                        "chapter": st_chapter,
+                        "verse": st_verse,
+                        "testament": st["testament"],
+                        "text": st_text or st["role"],
+                        "section_title": st["stage"],
+                        "is_root": (node_id == root_ref or st_ref == root_ref),
+                        "node_type": "chain_step",
+                        "chain_stage": st["stage"],
+                        "chain_role": st["role"]
+                    })
+                
+                # Chain sequential flow edge
+                if prev_step_id and prev_step_id != node_id:
+                    edges.append({
+                        "id": f"chain:{prev_step_id}->{node_id}",
+                        "source": prev_step_id,
+                        "target": node_id,
+                        "connection_type": "allusion" if st["testament"] == "NT" else "parallel",
+                        "connection_label": f"Mạch Cứu Chuộc: {st['stage']}",
+                        "badge_color": "emerald" if st["testament"] == "NT" else "amber",
+                        "epistemic_level": "canonical_typology",
+                        "theological_note": f"{st['role']} ({ch['title']})"
+                    })
+                prev_step_id = node_id
+
+    # 4. Connection Statistics for Filtering
+    stats = {
+        "total_nodes": len(nodes),
+        "total_edges": len(edges),
+        "ot_nodes": sum(1 for n in nodes if n["testament"] == "OT"),
+        "nt_nodes": sum(1 for n in nodes if n["testament"] == "NT"),
+        "quotation_count": sum(1 for e in edges if e["connection_type"] == "quotation"),
+        "allusion_count": sum(1 for e in edges if e["connection_type"] == "allusion"),
+        "parallel_count": sum(1 for e in edges if e["connection_type"] == "parallel"),
+        "explicit_count": sum(1 for e in edges if e["connection_type"] == "explicit"),
+        "theological_count": sum(1 for e in edges if e["connection_type"] == "theological_connection")
+    }
+
+    return {
+        "root": root_node,
+        "nodes": nodes,
+        "edges": edges,
+        "matched_chain": matched_chain,
+        "all_chains": all_chains_catalog,
+        "stats": stats
     }
 
 

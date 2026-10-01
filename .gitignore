@@ -4,6 +4,7 @@ vendor/
 .next/
 dist/
 build/
+*.tsbuildinfo
 
 # Environment and secrets
 .env
