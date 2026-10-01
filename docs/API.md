@@ -73,6 +73,11 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Endpoint**: `GET /api/bible/passage?ref={reference}`
 - **Description**: Parses freeform Vietnamese or code reference strings (e.g., `Ma-thi-ơ 14:22-33`, `Giăng 3:16`, `Gen 1:1-5`) and returns exact ordered verses.
 
+### 2.6 Inline Passage Exegesis Integration (Reader Drawer)
+- **Component**: `/bible` reader bottom drawer (`exegesis` tab)
+- **Integration**: Directly invokes `POST /api/rag/passage-study` with the currently selected chapter/passage range, delivering 11-dimension exegesis (Roman numeral outlines, historical context, Strong keywords, commentary citations, and reflection questions) without navigating away from the reader.
+- **Offline Resilience**: Bookmarks and user notes are backed by local cache (`localStorage`) hydration with graceful fallback when working offline.
+
 ---
 
 ## 3. Theological RAG & AI Exegesis Engine (`/api/rag`)
@@ -205,7 +210,7 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 
 ### 5.1 Multiple-Choice Theology Quiz
 - **Endpoint**: `GET /api/learn/quiz?category={category}&level={level}`
-- **Description**: Returns 30 verified multiple-choice theological questions with Scripture references and detailed explanations.
+- **Description**: Returns 48 verified multiple-choice theological questions covering the Pentateuch, Historical books, Wisdom literature, Gospels, Acts, Pauline Epistles (Romans, Corinthians, Galatians, Ephesians, Philippians, Colossians, Timothy), and General Epistles with Scripture references and detailed explanations.
 
 ### 5.2 Spaced Repetition Flashcards (SM-2 Algorithm)
 - **Endpoint**: `GET /api/learn/flashcards`

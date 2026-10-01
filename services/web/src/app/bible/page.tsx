@@ -247,6 +247,42 @@ interface ExportBundleData {
   markdown_bundle: string;
 }
 
+interface PassageExegesisData {
+  reference: string;
+  book_name: string;
+  chapter_range: string;
+  total_verses: number;
+  historical_context: string;
+  literary_genre: string;
+  author_and_date: string;
+  people: string[];
+  locations: string[];
+  events: string[];
+  structure_outline: Array<{
+    section_title: string;
+    verse_range: string;
+    summary: string;
+    key_truth: string;
+  }>;
+  keywords: Array<{
+    word: string;
+    strong_number?: string;
+    original_lemma?: string;
+    meaning: string;
+  }>;
+  cross_references: string[];
+  theological_themes: string[];
+  reflection_questions: string[];
+  scholarly_commentary_citations: Array<{
+    source_title: string;
+    author: string;
+    page_or_section: string;
+    quote: string;
+    theological_tradition?: string;
+  }>;
+  hermeneutical_takeaway: string;
+}
+
 // Canonical Categorization for 66 Books
 const BOOK_CATEGORIES = {
   OT: [
@@ -312,8 +348,13 @@ export default function BibleReaderPage() {
   // Verse Details (Entities, Strong Lexicon, Notes, Bookmark)
   const [verseDetails, setVerseDetails] = useState<VerseDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "harmony" | "citations" | "lexicon" | "entities" | "notes">("insight");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "exegesis" | "harmony" | "citations" | "lexicon" | "entities" | "notes">("insight");
   const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
+
+  // Inline Exegesis State (§13)
+  const [exegesisData, setExegesisData] = useState<PassageExegesisData | null>(null);
+  const [exegesisLoading, setExegesisLoading] = useState(false);
+  const [exegesisError, setExegesisError] = useState<string | null>(null);
 
   // AI Explain State
   const [aiLoading, setAiLoading] = useState(false);
@@ -351,17 +392,33 @@ export default function BibleReaderPage() {
     loadBooks();
   }, [apiUrl]);
 
-  // Fetch user bookmarks from database
+  // Fetch user bookmarks from database with offline localStorage fallback
   useEffect(() => {
     async function loadBookmarks() {
+      // 1. Instant offline hydration from localStorage
+      try {
+        const cached = typeof window !== "undefined" ? localStorage.getItem("bible_cached_bookmarks") : null;
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBookmarkedVerses(parsed);
+          }
+        }
+      } catch (_) {}
+
+      // 2. Network sync
       try {
         const res = await fetch(`${apiUrl}/api/study/bookmarks`);
         if (res.ok) {
           const data = await res.json();
-          setBookmarkedVerses(data.map((b: { verse_code: number }) => b.verse_code));
+          const codes = data.map((b: { verse_code: number }) => b.verse_code);
+          setBookmarkedVerses(codes);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("bible_cached_bookmarks", JSON.stringify(codes));
+          }
         }
       } catch (e) {
-        console.error("Failed to load bookmarks:", e);
+        console.warn("Offline: bookmarks loaded from local cache", e);
       }
     }
     loadBookmarks();
@@ -513,26 +570,35 @@ export default function BibleReaderPage() {
     setTimeout(() => setCopiedCitationKey(null), 2500);
   }
 
-  // Persistent Bookmark Toggle
+  // Persistent Bookmark Toggle with Offline Fallback
   async function toggleBookmark(verse: Verse) {
     if (!currentBook) return;
     const isBookmarked = bookmarkedVerses.includes(verse.verse_code);
     const scriptureRef = `${currentBook.name_vi} ${verse.chapter}:${verse.verse}`;
 
     if (isBookmarked) {
+      const nextBookmarks = bookmarkedVerses.filter(c => c !== verse.verse_code);
+      setBookmarkedVerses(nextBookmarks);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bible_cached_bookmarks", JSON.stringify(nextBookmarks));
+      }
       try {
         await fetch(`${apiUrl}/api/study/bookmarks/${verse.verse_code}`, { method: "DELETE" });
-        setBookmarkedVerses(prev => prev.filter(c => c !== verse.verse_code));
-        if (verseDetails) {
-          setVerseDetails({
-            ...verseDetails,
-            bookmark: { is_bookmarked: false, color: null, note: null }
-          });
-        }
       } catch (e) {
-        console.error("Failed to delete bookmark:", e);
+        console.warn("Offline: bookmark deletion cached locally", e);
+      }
+      if (verseDetails) {
+        setVerseDetails({
+          ...verseDetails,
+          bookmark: { is_bookmarked: false, color: null, note: null }
+        });
       }
     } else {
+      const nextBookmarks = [...bookmarkedVerses, verse.verse_code];
+      setBookmarkedVerses(nextBookmarks);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bible_cached_bookmarks", JSON.stringify(nextBookmarks));
+      }
       try {
         await fetch(`${apiUrl}/api/study/bookmarks`, {
           method: "POST",
@@ -544,20 +610,19 @@ export default function BibleReaderPage() {
             note: ""
           })
         });
-        setBookmarkedVerses(prev => [...prev, verse.verse_code]);
-        if (verseDetails) {
-          setVerseDetails({
-            ...verseDetails,
-            bookmark: { is_bookmarked: true, color: "amber", note: "" }
-          });
-        }
       } catch (e) {
-        console.error("Failed to add bookmark:", e);
+        console.warn("Offline: bookmark addition cached locally", e);
+      }
+      if (verseDetails) {
+        setVerseDetails({
+          ...verseDetails,
+          bookmark: { is_bookmarked: true, color: "amber", note: "" }
+        });
       }
     }
   }
 
-  // Save Inline Personal Note
+  // Save Inline Personal Note with Offline Fallback
   async function handleCreateNote() {
     if (!selectedVerse || !currentBook || !newNoteTitle.trim() || !newNoteContent.trim()) return;
     setNoteSaving(true);
@@ -587,11 +652,62 @@ export default function BibleReaderPage() {
             user_notes: [savedNote, ...verseDetails.user_notes]
           });
         }
+      } else {
+        throw new Error("API call failed");
       }
     } catch (e) {
-      console.error("Failed to save study note:", e);
+      // Offline fallback: store locally
+      const offlineNote = {
+        id: `offline-${Date.now()}`,
+        title: newNoteTitle.trim(),
+        scripture_ref: scriptureRef,
+        content: newNoteContent.trim(),
+        tags: tagArray,
+        updated_at: new Date().toISOString()
+      };
+      setNewNoteTitle("");
+      setNewNoteContent("");
+      setNewNoteTags("");
+      if (verseDetails) {
+        setVerseDetails({
+          ...verseDetails,
+          user_notes: [offlineNote, ...verseDetails.user_notes]
+        });
+      }
+      try {
+        const cached = JSON.parse(localStorage.getItem("bible_cached_notes") || "[]");
+        localStorage.setItem("bible_cached_notes", JSON.stringify([offlineNote, ...cached]));
+      } catch (_) {}
     } finally {
       setNoteSaving(false);
+    }
+  }
+
+  // Inline Exegesis Fetcher (§13)
+  async function handleLoadExegesis(refOverride?: string) {
+    if (!selectedVerse || !currentBook) return;
+    const targetRef = refOverride || `${currentBook.name_vi} ${selectedVerse.chapter}:${selectedVerse.verse}`;
+    setActiveDrawerTab("exegesis");
+    setExegesisLoading(true);
+    setExegesisError(null);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/rag/passage-study`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: targetRef })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExegesisData(data);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setExegesisError(errJson.detail || "Không thể tải dữ liệu giải kinh phân đoạn.");
+      }
+    } catch (e: any) {
+      setExegesisError(e.message || "Lỗi kết nối khi tải giải kinh.");
+    } finally {
+      setExegesisLoading(false);
     }
   }
 
@@ -1734,6 +1850,19 @@ export default function BibleReaderPage() {
 
             <button
               type="button"
+              onClick={() => handleLoadExegesis()}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                activeDrawerTab === "exegesis"
+                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              <span>Giải Kinh Phân Đoạn (§13)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveDrawerTab("harmony")}
               className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
                 activeDrawerTab === "harmony"
@@ -1804,7 +1933,7 @@ export default function BibleReaderPage() {
           </div>
 
           {/* Tab Content Display */}
-          <div className="max-h-64 overflow-y-auto pr-1">
+          <div className="max-h-80 md:max-h-[30rem] overflow-y-auto pr-1">
             {/* TAB 1: INSIGHT & AI EXPLANATION */}
             {activeDrawerTab === "insight" && (
               <div className="flex flex-col gap-3">
@@ -1838,14 +1967,15 @@ export default function BibleReaderPage() {
                     <span>Hỏi AI Giải Thích</span>
                   </button>
 
-                  <Link
-                    href={`/research?passage=${encodeURIComponent(`${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                  <button
+                    type="button"
+                    onClick={() => handleLoadExegesis()}
                     className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-xs font-semibold text-amber-300 flex items-center gap-1.5 transition-colors shadow-sm"
-                    title="Giải Kinh Phân Đoạn 11 Chiều (§13) với Dàn Ý La Mã, Từ Khóa Strong's và Chú Giải 275 Sách"
+                    title="Giải Kinh Phân Đoạn 11 Chiều (§13) trực tiếp ngay tại đây"
                   >
                     <Layers className="w-3.5 h-3.5 text-amber-400" />
                     <span>Giải Kinh 11 Chiều (§13)</span>
-                  </Link>
+                  </button>
 
                   <Link
                     href={`/research?query=${encodeURIComponent(`Nghiên cứu thần học chuyên sâu về ${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
@@ -1921,6 +2051,176 @@ export default function BibleReaderPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB EXEGESIS: 11-DIMENSION PASSAGE EXEGESIS (§13) */}
+            {activeDrawerTab === "exegesis" && (
+              <div className="flex flex-col gap-4 text-xs">
+                {exegesisLoading ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+                    <p className="text-slate-400 text-xs">Đang phân tích 11 chiều thần học, cấu trúc La Mã & chú giải 275 sách...</p>
+                  </div>
+                ) : exegesisError ? (
+                  <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/40 text-red-300 text-xs">
+                    {exegesisError}
+                  </div>
+                ) : exegesisData ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Exegesis Header Banner */}
+                    <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-white">{exegesisData.reference}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-semibold border border-amber-500/30">
+                            {exegesisData.literary_genre}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Tác giả & Niên đại: <span className="text-slate-200">{exegesisData.author_and_date}</span>
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/research?passage=${encodeURIComponent(exegesisData.reference)}`}
+                        className="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors"
+                      >
+                        <span>Mở toàn trang Research</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+
+                    {/* Historical & Cultural Context */}
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                        Bối Cảnh Lịch Sử & Xã Hội:
+                      </span>
+                      <p className="text-slate-300 leading-relaxed">
+                        {exegesisData.historical_context}
+                      </p>
+                    </div>
+
+                    {/* Structure Outline (Roman Numerals) */}
+                    {exegesisData.structure_outline && exegesisData.structure_outline.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                          <Layers className="w-3 h-3" /> Đề Cương Cấu Trúc Phân Đoạn (Outline):
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {exegesisData.structure_outline.map((item, idx) => (
+                            <div key={idx} className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs">
+                                  {item.section_title}
+                                </span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-blue-300">
+                                  {item.verse_range}
+                                </span>
+                              </div>
+                              <p className="text-slate-400 text-[11px] leading-relaxed">
+                                {item.summary}
+                              </p>
+                              <div className="pt-1 border-t border-slate-800/80 text-[10px] text-amber-300">
+                                <span className="font-semibold">Chân lý:</span> {item.key_truth}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Keywords Strong's */}
+                    {exegesisData.keywords && exegesisData.keywords.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <Languages className="w-3 h-3" /> Căn Ngữ Trọng Tâm (Keywords):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {exegesisData.keywords.map((kw, i) => (
+                            <div key={i} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-0.5">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="font-bold text-white">{kw.word}</span>
+                                {kw.strong_number && (
+                                  <span className="font-mono text-cyan-300 font-bold">{kw.strong_number}</span>
+                                )}
+                              </div>
+                              {kw.original_lemma && (
+                                <span className="font-serif text-xs text-amber-200">{kw.original_lemma}</span>
+                              )}
+                              <span className="text-[10px] text-slate-400 line-clamp-1">{kw.meaning}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Theological Themes & Hermeneutical Takeaway */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                          Chủ Đề Thần Học Trọng Tâm:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {exegesisData.theological_themes.map((theme, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-lg bg-purple-950/60 border border-purple-800/50 text-[11px] text-purple-300 font-medium">
+                              #{theme}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                          Bài Học Cốt Lõi (Hermeneutical Takeaway):
+                        </span>
+                        <p className="text-slate-200 text-[11px] leading-relaxed">
+                          {exegesisData.hermeneutical_takeaway}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Scholarly Commentary Excerpts (275 books) */}
+                    {exegesisData.scholarly_commentary_citations && exegesisData.scholarly_commentary_citations.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <BookOpen className="w-3 h-3" /> Trích Dẫn Chú Giải 275 Sách Thần Học:
+                        </span>
+                        <div className="flex flex-col gap-2">
+                          {exegesisData.scholarly_commentary_citations.map((c, i) => (
+                            <div key={i} className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-amber-300 text-[11px]">{c.source_title}</span>
+                                <span className="text-[10px] text-slate-400 font-sans">{c.author}</span>
+                              </div>
+                              <p className="text-slate-300 text-[11px] italic font-serif leading-relaxed">
+                                &ldquo;{c.quote}&rdquo;
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reflection Questions */}
+                    {exegesisData.reflection_questions && exegesisData.reflection_questions.length > 0 && (
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                          Câu Hỏi Suy Ngẫm Dưỡng Linh:
+                        </span>
+                        <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-300">
+                          {exegesisData.reflection_questions.map((q, idx) => (
+                            <li key={idx} className="leading-relaxed">{q}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-slate-500">
+                    Bấm &ldquo;Giải Kinh Phân Đoạn 11 Chiều&rdquo; để khởi tạo phân tích chuyên sâu cho câu này.
                   </div>
                 )}
               </div>
