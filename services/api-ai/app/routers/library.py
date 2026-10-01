@@ -41,6 +41,29 @@ def determine_category(title: str, author: str) -> Dict[str, str]:
     return {"category": "monograph", "category_vi": "Thần Học Chuyên Đề & Đời Sống"}
 
 
+def extract_series(title: str) -> str:
+    t = title or ""
+    if re.search(r"wiersbe.*be\s+series", t, re.IGNORECASE):
+        return "Warren Wiersbe's Be Series"
+    if re.search(r"tntc|tyndale new testament", t, re.IGNORECASE):
+        return "Tyndale New Testament Commentaries (TNTC)"
+    if re.search(r"totc|tyndale old testament", t, re.IGNORECASE):
+        return "Tyndale Old Testament Commentaries (TOTC)"
+    if re.search(r"nivac|niv application", t, re.IGNORECASE):
+        return "NIV Application Commentary"
+    if re.search(r"bk commentary|bible knowledge commentary", t, re.IGNORECASE):
+        return "Bible Knowledge Commentary"
+    if re.search(r"oxford", t, re.IGNORECASE):
+        return "Oxford Reference Collection"
+    if re.search(r"ivp", t, re.IGNORECASE):
+        return "IVP Reference & Academic"
+    if re.search(r"zondervan", t, re.IGNORECASE):
+        return "Zondervan Reference Collection"
+    if re.search(r"holman", t, re.IGNORECASE):
+        return "Holman Reference Guides"
+    return "Độc lập / Tuyển tập chuyên khảo"
+
+
 def load_catalog() -> Dict[str, Any]:
     global _CATALOG_CACHE
     if _CATALOG_CACHE is not None:
@@ -56,9 +79,11 @@ def load_catalog() -> Dict[str, Any]:
         enriched_sources = []
         for s in raw.get("sources", []):
             cat_info = determine_category(s.get("title", ""), s.get("author", ""))
+            series_name = extract_series(s.get("title", ""))
             enriched_sources.append({
                 **s,
-                **cat_info
+                **cat_info,
+                "series": series_name
             })
 
         raw["sources"] = enriched_sources
@@ -75,13 +100,14 @@ def get_library_stats(db: Session = Depends(get_db)):
     catalog = load_catalog()
     sources = catalog.get("sources", [])
 
-    # Count categories
+    # Count categories and series
     cat_counts = {
         "commentary": 0,
         "dictionary": 0,
         "survey": 0,
         "monograph": 0
     }
+    series_counts: Dict[str, int] = {}
     total_chars = 0
     total_chapters = 0
 
@@ -89,6 +115,9 @@ def get_library_stats(db: Session = Depends(get_db)):
         cat = s.get("category", "monograph")
         if cat in cat_counts:
             cat_counts[cat] += 1
+        ser = s.get("series", "Độc lập / Tuyển tập chuyên khảo")
+        series_counts[ser] = series_counts.get(ser, 0) + 1
+
         total_chars += s.get("chars", 0)
         total_chapters += s.get("total_chapters", 0)
 
@@ -129,13 +158,19 @@ def get_library_stats(db: Session = Depends(get_db)):
                 "count": cat_counts["monograph"],
                 "label_vi": "Thần Học Chuyên Đề (Theological Monographs)"
             }
-        }
+        },
+        "series": [
+            {"series_name": k, "count": v}
+            for k, v in sorted(series_counts.items(), key=lambda x: x[1], reverse=True)
+            if k != "Độc lập / Tuyển tập chuyên khảo"
+        ]
     }
 
 
 @router.get("/catalog")
 def list_catalog(
     category: Optional[str] = Query(None, description="'commentary', 'dictionary', 'survey', or 'monograph'"),
+    series: Optional[str] = Query(None, description="Filter by book series name"),
     q: Optional[str] = Query(None, description="Search by title, author or keyword"),
     limit: int = Query(50, ge=1, le=300),
     offset: int = Query(0, ge=0)
@@ -150,6 +185,10 @@ def list_catalog(
         c_clean = category.lower().strip()
         filtered = [s for s in filtered if s.get("category") == c_clean]
 
+    if series and series != "all":
+        s_clean = series.lower().strip()
+        filtered = [s for s in filtered if s_clean in s.get("series", "").lower()]
+
     if q and q.strip():
         q_clean = q.lower().strip()
         filtered = [
@@ -157,6 +196,7 @@ def list_catalog(
             if q_clean in s.get("title", "").lower() 
             or q_clean in s.get("author", "").lower()
             or q_clean in s.get("filename", "").lower()
+            or q_clean in s.get("series", "").lower()
         ]
 
     total_filtered = len(filtered)

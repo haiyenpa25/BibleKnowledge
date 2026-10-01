@@ -39,6 +39,7 @@ interface LibraryStats {
     surveys: { count: number; label_vi: string };
     monographs: { count: number; label_vi: string };
   };
+  series?: { series_name: string; count: number }[];
 }
 
 interface BookItem {
@@ -48,6 +49,7 @@ interface BookItem {
   author: string;
   category: string;
   category_vi: string;
+  series?: string;
   chars: number;
   total_chapters: number;
   filename: string;
@@ -95,6 +97,7 @@ export default function LibraryPage() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSeries, setSelectedSeries] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [totalBooksCount, setTotalBooksCount] = useState(0);
 
@@ -117,7 +120,7 @@ export default function LibraryPage() {
   // Initial load: stats and books
   useEffect(() => {
     fetchStats();
-    fetchBooks("all", "");
+    fetchBooks("all", "", "all");
   }, [apiUrl]);
 
   // Fetch Stats
@@ -134,13 +137,14 @@ export default function LibraryPage() {
   }
 
   // Fetch Books Catalog
-  async function fetchBooks(cat: string, q: string) {
+  async function fetchBooks(cat: string, q: string, ser: string = "all") {
     setLoadingBooks(true);
     try {
       const params = new URLSearchParams();
       if (cat && cat !== "all") params.append("category", cat);
+      if (ser && ser !== "all") params.append("series", ser);
       if (q && q.trim()) params.append("q", q.trim());
-      params.append("limit", "100");
+      params.append("limit", "150");
 
       const res = await fetch(`${apiUrl}/api/library/catalog?${params.toString()}`);
       if (res.ok) {
@@ -379,7 +383,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => {
                   setSelectedCategory("all");
-                  fetchBooks("all", searchQuery);
+                  fetchBooks("all", searchQuery, selectedSeries);
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === "all" ? "bg-amber-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -391,7 +395,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => {
                   setSelectedCategory("commentary");
-                  fetchBooks("commentary", searchQuery);
+                  fetchBooks("commentary", searchQuery, selectedSeries);
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === "commentary" ? "bg-amber-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -403,7 +407,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => {
                   setSelectedCategory("dictionary");
-                  fetchBooks("dictionary", searchQuery);
+                  fetchBooks("dictionary", searchQuery, selectedSeries);
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === "dictionary" ? "bg-amber-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -415,7 +419,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => {
                   setSelectedCategory("survey");
-                  fetchBooks("survey", searchQuery);
+                  fetchBooks("survey", searchQuery, selectedSeries);
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === "survey" ? "bg-amber-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -427,7 +431,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => {
                   setSelectedCategory("monograph");
-                  fetchBooks("monograph", searchQuery);
+                  fetchBooks("monograph", searchQuery, selectedSeries);
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === "monograph" ? "bg-amber-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -445,13 +449,51 @@ export default function LibraryPage() {
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  fetchBooks(selectedCategory, e.target.value);
+                  fetchBooks(selectedCategory, e.target.value, selectedSeries);
                 }}
                 placeholder="Tìm theo tác giả, tựa sách..."
                 className="w-full pl-10 pr-4 py-2 rounded-2xl bg-slate-900/80 border border-slate-700 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               />
             </div>
           </div>
+
+          {/* Series Filter Horizontal Bar */}
+          {stats?.series && stats.series.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap mr-1">Bộ sách:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSeries("all");
+                  fetchBooks(selectedCategory, searchQuery, "all");
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition-all ${
+                  selectedSeries === "all"
+                    ? "bg-amber-600/30 text-amber-300 border border-amber-500/50 font-bold"
+                    : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-white"
+                }`}
+              >
+                Tất cả bộ ({stats.total_books})
+              </button>
+              {stats.series.map(s => (
+                <button
+                  key={s.series_name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSeries(s.series_name);
+                    fetchBooks(selectedCategory, searchQuery, s.series_name);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition-all ${
+                    selectedSeries === s.series_name
+                      ? "bg-amber-600/30 text-amber-300 border border-amber-500/50 font-bold"
+                      : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-white"
+                  }`}
+                >
+                  {s.series_name} ({s.count})
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Books List Grid */}
           {loadingBooks ? (
@@ -479,6 +521,12 @@ export default function LibraryPage() {
                     <h3 className="text-sm font-bold text-white group-hover:text-amber-200 transition-colors leading-snug line-clamp-2">
                       {b.title}
                     </h3>
+
+                    {b.series && b.series !== "Độc lập / Tuyển tập chuyên khảo" && (
+                      <span className="inline-block text-[10px] text-amber-400/90 bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-800/40 truncate max-w-full">
+                        🏷️ {b.series}
+                      </span>
+                    )}
 
                     {b.author && (
                       <p className="text-xs text-slate-400">
