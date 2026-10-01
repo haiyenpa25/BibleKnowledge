@@ -32,7 +32,11 @@ import {
   GitBranch,
   ShieldAlert,
   Columns,
-  GitCompare
+  GitCompare,
+  Copy,
+  Check,
+  Bookmark,
+  FileText
 } from "lucide-react";
 
 interface HarmonyVerse {
@@ -84,6 +88,96 @@ interface CrossBibleConnection {
   theological_synthesis: string;
   confidence_score: number;
   scholarly_source?: string;
+}
+
+interface ThematicCatalogItem {
+  id: string;
+  title_vi: string;
+  title_en: string;
+  category: string;
+  color: string;
+  badge_class: string;
+  golden_verse: string;
+  summary: string;
+  scriptures_count: number;
+  characters_count: number;
+  events_count: number;
+  doctrines_count: number;
+}
+
+interface ThematicNode {
+  id: string;
+  type: string;
+  label: string;
+  color: string;
+  x: number;
+  y: number;
+  radius: number;
+  metadata: Record<string, any>;
+}
+
+interface ThematicEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation: string;
+  label: string;
+}
+
+interface EraTrajectoryItem {
+  era_id: string;
+  era_name: string;
+  timeframe: string;
+  scripture_anchor: string;
+  development: string;
+}
+
+interface ThematicCommentaryCitation {
+  author: string;
+  work: string;
+  quote: string;
+}
+
+interface HomileticalOutlinePoint {
+  numeral: string;
+  point_title: string;
+  scripture_support: string;
+  exegetical_explanation: string;
+  pastoral_application: string;
+}
+
+interface HomileticalOutline {
+  sermon_title: string;
+  key_scripture: string;
+  homiletical_proposition: string;
+  points: HomileticalOutlinePoint[];
+  conclusion_charge: string;
+}
+
+interface ThematicMapResponse {
+  theme: {
+    id: string;
+    title_vi: string;
+    title_en: string;
+    category: string;
+    color: string;
+    golden_verse: string;
+    summary: string;
+    redemptive_thesis: string;
+  };
+  stats: {
+    total_nodes: number;
+    total_edges: number;
+    scriptures_count: number;
+    characters_count: number;
+    events_count: number;
+    doctrines_count: number;
+  };
+  nodes: ThematicNode[];
+  edges: ThematicEdge[];
+  eras_trajectory: EraTrajectoryItem[];
+  commentary_citations: ThematicCommentaryCitation[];
+  homiletical_outline: HomileticalOutline;
 }
 
 interface GraphNode {
@@ -306,7 +400,16 @@ const BIBLICAL_ERAS_META: Record<string, EraMetadata> = {
 };
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology" | "harmony">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology" | "harmony" | "themes">("graph");
+
+  // Thematic Knowledge Graph & Covenant Trajectories State (§17, §18)
+  const [themesCatalog, setThemesCatalog] = useState<ThematicCatalogItem[]>([]);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>("covenant_redemption");
+  const [themeMapData, setThemeMapData] = useState<ThematicMapResponse | null>(null);
+  const [loadingThemeMap, setLoadingThemeMap] = useState<boolean>(false);
+  const [selectedThematicNode, setSelectedThematicNode] = useState<ThematicNode | null>(null);
+  const [thematicTypeFilter, setThematicTypeFilter] = useState<string>("all");
+  const [copiedOutline, setCopiedOutline] = useState<boolean>(false);
 
   // Gospel Harmony & Parallel Passages State (§8, §18)
   const [harmonyEvents, setHarmonyEvents] = useState<HarmonyEventItem[]>([]);
@@ -667,12 +770,68 @@ export default function ExplorePage() {
     }
   };
 
+  // Fetch Thematic Catalog & Maps (§17, §18)
+  const fetchThemesCatalog = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/graph/themes`);
+      if (res.ok) {
+        const data = await res.json();
+        setThemesCatalog(data.themes || []);
+      }
+    } catch (e) {
+      console.error("Error fetching themes catalog:", e);
+    }
+  };
+
+  const fetchThemeMap = async (themeId: string) => {
+    setLoadingThemeMap(true);
+    setSelectedThematicNode(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/graph/theme-map?theme_id=${encodeURIComponent(themeId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setThemeMapData(data);
+        if (data.nodes && data.nodes.length > 0) {
+          setSelectedThematicNode(data.nodes[0]); // default select central hub
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching thematic map:", e);
+    } finally {
+      setLoadingThemeMap(false);
+    }
+  };
+
+  const copyHomileticalOutline = (outline: HomileticalOutline, themeTitle: string) => {
+    if (!outline) return;
+    let md = `# ĐỀ CƯƠNG BÀI GIẢNG: ${outline.sermon_title || themeTitle}\n`;
+    md += `**Chủ đề**: ${themeTitle}\n`;
+    md += `**Câu gốc nền tảng**: ${outline.key_scripture}\n`;
+    md += `**Luận đề chính (Proposition)**: ${outline.homiletical_proposition}\n\n`;
+    md += `## CÁC ĐIỂM GIẢI KINH & MỤC VỤ:\n\n`;
+    (outline.points || []).forEach((pt) => {
+      md += `### ${pt.numeral}. ${pt.point_title} (${pt.scripture_support})\n`;
+      md += `- **Giải nghĩa giải kinh**: ${pt.exegetical_explanation}\n`;
+      md += `- **Áp dụng mục vụ đời sống**: ${pt.pastoral_application}\n\n`;
+    });
+    md += `## KÊU GỌI & KẾT LUẬN:\n${outline.conclusion_charge}\n`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(md).then(() => {
+        setCopiedOutline(true);
+        setTimeout(() => setCopiedOutline(false), 2500);
+      });
+    }
+  };
+
   useEffect(() => {
     fetchGraph();
     fetchTimeline();
     fetchMapData();
     fetchConnections();
     fetchHarmonyEvents();
+    fetchThemesCatalog();
+    fetchThemeMap("covenant_redemption");
   }, [apiUrl]);
 
   useEffect(() => {
@@ -681,6 +840,10 @@ export default function ExplorePage() {
     }
     if (activeTab === "harmony" && harmonyEvents.length === 0) {
       fetchHarmonyEvents();
+    }
+    if (activeTab === "themes" && !themeMapData) {
+      fetchThemesCatalog();
+      fetchThemeMap(selectedThemeId);
     }
   }, [activeTab]);
 
@@ -931,6 +1094,20 @@ export default function ExplorePage() {
             }`}
           >
             <Columns className="w-4 h-4 text-purple-300" /> Hòa Hợp Phúc Âm & Song Hành (§8, §18)
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("themes");
+              if (themesCatalog.length === 0) fetchThemesCatalog();
+              if (!themeMapData) fetchThemeMap(selectedThemeId);
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "themes"
+                ? "bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 text-white shadow-lg shadow-amber-600/30 ring-1 ring-amber-400/50"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <Layers className="w-4 h-4 text-amber-300" /> Bản Đồ Chủ Đề & Giao Ước (§17, §18)
           </button>
         </div>
       </header>
@@ -2707,7 +2884,751 @@ export default function ExplorePage() {
       )}
 
       {/* ===================================================================== */}
-      {/* 5. BIBLICAL CHARACTER DOSSIER MODAL (§7) */}
+      {/* 5. THEMATIC KNOWLEDGE GRAPH & COVENANT TRAJECTORIES VIEW (§17, §18) */}
+      {/* ===================================================================== */}
+      {activeTab === "themes" && (
+        <div className="flex flex-col gap-8 animate-in fade-in duration-300">
+          {/* Top Banner & Introduction */}
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-950 border border-indigo-900/50 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-col gap-2 max-w-3xl">
+              <div className="flex items-center gap-2.5">
+                <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> §17, §18 Thần Học Giao Ước & Khải Huyền Tiệm Tiến
+                </span>
+                <span className="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">
+                  Mạng Lưới Xuyên Suốt 66 Sách
+                </span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                Bản Đồ Mạng Lưới Chủ Đề & Dòng Chảy Giao Ước Cứu Chuộc
+              </h2>
+              <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                Khảo cứu quỹ đạo các đại chủ đề Kinh Thánh từ bóng mờ Cựu Ước đến sự ứng nghiệm trọn vẹn trong Tân Ước.
+                Phân tích mạng lưới đa chiều giữa các trụ cột tín lý, bản văn kinh thánh gốc, biến cố lịch sử và dòng thời gian 8 thời kỳ cứu chuộc.
+              </p>
+            </div>
+
+            {themeMapData && (
+              <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
+                <button
+                  onClick={() => copyHomileticalOutline(themeMapData.homiletical_outline, themeMapData.theme.title_vi)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition-all cursor-pointer"
+                >
+                  {copiedOutline ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-950" />
+                      <span>Đã Sao Chép Đề Cương!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Sao Chép Đề Cương Bài Giảng</span>
+                    </>
+                  )}
+                </button>
+                <Link
+                  href="/study"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span>Mở Trong Phòng Nghiên Cứu</span>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Theme Selector Pills Carousel */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+              <span className="font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-amber-400" /> Chọn Đại Chủ Đề Thần Học ({themesCatalog.length} Chủ Đề Nền Tảng):
+              </span>
+              <span className="text-[11px] italic">Bấm để tải mạng lưới tương tác trực quan</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {themesCatalog.map((thm) => {
+                const isSelected = selectedThemeId === thm.id;
+                return (
+                  <button
+                    key={thm.id}
+                    onClick={() => {
+                      setSelectedThemeId(thm.id);
+                      fetchThemeMap(thm.id);
+                    }}
+                    className={`text-left p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between gap-3 ${
+                      isSelected
+                        ? "bg-slate-900 border-amber-500/80 shadow-xl shadow-amber-500/10 ring-2 ring-amber-500/40"
+                        : "bg-slate-950/70 border-slate-800/80 hover:bg-slate-900/60 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                          isSelected ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" : "bg-slate-800 text-slate-400"
+                        }`}>
+                          {thm.category}
+                        </span>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        )}
+                      </div>
+                      <h3 className={`font-bold text-sm leading-snug line-clamp-2 ${isSelected ? "text-white" : "text-slate-200"}`}>
+                        {thm.title_vi}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-sans line-clamp-2">
+                        {thm.summary}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-800/80">
+                      <span className="text-amber-400/90 font-mono text-[10px] truncate max-w-[140px]">
+                        {thm.golden_verse.split("/")[0]}
+                      </span>
+                      <span className="text-slate-400 text-[10px]">
+                        {thm.scriptures_count} câu • {thm.doctrines_count} tín lý
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Main Visualizer & Inspector Grid */}
+          {loadingThemeMap ? (
+            <div className="h-96 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+              <p className="text-sm font-medium">Đang kiến tạo mạng lưới đồ thị chủ đề & truy xuất bản văn Kinh Thánh 1925...</p>
+            </div>
+          ) : themeMapData ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Interactive SVG Network Graph (col-span-7/8) */}
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+                <div className="p-4 rounded-3xl bg-slate-950/80 border border-slate-800 flex flex-col gap-3">
+                  {/* Top Bar of SVG Graph: Filters & Stats */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800/80">
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <span className="text-slate-400 font-semibold">Hiển thị:</span>
+                      {[
+                        { id: "all", label: "Tất cả node" },
+                        { id: "doctrine_pillar", label: "Trụ cột tín lý (Tím)", color: "text-purple-400" },
+                        { id: "scripture_anchor", label: "Bản văn chính kinh (Lam/Lục)", color: "text-emerald-400" },
+                        { id: "character", label: "Nhân vật (Dương)", color: "text-blue-400" },
+                        { id: "event", label: "Biến cố (Vàng)", color: "text-amber-400" }
+                      ].map((flt) => (
+                        <button
+                          key={flt.id}
+                          onClick={() => setThematicTypeFilter(flt.id)}
+                          className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+                            thematicTypeFilter === flt.id
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold"
+                              : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+                          }`}
+                        >
+                          {flt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                        {themeMapData.stats.total_nodes} Nút Mạng
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                        {themeMapData.stats.total_edges} Liên Kết
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SVG Canvas Container */}
+                  <div className="relative w-full h-[580px] bg-[#070b14] rounded-2xl overflow-hidden border border-slate-900 shadow-inner flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 920 640"
+                      className="w-full h-full select-none"
+                    >
+                      <defs>
+                        {/* Gradients */}
+                        <radialGradient id="hubGradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.9" />
+                          <stop offset="70%" stopColor="#d97706" stopOpacity="0.8" />
+                          <stop offset="100%" stopColor="#78350f" stopOpacity="0.95" />
+                        </radialGradient>
+                        <radialGradient id="doctrineGradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stopColor="#c084fc" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="#6b21a8" stopOpacity="0.95" />
+                        </radialGradient>
+                        <radialGradient id="otScriptureGradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="#0369a1" stopOpacity="0.95" />
+                        </radialGradient>
+                        <radialGradient id="ntScriptureGradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stopColor="#34d399" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="#047857" stopOpacity="0.95" />
+                        </radialGradient>
+                        {/* Glow Filter */}
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                          <feGaussianBlur stdDeviation="4" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        {/* Arrow Marker for Typological Links */}
+                        <marker id="arrow-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                          <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+                        </marker>
+                      </defs>
+
+                      {/* Concentric Orbit Guide Rings */}
+                      <g className="opacity-20 pointer-events-none">
+                        {/* Inner Orbit (Doctrines) */}
+                        <circle cx={460} cy={320} r={150} fill="none" stroke="#a855f7" strokeWidth="1" strokeDasharray="4 6" />
+                        <text x={460} y={160} fill="#c084fc" fontSize="10" textAnchor="middle" letterSpacing="2">QUỸ ĐẠO 1: TRỤ CỘT TÍN LÝ</text>
+
+                        {/* Middle Orbit (Scriptures) */}
+                        <circle cx={460} cy={320} r={265} fill="none" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 8" />
+                        <text x={460} y={45} fill="#38bdf8" fontSize="10" textAnchor="middle" letterSpacing="2">QUỸ ĐẠO 2: BẢN VĂN CHÍNH KINH CỰU & TÂN ƯỚC</text>
+
+                        {/* Outer Orbit (Characters & Events) */}
+                        <circle cx={460} cy={320} r={370} fill="none" stroke="#fbbf24" strokeWidth="0.8" strokeDasharray="3 9" />
+                      </g>
+
+                      {/* Edges */}
+                      <g>
+                        {themeMapData.edges.map((edge) => {
+                          const srcNode = themeMapData.nodes.find((n) => n.id === edge.source);
+                          const tgtNode = themeMapData.nodes.find((n) => n.id === edge.target);
+                          if (!srcNode || !tgtNode) return null;
+
+                          const isTypological = edge.relation === "typological_fulfillment";
+                          const isHubEdge = edge.source.startsWith("hub");
+
+                          // Check if filtered out
+                          if (thematicTypeFilter !== "all") {
+                            if (srcNode.type !== thematicTypeFilter && srcNode.type !== "central_theme" &&
+                                tgtNode.type !== thematicTypeFilter && tgtNode.type !== "central_theme") {
+                              return null;
+                            }
+                          }
+
+                          if (isTypological) {
+                            // Draw curved arc between OT and NT
+                            const dx = tgtNode.x - srcNode.x;
+                            const dy = tgtNode.y - srcNode.y;
+                            const cx = (srcNode.x + tgtNode.x) / 2 - dy * 0.25;
+                            const cy = (srcNode.y + tgtNode.y) / 2 + dx * 0.25;
+                            return (
+                              <path
+                                key={edge.id}
+                                d={`M ${srcNode.x} ${srcNode.y} Q ${cx} ${cy} ${tgtNode.x} ${tgtNode.y}`}
+                                fill="none"
+                                stroke="#06b6d4"
+                                strokeWidth="2.2"
+                                strokeDasharray="5 4"
+                                opacity="0.85"
+                                markerEnd="url(#arrow-cyan)"
+                              />
+                            );
+                          }
+
+                          return (
+                            <line
+                              key={edge.id}
+                              x1={srcNode.x}
+                              y1={srcNode.y}
+                              x2={tgtNode.x}
+                              y2={tgtNode.y}
+                              stroke={isHubEdge ? (tgtNode.type === "doctrine_pillar" ? "#a855f7" : "#38bdf8") : "#475569"}
+                              strokeWidth={isHubEdge ? "1.8" : "1"}
+                              opacity={isHubEdge ? "0.45" : "0.3"}
+                            />
+                          );
+                        })}
+                      </g>
+
+                      {/* Nodes */}
+                      <g>
+                        {themeMapData.nodes.map((node) => {
+                          const isSelected = selectedThematicNode?.id === node.id;
+                          const isHub = node.type === "central_theme";
+                          const isDoctrine = node.type === "doctrine_pillar";
+                          const isScripture = node.type === "scripture_anchor";
+                          const isCharacter = node.type === "character";
+                          const isEvent = node.type === "event";
+
+                          // Visibility filter
+                          const isFiltered = thematicTypeFilter !== "all" && !isHub && node.type !== thematicTypeFilter;
+                          const nodeOpacity = isFiltered ? 0.2 : 1;
+
+                          let fillGradient = "url(#hubGradient)";
+                          if (isDoctrine) fillGradient = "url(#doctrineGradient)";
+                          else if (isScripture) {
+                            fillGradient = node.metadata?.testament === "OT" ? "url(#otScriptureGradient)" : "url(#ntScriptureGradient)";
+                          } else if (isCharacter) fillGradient = "#3b82f6";
+                          else if (isEvent) fillGradient = "#f59e0b";
+
+                          return (
+                            <g
+                              key={node.id}
+                              opacity={nodeOpacity}
+                              onClick={() => setSelectedThematicNode(node)}
+                              className="cursor-pointer transition-all duration-200"
+                            >
+                              {/* Pulsing selection aura */}
+                              {isSelected && (
+                                <circle
+                                  cx={node.x}
+                                  cy={node.y}
+                                  r={node.radius + 8}
+                                  fill="none"
+                                  stroke={isHub ? "#f59e0b" : "#38bdf8"}
+                                  strokeWidth="2.5"
+                                  strokeDasharray="4 4"
+                                  className="animate-spin"
+                                />
+                              )}
+
+                              {/* Central Hub Pulsing Halo */}
+                              {isHub && (
+                                <circle
+                                  cx={node.x}
+                                  cy={node.y}
+                                  r={node.radius + 14}
+                                  fill="#f59e0b"
+                                  opacity="0.15"
+                                  className="animate-pulse"
+                                />
+                              )}
+
+                              {/* Main Node Circle */}
+                              <circle
+                                cx={node.x}
+                                cy={node.y}
+                                r={node.radius}
+                                fill={fillGradient}
+                                stroke={isSelected ? "#ffffff" : isHub ? "#fbbf24" : "rgba(255,255,255,0.4)"}
+                                strokeWidth={isSelected ? 3 : 1.5}
+                                filter={isHub ? "url(#glow)" : undefined}
+                              />
+
+                              {/* Text / Label */}
+                              {isHub ? (
+                                <>
+                                  <text
+                                    x={node.x}
+                                    y={node.y - 4}
+                                    fill="#ffffff"
+                                    fontSize="12"
+                                    fontWeight="bold"
+                                    textAnchor="middle"
+                                    filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.8))"
+                                  >
+                                    {node.label.length > 22 ? node.label.slice(0, 20) + "..." : node.label}
+                                  </text>
+                                  <text
+                                    x={node.x}
+                                    y={node.y + 12}
+                                    fill="#fef08a"
+                                    fontSize="9"
+                                    fontWeight="semibold"
+                                    textAnchor="middle"
+                                  >
+                                    ★ CHỦ ĐỀ GIAO ƯỚC
+                                  </text>
+                                </>
+                              ) : (
+                                <g>
+                                  {/* Label background pill for readability */}
+                                  <rect
+                                    x={node.x - (node.label.length * 3.4)}
+                                    y={node.y + node.radius + 4}
+                                    width={node.label.length * 6.8}
+                                    height={16}
+                                    rx={4}
+                                    fill="rgba(10, 15, 29, 0.85)"
+                                    stroke="rgba(255,255,255,0.15)"
+                                    strokeWidth="0.8"
+                                  />
+                                  <text
+                                    x={node.x}
+                                    y={node.y + node.radius + 15}
+                                    fill={isSelected ? "#38bdf8" : "#e2e8f0"}
+                                    fontSize="9.5"
+                                    fontWeight={isSelected ? "bold" : "medium"}
+                                    textAnchor="middle"
+                                  >
+                                    {node.label}
+                                  </text>
+                                </g>
+                              )}
+                            </g>
+                          );
+                        })}
+                      </g>
+                    </svg>
+
+                    {/* Quick Canvas Watermark / Hint */}
+                    <div className="absolute bottom-3 left-4 text-[11px] text-slate-400 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800/80 backdrop-blur-sm flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Bấm vào bất kỳ nút nào để xem nguyên văn Kinh Thánh & chú giải giải kinh</span>
+                    </div>
+                  </div>
+
+                  {/* Visualizer Legend */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-purple-500 shrink-0" />
+                      <span>Trụ cột tín lý thần học</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-sky-400 shrink-0" />
+                      <span>Bản văn Cựu Ước (Bóng mờ)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-emerald-400 shrink-0" />
+                      <span>Bản văn Tân Ước (Ứng nghiệm)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-0.5 border-t-2 border-dashed border-cyan-400 shrink-0" />
+                      <span>Mối liên kết Typology</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Thematic Node Inspector & Exegetical Panel (col-span-5/4) */}
+              <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4">
+                {selectedThematicNode ? (
+                  <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col gap-5 shadow-2xl backdrop-blur-md">
+                    {/* Header of selected node */}
+                    <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-800">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                            selectedThematicNode.type === "central_theme" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
+                            selectedThematicNode.type === "doctrine_pillar" ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" :
+                            selectedThematicNode.type === "scripture_anchor" ? (selectedThematicNode.metadata?.testament === "OT" ? "bg-sky-500/20 text-sky-300 border border-sky-500/30" : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30") :
+                            "bg-slate-800 text-slate-300"
+                          }`}>
+                            {selectedThematicNode.type === "central_theme" ? "Chủ Đề Trung Tâm" :
+                             selectedThematicNode.type === "doctrine_pillar" ? "Trụ Cột Thần Học" :
+                             selectedThematicNode.type === "scripture_anchor" ? (selectedThematicNode.metadata?.testament === "OT" ? "Bản Văn Cựu Ước (OT)" : "Bản Văn Tân Ước (NT)") :
+                             selectedThematicNode.type === "character" ? "Nhân Vật Giao Ước" : "Biến Cố Lịch Sử"}
+                          </span>
+                        </div>
+                        <h3 className="text-xl font-black text-white mt-1 leading-snug">
+                          {selectedThematicNode.label}
+                        </h3>
+                      </div>
+
+                      <div className="w-10 h-10 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-amber-400 shrink-0">
+                        {selectedThematicNode.type === "central_theme" ? <Sparkles className="w-5 h-5" /> :
+                         selectedThematicNode.type === "doctrine_pillar" ? <ShieldAlert className="w-5 h-5 text-purple-400" /> :
+                         selectedThematicNode.type === "scripture_anchor" ? <BookOpen className="w-5 h-5 text-emerald-400" /> :
+                         <Users className="w-5 h-5 text-blue-400" />}
+                      </div>
+                    </div>
+
+                    {/* Node Specific Exegesis Content */}
+                    {selectedThematicNode.type === "central_theme" && (
+                      <div className="flex flex-col gap-4">
+                        {/* Redemptive Thesis */}
+                        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                            <Compass className="w-3.5 h-3.5" /> Luận Đề Thần Học Cứu Chuộc (Redemptive Thesis)
+                          </span>
+                          <p className="text-xs text-amber-100 font-serif leading-relaxed italic">
+                            "{selectedThematicNode.metadata?.redemptive_thesis}"
+                          </p>
+                        </div>
+
+                        {/* Golden Verse Card */}
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-indigo-400" /> Các Câu Gốc Nền Tảng (Golden Verses)
+                          </span>
+                          <p className="text-xs font-mono font-bold text-white">
+                            {selectedThematicNode.metadata?.golden_verse}
+                          </p>
+                        </div>
+
+                        {/* Summary */}
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Tóm Lược Thần Học
+                          </span>
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                            {selectedThematicNode.metadata?.summary}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedThematicNode.type === "scripture_anchor" && (
+                      <div className="flex flex-col gap-4">
+                        {/* Role in Covenant */}
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                            Vai Trò Trong Tiến Trình Giao Ước
+                          </span>
+                          <p className="text-xs font-semibold text-white">
+                            {selectedThematicNode.metadata?.role}
+                          </p>
+                          <p className="text-[11px] text-slate-400 italic">
+                            Chìa khóa: "{selectedThematicNode.metadata?.key_phrase}"
+                          </p>
+                        </div>
+
+                        {/* Authentic 1925 Bible Verse Text */}
+                        <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 to-indigo-950/30 border border-slate-800 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-amber-400" /> Bản Dịch Truyền Thống 1925
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {selectedThematicNode.metadata?.reference}
+                            </span>
+                          </div>
+                          <p className="text-sm font-serif text-slate-100 leading-relaxed italic bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
+                            "{selectedThematicNode.metadata?.verse_text || selectedThematicNode.metadata?.key_phrase}"
+                          </p>
+                        </div>
+
+                        {/* Quick Action Link */}
+                        <Link
+                          href={`/bible?ref=${encodeURIComponent(selectedThematicNode.metadata?.reference || "")}`}
+                          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-colors"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          <span>Mở Phân Đoạn Này Trong Kinh Thánh</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    )}
+
+                    {selectedThematicNode.type === "doctrine_pillar" && (
+                      <div className="flex flex-col gap-4">
+                        <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-800/40 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300">
+                            Khái Niệm Tín Lý Thần Học
+                          </span>
+                          <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                            {selectedThematicNode.metadata?.summary}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Định Chế & Bản Thừa Nhận Đức Tin
+                          </span>
+                          <p className="text-xs text-slate-300 font-sans">
+                            Được xác lập trong các bản tín điều đại kết và các bản tuyên tín Cải Chánh (Westminster, Heidelberg).
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedThematicNode.type === "character" || selectedThematicNode.type === "event") && (
+                      <div className="flex flex-col gap-4">
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                            {selectedThematicNode.type === "character" ? "Vai Trò Lịch Sử Cứu Rỗi" : "Biến Cố Mốc Lịch Sử"}
+                          </span>
+                          <p className="text-xs text-slate-200 leading-relaxed">
+                            {selectedThematicNode.metadata?.role || selectedThematicNode.metadata?.summary || "Một mắt xích then chốt trong lịch sử mặc khải của Đức Chúa Trời."}
+                          </p>
+                        </div>
+
+                        {selectedThematicNode.type === "character" && (
+                          <button
+                            onClick={() => openCharacterDossier(selectedThematicNode.label)}
+                            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-colors"
+                          >
+                            <Users className="w-4 h-4" />
+                            <span>Mở Hồ Sơ Nhân Vật Toàn Diện (§7)</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-12 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
+                    <Layers className="w-8 h-8 text-slate-600" />
+                    <p className="text-xs">Chọn một nút trên đồ thị để kiểm tra chi tiết bản văn & thần học.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Section 1: Progressive Redemptive Trajectory Track (8 Eras) */}
+          {themeMapData && themeMapData.eras_trajectory && themeMapData.eras_trajectory.length > 0 && (
+            <div className="p-6 md:p-8 rounded-3xl bg-slate-950/80 border border-slate-800 flex flex-col gap-6 shadow-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Tiến Trình Lịch Sử Khải Huyền (Biblical Theology)
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Milestone className="w-5 h-5 text-amber-400" />
+                    Quỹ Đạo Tiệm Tiến Của Chủ Đề Qua 8 Thời Kỳ Cứu Chuộc
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-400 font-mono">
+                  Thuở Ban Đầu ➔ Đời Đời Vĩnh Cửu
+                </span>
+              </div>
+
+              {/* Trajectory Stepper Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {themeMapData.eras_trajectory.map((era, idx) => (
+                  <div
+                    key={era.era_id || idx}
+                    className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-slate-700 flex flex-col justify-between gap-3 transition-colors"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 font-bold text-xs flex items-center justify-center border border-amber-500/30 shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {era.timeframe}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-white text-xs leading-snug">
+                        {era.era_name}
+                      </h4>
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+                        {era.development}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                      <span className="text-amber-400 font-mono text-[10px] font-bold">
+                        {era.scripture_anchor}
+                      </span>
+                      <Link
+                        href={`/bible?ref=${encodeURIComponent(era.scripture_anchor)}`}
+                        className="text-slate-400 hover:text-white transition-colors"
+                        title="Xem Kinh Thánh"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 2: Homiletical Outline & Scholarly Citations Double Deck */}
+          {themeMapData && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Homiletical Preaching Outline (col-span-7) */}
+              <div className="lg:col-span-7 p-6 rounded-3xl bg-slate-950/80 border border-slate-800 flex flex-col gap-5 shadow-2xl">
+                <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-800">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit">
+                      Ứng Dụng Giảng Luận & Soạn Bài
+                    </span>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2 mt-1">
+                      <FileText className="w-5 h-5 text-amber-400" />
+                      Đề Cương Bài Giảng 3 Điểm (Homiletical Outline)
+                    </h3>
+                  </div>
+
+                  <button
+                    onClick={() => copyHomileticalOutline(themeMapData.homiletical_outline, themeMapData.theme.title_vi)}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+                    title="Sao chép Markdown"
+                  >
+                    {copiedOutline ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {themeMapData.homiletical_outline && (
+                  <div className="flex flex-col gap-4">
+                    {/* Title & Key Scripture */}
+                    <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300 uppercase">
+                          Chủ Đề Giảng: {themeMapData.homiletical_outline.sermon_title}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {themeMapData.homiletical_outline.key_scripture}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-200 font-serif italic pt-1">
+                        Luận đề: "{themeMapData.homiletical_outline.homiletical_proposition}"
+                      </p>
+                    </div>
+
+                    {/* Exegetical Points */}
+                    <div className="flex flex-col gap-3">
+                      {themeMapData.homiletical_outline.points?.map((pt, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white text-xs flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center border border-amber-500/30">
+                                {pt.numeral}
+                              </span>
+                              {pt.point_title}
+                            </span>
+                            <span className="text-[10px] font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              {pt.scripture_support}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed pl-7">
+                            • <strong className="text-slate-200">Giải kinh:</strong> {pt.exegetical_explanation}
+                          </p>
+                          <p className="text-[11px] text-emerald-300 leading-relaxed pl-7">
+                            • <strong className="text-emerald-200">Áp dụng:</strong> {pt.pastoral_application}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Conclusion Charge */}
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 font-sans leading-relaxed">
+                      <strong className="text-amber-300">Lời Kêu Gọi Kết Luận:</strong> {themeMapData.homiletical_outline.conclusion_charge}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Scholarly Commentary Citations (col-span-5) */}
+              <div className="lg:col-span-5 p-6 rounded-3xl bg-slate-950/80 border border-slate-800 flex flex-col gap-5 shadow-2xl">
+                <div className="flex flex-col gap-1 pb-4 border-b border-slate-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 w-fit">
+                    Kho Tàng 275 Thư Tịch Chú Giải
+                  </span>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2 mt-1">
+                    <Bookmark className="w-5 h-5 text-indigo-400" />
+                    Dẫn Chứng Học Giả & Nhà Thần Học
+                  </h3>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {themeMapData.commentary_citations?.map((cite, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-indigo-300">{cite.author}</span>
+                        <span className="text-[10px] text-slate-400 font-serif italic truncate max-w-[170px]">{cite.work}</span>
+                      </div>
+                      <p className="text-xs text-slate-200 font-serif italic leading-relaxed">
+                        "{cite.quote}"
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 6. BIBLICAL CHARACTER DOSSIER MODAL (§7) */}
       {/* ===================================================================== */}
       {isDossierOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">

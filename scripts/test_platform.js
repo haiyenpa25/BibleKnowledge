@@ -183,6 +183,12 @@ async function main() {
   const rEntities = await testEndpoint('/api/graph/entities', d => (!Array.isArray(d) || d.length === 0) && 'No entities returned');
   report('GET /api/graph/entities (Global theological entity directory)', rEntities.ok, rEntities.error);
 
+  const rThemes = await testEndpoint('/api/graph/themes', d => (!d.themes || d.total_themes < 7) && `Expected at least 7 themes, got ${d?.total_themes}`);
+  report(`GET /api/graph/themes (${rThemes.data?.total_themes || 7} Foundational Biblical & Covenantal Themes §17, §18)`, rThemes.ok, rThemes.error);
+
+  const rThemeMap = await testEndpoint('/api/graph/theme-map?theme_id=covenant_redemption', d => (!d.nodes || d.nodes.length === 0 || !d.edges || !d.eras_trajectory || !d.homiletical_outline) && 'Invalid theme map response');
+  report('GET /api/graph/theme-map (Thematic network radial graph, OT/NT typology links & 8-era trajectory)', rThemeMap.ok, rThemeMap.error);
+
   // Learning & Discipleship Module
   const rQuiz = await testEndpoint('/api/learn/quiz', d => (!Array.isArray(d) || d.length === 0) && 'No quiz questions');
   report('GET /api/learn/quiz (Interactive theological quiz)', rQuiz.ok, rQuiz.error);

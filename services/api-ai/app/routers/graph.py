@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import json
 import logging
+import math
+import re
 
 from app.db.session import get_db
 
@@ -857,5 +859,827 @@ def get_messianic_prophecies_matrix(
         ],
         "prophecies": results[:limit]
     }
+
+
+# ==============================================================================
+# Topical Thematic Map Visualizer & Covenant Trajectories (§17, §18)
+# ==============================================================================
+
+THEMATIC_CATALOG: Dict[str, Dict[str, Any]] = {
+    "covenant_redemption": {
+        "id": "covenant_redemption",
+        "title_vi": "Giao Ước Cứu Chuộc & Tiến Trình Cứu Rỗi",
+        "title_en": "Covenant of Redemption & Historical Unfolding",
+        "category": "Thần Học Giao Ước (Covenant Theology)",
+        "color": "#f59e0b",
+        "badge_class": "amber",
+        "golden_verse": "Sáng-thế Ký 3:15 / Giê-rê-mi 31:31 / Hê-bơ-rơ 8:6",
+        "summary": "Tiến trình giao ước đời đời bất biến của Ba Ngôi Đức Chúa Trời từ Giao ước Sơ Khởi (Protoevangelium) đến Giao Ước Mới trong Huyết Đấng Christ.",
+        "redemptive_thesis": "Mọi giao ước lịch sử trong Cựu Ước (Áp-ra-ham, Xi-na-i, Đa-vít) đều là những bóng mờ sư phạm tiệm tiến hướng đến sự ứng nghiệm trọn vẹn và tối hậu trong Giao Ước Mới được đóng ấn bằng chính Thập Tự Giá của Chúa Cứu Thế Giê-xu.",
+        "scriptures": [
+            {"ref": "Sáng-thế Ký 3:15", "testament": "OT", "role": "Giao Ước Sơ Khởi (Protoevangelium)", "key_phrase": "Dòng dõi người nữ sẽ giày đạp đầu con rắn"},
+            {"ref": "Sáng-thế Ký 12:1-3", "testament": "OT", "role": "Giao Ước Áp-ra-ham", "key_phrase": "Các chi tộc nơi thế gian sẽ nhờ ngươi mà được phước"},
+            {"ref": "Xuất Ê-díp-tô Ký 24:7-8", "testament": "OT", "role": "Giao Ước Xi-na-i (Luật Pháp)", "key_phrase": "Nầy là huyết của sự giao ước mà Đức Giê-hô-va đã lập"},
+            {"ref": "II Sa-mu-ên 7:12-16", "testament": "OT", "role": "Giao Ước Đa-vít (Vương Quyền)", "key_phrase": "Ta sẽ lập ngôi nước người vững bền đời đời"},
+            {"ref": "Giê-rê-mi 31:31-34", "testament": "OT", "role": "Lời Tiên Tri Giao Ước Mới", "key_phrase": "Ta sẽ ghi tạc luật pháp Ta vào lòng chúng nó"},
+            {"ref": "Lu-ca 22:20", "testament": "NT", "role": "Thiết Lập Giao Ước Mới", "key_phrase": "Chén nầy là giao ước mới trong huyết Ta vì các ngươi"},
+            {"ref": "Hê-bơ-rơ 8:6-13", "testament": "NT", "role": "Đấng Trung Bảo Giao Ước Tốt Hơn", "key_phrase": "Ngài là Đấng trung bảo của giao ước tốt hơn"},
+            {"ref": "Khải-huyền 21:1-4", "testament": "NT", "role": "Sự Hoàn Thành Tối Hậu Của Giao Ước", "key_phrase": "Đức Chúa Trời sẽ ở với họ và họ sẽ làm dân Ngài"}
+        ],
+        "characters": [
+            {"name": "Áp-ra-ham", "role": "Tổ phụ của giao ước đức tin", "testament": "OT", "era": "Tổ Phụ", "significance": "Nhận lời hứa về đất hứa, dòng dõi và nguồn phước cho muôn dân tộc."},
+            {"name": "Môi-se", "role": "Người trung bảo giao ước luật pháp", "testament": "OT", "era": "Xuất Hành", "significance": "Đưa dân sự ra khỏi Ai Cập, nhận bảng chứng giao ước tại núi Si-na-i."},
+            {"name": "Đa-vít", "role": "Vua theo lòng Chúa", "testament": "OT", "era": "Vương Quốc Thống Nhất", "significance": "Nhận giao ước vương quyền đời đời dẫn đến Đấng Mê-si."},
+            {"name": "Chúa Giê-xu", "role": "Đấng Trung Bảo Tối Thượng", "testament": "NT", "era": "Cuộc Đời Chúa Giê-xu", "significance": "Đổ huyết chuộc tội trên Thập Tự Giá để đóng ấn Giao Ước Mới vĩnh cửu."}
+        ],
+        "events": [
+            {"name": "Lời Hứa Tại Vườn Ê-đen", "period": "Thuở Ban Đầu", "significance": "Tuyên bố đầu tiên về sự đắc thắng của Đấng Mê-si trên Sa-tan."},
+            {"name": "Giao Ước Cắt Bì Áp-ra-ham", "period": "Tổ Phụ", "significance": "Dấu hiệu thánh thể hiện sự biệt riêng thuộc về Đức Chúa Trời."},
+            {"name": "Lễ Vượt Qua Tại Ai Cập", "period": "Xuất Hành", "significance": "Huyết chiên con bôi trên mày cửa bảo toàn mạng sống tuyển dân."},
+            {"name": "Bữa Tiệc Ly & Lễ Tiệc Thánh", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Chúa Giê-xu công bố Chén Giao Ước Mới trước khi chịu thương khó."}
+        ],
+        "doctrines": [
+            {"name": "Giao Ước Ân Điển (Covenant of Grace)", "summary": "Chương trình cứu chuộc đời đời đặt trên công đức duy nhất của Đấng Christ thay vì việc lành luật pháp."},
+            {"name": "Mặc Khải Tiệm Tiến (Progressive Revelation)", "summary": "Chân lý cứu rỗi mở ra từng bước trong lịch sử từ mờ ảo đến sáng tỏ trọn vẹn."},
+            {"name": "Sự Trung Bảo Duy Nhất (Sole Mediation)", "summary": "Chỉ có một Đức Chúa Trời và chỉ có một Đấng Trung Bảo duy nhất giữa Đức Chúa Trời và loài người: Đức Chúa Giê-xu Christ."}
+        ],
+        "eras_progression": [
+            {"era_name": "Sáng Tạo & Sa Ngã", "revelation_step": "Giao ước việc làm bị phá vỡ; Lời hứa cứu rỗi đầu tiên (Sáng 3:15).", "scripture": "Sáng-thế Ký 3:15", "focus": "Hạt giống khởi đầu"},
+            {"era_name": "Tổ Phụ", "revelation_step": "Giao ước vô điều kiện với Áp-ra-ham qua đức tin và lời hứa ban phước muôn dân.", "scripture": "Sáng-thế Ký 12:1-3", "focus": "Dòng dõi và Đất Hứa"},
+            {"era_name": "Xuất Hành & Đồng Vắng", "revelation_step": "Giao ước luật pháp Xi-na-i: chức tế lễ, đền tạm và hệ thống hiến tế làm bóng.", "scripture": "Xuất Ê-díp-tô Ký 24:7-8", "focus": "Thánh khiết và Luật pháp"},
+            {"era_name": "Vương Quốc Thống Nhất", "revelation_step": "Giao ước vương triều Đa-vít: Ngôi vua Đấng Mê-si trị vì muôn đời.", "scripture": "II Sa-mu-ên 7:12-16", "focus": "Vương quyền Đấng Mê-si"},
+            {"era_name": "Lưu Đày & Tiên Tri", "revelation_step": "Các tiên tri loan báo giao ước cũ bị vi phạm và hứa ban Giao Ước Mới đổi mới lòng dạ.", "scripture": "Giê-rê-mi 31:31-34", "focus": "Tấm lòng tái sinh"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Đấng Christ hoàn thành luật pháp và đóng ấn Giao Ước Mới bằng Huyết báu trên Thập tự.", "scripture": "Lu-ca 22:20", "focus": "Sự chuộc tội trọn vẹn"},
+            {"era_name": "Hội Thánh Ban Đầu", "revelation_step": "Phúc Âm giao ước được rao truyền cho muôn dân; dân ngoại cùng dự phần giao ước đức tin.", "scripture": "Ê-phê-sô 2:12-13", "focus": "Hiệp nhất trong Thân Thể"},
+            {"era_name": "Khải Huyền & Vinh Hiển", "revelation_step": "Lời hứa giao ước tối hậu: Đức Chúa Trời ngự giữa dân Ngài trong Thành Thánh Giê-ru-sa-lem Mới.", "scripture": "Khải-huyền 21:3", "focus": "Sự sống đời đời trọn vẹn"}
+        ],
+        "citations": [
+            {"author": "J.I. Packer", "work": "Knowing God", "quote": "Giao ước ân điển không phải là kế hoạch cứu vãn dự phòng của Đức Chúa Trời, mà là mục đích đời đời của Ngài để đem một dân tộc được chuộc vào sự tương giao hiệp một mật thiết với chính Ba Ngôi.", "tradition": "Reformed Evangelical"},
+            {"author": "F.F. Bruce", "work": "The Epistle to the Hebrews (NICNT)", "quote": "Chúa Giê-xu không chỉ là Đấng thiết lập Giao Ước Mới, chính Ngài là sự bảo đảm sống động cho giao ước ấy — một giao ước vượt trội hơn mọi giao ước cũ về cả phẩm chất, hiệu lực và tính vĩnh cửu.", "tradition": "New Testament Exegesis"}
+        ],
+        "homiletical_outline": {
+            "title": "Giao Ước Đời Đời: Từ Lời Hứa Sa Ngã Đến Vinh Quang Thập Tự",
+            "scripture_main": "Giê-rê-mi 31:31-34 & Hê-bơ-rơ 8:6-13",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Sự Bất Toàn Của Giao Ước Cũ và Sự Bất Thành Tín Của Con Người",
+                    "scripture": "Xuất 24:7; Hê-bơ-rơ 8:7-9",
+                    "exposition": "Luật pháp là thánh khiết và công bình, nhưng không thể ban năng lực cho bản tính xác thịt tội lỗi. Con người luôn thất bại trong việc gìn giữ giao ước việc làm.",
+                    "application": "Nhận thức sự bất lực hoàn toàn của công đức cá nhân để từ bỏ sự tự công bình và chạy đến nơi ẩn náu của ân điển."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Sự Thiết Lập Giao Ước Mới Đóng Ấn Bằng Huyết Đấng Christ",
+                    "scripture": "Lu-ca 22:20; Hê-bơ-rơ 9:11-15",
+                    "exposition": "Đấng Christ đứng làm Người Đại Diện và Đấng Bảo Đảm cho chúng ta. Ngài đổ huyết thanh tẩy lương tâm khỏi các công việc chết để phụng sự Đức Chúa Trời hằng sống.",
+                    "application": "Duyệt xét lòng biết ơn sâu sắc mỗi khi dự Tiệc Thánh: chúng ta thuộc về Giao Ước Mới của tình yêu và sự tha thứ trọn vẹn."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Đời Sống Mới Dưới Luật Pháp Tình Yêu Ghi Tạc Trong Lòng",
+                    "scripture": "Giê-rê-mi 31:33-34; II Cô-rinh-tô 3:3-6",
+                    "exposition": "Đức Thánh Linh ngự vào lòng người tin, ban bản tính mới và sự khao khát vâng phục Lời Chúa từ động cơ tình yêu biết ơn chứ không bởi nỗi sợ hãi hình phạt.",
+                    "application": "Bước đi theo Thánh Linh mỗi ngày, thể hiện lòng trung tín của một dân tộc giao ước giữa thế gian hư hoại."
+                }
+            ],
+            "reflection_questions": [
+                "Làm thế nào để phân biệt sự vâng lời dưới Luật pháp (sợ hãi) và sự vâng lời dưới Giao Ước Ân Điển (yêu thương)?",
+                "Ý nghĩa việc Chúa Giê-xu là 'Đấng Bảo Đảm' (Surety) của Giao Ước đem lại sự an ninh cứu rỗi cho bạn như thế nào?"
+            ]
+        }
+    },
+    "grace_faith": {
+        "id": "grace_faith",
+        "title_vi": "Ân Điển & Đức Tin Cứu Rỗi",
+        "title_en": "Grace, Faith & Justification (Sola Gratia, Sola Fide)",
+        "category": "Cứu Rỗi Học (Soteriology)",
+        "color": "#3b82f6",
+        "badge_class": "blue",
+        "golden_verse": "Sáng-thế Ký 15:6 / Ê-phê-sô 2:8-9 / Rô-ma 5:1",
+        "summary": "Nền tảng của sự xưng công bình duy bởi đức tin và ân điển nhưng không, từ chiếc áo da thú của A-đam đến thần học Phao-lô.",
+        "redemptive_thesis": "Đức tin không phải là một công đức hay tác phẩm của con người để đổi lấy sự cứu chuộc, mà là bàn tay không trống rỗng tiếp nhận món quà ân điển vô điều kiện mà Đức Chúa Trời đã hoàn tất trọn vẹn trong Đấng Christ.",
+        "scriptures": [
+            {"ref": "Sáng-thế Ký 15:6", "testament": "OT", "role": "Nền Tảng Đức Tin Xưng Công Bình", "key_phrase": "Áp-ram tin Đức Giê-hô-va, thì Ngài kể sự đó là công bình cho người"},
+            {"ref": "Ha-ba-cúc 2:4", "testament": "OT", "role": "Khẩu Hiệu Tiên Tri Đức Tin", "key_phrase": "Người công bình sẽ sống bởi đức tin mình"},
+            {"ref": "Rô-ma 3:23-26", "testament": "NT", "role": "Ân Điển Nhưng Không Qua Sự Cứu Chuộc", "key_phrase": "Được xưng công bình nhưng không bởi ân điển Ngài"},
+            {"ref": "Rô-ma 5:1-2", "testament": "NT", "role": "Hòa Thuận Lại Với Đức Chúa Trời", "key_phrase": "Đã được xưng công bình bởi đức tin, chúng ta được hòa thuận với Đức Chúa Trời"},
+            {"ref": "Ga-la-ti 2:16", "testament": "NT", "role": "Không Bởi Việc Làm Của Luật Pháp", "key_phrase": "Chẳng phải bởi việc làm của luật pháp, bèn là bởi đức tin trong Đức Chúa Giê-xu"},
+            {"ref": "Ê-phê-sô 2:8-10", "testament": "NT", "role": "Ân Điển Nhờ Đức Tin Để Làm Việc Lành", "key_phrase": "Nhờ ân điển, bởi đức tin, mà anh em được cứu; điều đó không phải đến từ anh em"},
+            {"ref": "Hê-bơ-rơ 11:1-6", "testament": "NT", "role": "Bản Chất Của Đức Tin Thật", "key_phrase": "Đức tin là sự biết chắc vững vàng của những điều mình đang trông mong"}
+        ],
+        "characters": [
+            {"name": "Áp-ra-ham", "role": "Gương mẫu đức tin xưng công bình", "testament": "OT", "era": "Tổ Phụ", "significance": "Tin vào lời hứa của Đức Chúa Trời trước khi chịu phép cắt bì."},
+            {"name": "Đa-vít", "role": "Người kinh nghiệm phước hạnh tha thứ", "testament": "OT", "era": "Vương Quốc Thống Nhất", "significance": "Được xưng công bình khi xưng tội trong Thi thiên 32."},
+            {"name": "Sứ đồ Phao-lô", "role": "Nhà thần học của Ân điển", "testament": "NT", "era": "Hội Thánh Ban Đầu", "significance": "Biện minh giáo lý Sola Gratia chống lại chủ nghĩa luật pháp hẹp hòi."}
+        ],
+        "events": [
+            {"name": "Chiếc Áo Da Thú Cứu Chuộc", "period": "Thuở Ban Đầu", "significance": "Đức Chúa Trời lấy da thú làm áo che sự lõa lồ hổ thẹn của con người sa ngã."},
+            {"name": "Áp-ram Tin Lời Hứa Đêm Sao", "period": "Tổ Phụ", "significance": "Nhìn lên bầu trời đầy sao và tin cậy tuyệt đối vào quyền năng Chúa."},
+            {"name": "Sự Đổi Mới Của Phao-lô Trên Đường Đa-mách", "period": "Hội Thánh Ban Đầu", "significance": "Từ kẻ nhiệt thành luật pháp bắt bớ đạo trở thành sứ đồ của ân điển."}
+        ],
+        "doctrines": [
+            {"name": "Xưng Công Bình (Justification)", "summary": "Hành vi pháp lý tối cao của Đức Chúa Trời tuyên bố tội nhân là vô tội và công chính nhờ công đức gán ghép của Đấng Christ."},
+            {"name": "Ân Điển Bất Khả Kháng (Irresistible Grace)", "summary": "Tình yêu chủ động của Đức Thánh Linh đánh thức và tái sinh tấm lòng chai đá để tự do quay về tin nhận Chúa."},
+            {"name": "Đức Tin Sống Động (Living Faith)", "summary": "Đức tin thật không đứng đơn độc; đức tin cứu rỗi tự nhiên sinh ra bông trái việc lành yêu thương."}
+        ],
+        "eras_progression": [
+            {"era_name": "Sáng Tạo & Sa Ngã", "revelation_step": "Ân điển che chở chiếc áo da thú khi con người thất bại trong giao ước việc làm.", "scripture": "Sáng-thế Ký 3:21", "focus": "Bóng mờ ân điển"},
+            {"era_name": "Tổ Phụ", "revelation_step": "Áp-ra-ham được xưng công bình bởi đức tin đặt nơi Lời Hứa chứ không qua cắt bì hay việc làm.", "scripture": "Sáng-thế Ký 15:6", "focus": "Mẫu mực đức tin"},
+            {"era_name": "Xuất Hành & Quan Xét", "revelation_step": "Luật pháp được ban ra như thầy giáo dẫn dắt người ta nhận biết tội lỗi để khao khát ân điển.", "scripture": "Ga-la-ti 3:24", "focus": "Mục đích sư phạm của Luật"},
+            {"era_name": "Lưu Đày & Tiên Tri", "revelation_step": "Tiên tri Ha-ba-cúc công bố: Người công bình sẽ sống bởi đức tin giữa nghịch cảnh.", "scripture": "Ha-ba-cúc 2:4", "focus": "Niềm tin kiên định"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Đấng Christ mang lấy án phạt tội lỗi thay cho con người; sự cứu rỗi hoàn tất trọn vẹn.", "scripture": "Giăng 19:30", "focus": "Công giá đã trả xong"},
+            {"era_name": "Hội Thánh & Thư Tín", "revelation_step": "Công thức cứu rỗi vĩ đại: 'Nhờ ân điển, bởi đức tin... ấy là sự ban cho của Đức Chúa Trời'.", "scripture": "Ê-phê-sô 2:8-9", "focus": "Xưng công bình bởi đức tin"},
+            {"era_name": "Khải Huyền", "revelation_step": "Đoàn dân mặc áo trắng sạch được giặt trong Huyết Chiên Con ca tụng ân điển đời đời.", "scripture": "Khải-huyền 7:14", "focus": "Vinh hiển vĩnh hằng"}
+        ],
+        "citations": [
+            {"author": "Martin Luther", "work": "Commentary on Galatians", "quote": "Giáo lý xưng công bình duy bởi đức tin là trụ cột mà trên đó Hội Thánh đứng vững hay sụp đổ. Nếu đánh mất giáo lý này, ta đánh mất chính Phúc Âm.", "tradition": "Reformation"},
+            {"author": "John Calvin", "work": "Institutes of the Christian Religion", "quote": "Đức tin ví như chiếc bình rỗng được đưa ra để tiếp nhận sự sung mãn vô tận của Đấng Christ; ta không được xưng công bình vì giá trị của chiếc bình, mà vì sự phong phú của Đấng ngự vào trong đó.", "tradition": "Reformed Theology"}
+        ],
+        "homiletical_outline": {
+            "title": "Món Quà Vô Giá: Sự Cứu Rỗi Bởi Ân Điển Qua Đức Tin",
+            "scripture_main": "Ê-phê-sô 2:8-10 & Rô-ma 3:21-26",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Tình Trạng Bất Lực Tuyệt Đối Của Con Người Ngoài Đấng Christ",
+                    "scripture": "Rô-ma 3:23; Ê-phê-sô 2:1-3",
+                    "exposition": "Trước khi gặp Chúa, mọi người đều chết vì lầm lỗi và tội ác của mình, không một ai có thể tự cứu bằng đạo đức, tri thức hay việc làm luật pháp.",
+                    "application": "Dẹp bỏ mọi kiêu ngạo thuộc linh; hạ mình thừa nhận sự thiếu thốn và khốn cùng thuộc linh trước mặt Đức Chúa Trời."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Bản Chất Của Ân Điển Nhưng Không: Ban Cho Bất Kỳ Đòi Hỏi Nào",
+                    "scripture": "Rô-ma 3:24; Ê-phê-sô 2:8-9",
+                    "exposition": "Ân điển (Charis) là ân huệ dư dật dành cho kẻ hoàn toàn không xứng đáng. Đức tin là khí cụ tiếp nhận quà tặng cứu chuộc mà Đức Chúa Trời đã trả giá bằng Con Ngài.",
+                    "application": "Vui mừng tiếp nhận sự tha thứ trọn vẹn, không sống trong mặc cảm tội lỗi hay cố gắng tự lập công tích."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Mục Đích Của Ân Điển: Tạo Dựng Tác Phẩm Mới Để Làm Việc Lành",
+                    "scripture": "Ê-phê-sô 2:10; Tít 2:11-14",
+                    "exposition": "Chúng ta không được cứu BỞI việc lành, nhưng được cứu ĐỂ LÀM việc lành mà Đức Chúa Trời đã sắm sẵn trước. Đời sống biến đổi là bằng chứng của đức tin thật.",
+                    "application": "Bày tỏ đức tin qua tình yêu thương cụ thể, phục vụ cộng đồng và tỏa sáng sự công chính của Nước Trời giữa đời sống hằng ngày."
+                }
+            ],
+            "reflection_questions": [
+                "Tại sao con người tự nhiên luôn có xu hướng muốn thêm 'việc lành' vào công thức cứu rỗi của ân điển?",
+                "Việc biết chắc mình được cứu duy bởi ân điển đem lại sự giải phóng tâm linh như thế nào cho đời sống bạn?"
+            ]
+        }
+    },
+    "kingdom_god": {
+        "id": "kingdom_god",
+        "title_vi": "Nước Đức Chúa Trời (The Kingdom of God)",
+        "title_en": "The Sovereignty & Kingdom of God (Basileia tou Theou)",
+        "category": "Vương Quốc & Cánh Chung (Kingdom & Eschatology)",
+        "color": "#a855f7",
+        "badge_class": "purple",
+        "golden_verse": "Đa-ni-ên 7:14 / Ma-thi-ơ 6:33 / Khải-huyền 11:15",
+        "summary": "Quyền tể trị tối cao của Đức Chúa Trời trong lịch sử, sự hiện diện của Nước Trời qua Đấng Mê-si ('Đã đến nhưng Chưa hoàn tất'), và sự trị vì vinh hiển muôn đời.",
+        "redemptive_thesis": "Nước Đức Chúa Trời không phải là một địa giới chính trị trần thế, mà là sự cai trị của Vua Muôn Vua trên tấm lòng, dân tộc và toàn bộ tạo vật, được khai mạc bởi chức vụ của Chúa Giê-xu và hoàn tất khi Ngài tái lâm.",
+        "scriptures": [
+            {"ref": "Đa-ni-ên 2:44", "testament": "OT", "role": "Tiên Tri Vương Quốc Không Hề Bị Phá Hủy", "key_phrase": "Đức Chúa Trời của các từng trời sẽ dựng nên một nước không hề bị hủy diệt"},
+            {"ref": "Đa-ni-ên 7:13-14", "testament": "OT", "role": "Con Người Được Ban Quyền Trị Vì", "key_phrase": "Người được ban cho quyền thế, vinh hiển và nước"},
+            {"ref": "Ma-thi-ơ 4:17", "testament": "NT", "role": "Lời Loan Báo Khởi Đầu Chức Vụ", "key_phrase": "Hãy ăn năn, vì nước thiên đàng đã đến gần"},
+            {"ref": "Ma-thi-ơ 6:33", "testament": "NT", "role": "Ưu Tiên Tối Cao Của Môn Đồ", "key_phrase": "Nhưng trước hết, hãy tìm kiếm nước Đức Chúa Trời và sự công bình của Ngài"},
+            {"ref": "Ma-thi-ơ 13:44-46", "testament": "NT", "role": "Giá Trị Tuyệt Đối Của Nước Trời", "key_phrase": "Nước thiên đàng giống như của báu giấu trong ruộng"},
+            {"ref": "Lu-ca 17:20-21", "testament": "NT", "role": "Bản Chất Thuộc Linh Của Nước Chúa", "key_phrase": "Vì nầy, nước Đức Chúa Trời ở trong lòng các ngươi"},
+            {"ref": "Khải-huyền 11:15", "testament": "NT", "role": "Vương Quốc Hoàn Tất Muôn Đời", "key_phrase": "Nước của thế gian thuộc về Chúa chúng ta và Đấng Christ của Ngài"}
+        ],
+        "characters": [
+            {"name": "Đa-ni-ên", "role": "Tiên tri của các vương quốc", "testament": "OT", "era": "Lưu Đày Ba-by-lôn", "significance": "Thấy khải tượng về sự sụp đổ của các đế quốc loài người trước Vương quốc đời đời của Đức Chúa Trời."},
+            {"name": "Giăng Báp-tít", "role": "Người dọn đường cho Vua", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Kêu gọi toàn dân ăn năn tiếp đón Vua Nước Trời."},
+            {"name": "Chúa Giê-xu", "role": "Vua Muôn Vua & Chúa Muôn Chúa", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Đem Nước Trời vào thế giới loài người qua lời giảng, phép lạ và sự phục sinh."},
+            {"name": "Sứ đồ Giăng", "role": "Người thấy khải tượng vinh quang tối hậu", "testament": "NT", "era": "Khải Huyền", "significance": "Ghi chép sự trị vì muôn đời của Đấng Christ trên trời mới đất mới."}
+        ],
+        "events": [
+            {"name": "Giấc Mơ Về Pho Tượng & Hòn Đá", "period": "Lưu Đày Ba-by-lôn", "significance": "Hòn đá đục không bởi tay người đánh tan pho tượng và trở nên hòn núi lớn đầy dẫy khắp đất."},
+            {"name": "Bài Giảng Trên Núi (Hiến Chương Nước Trời)", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Thiết lập chuẩn mực đạo đức thánh khiết và lối sống của công dân Nước Trời."},
+            {"name": "Sự Tái Lâm & Khải Hoàn Toàn Thể", "period": "Khải Huyền", "significance": "Vua Đấng Christ trở lại tiêu diệt mọi kẻ thù và thiết lập nền hòa bình vĩnh cửu."}
+        ],
+        "doctrines": [
+            {"name": "Hiện Diện Nhưng Chưa Hoàn Tất (Already, But Not Yet)", "summary": "Nước Trời đã hiện diện quyền năng trong chức vụ Đấng Christ và Hội Thánh, nhưng chỉ hoàn tất trọn vẹn trong ngày Chúa tái lâm."},
+            {"name": "Chủ Quyền Tối Thượng (Divine Sovereignty)", "summary": "Đức Chúa Trời cai quản trên mọi biến chuyển lịch sử, quyền thế và đế quốc thế gian."},
+            {"name": "Đổi Mới Toàn Bộ Tạo Vật (Cosmic Restoration)", "summary": "Nước Chúa không chỉ cứu chuộc linh hồn cá nhân mà còn chuộc lại và đổi mới toàn thể vũ trụ trời mới đất mới."}
+        ],
+        "eras_progression": [
+            {"era_name": "Sáng Tạo", "revelation_step": "Đức Chúa Trời ban quyền cai quản thế giới cho loài người dưới quyền tể trị tối cao của Ngài.", "scripture": "Sáng-thế Ký 1:28", "focus": "Ủy thác quyền quản trị"},
+            {"era_name": "Vương Quốc Thống Nhất", "revelation_step": "Vương quyền Đa-vít làm hình bóng tiên trưng cho ngôi nước Đấng Mê-si không hề dời đổi.", "scripture": "II Sa-mu-ên 7:16", "focus": "Ngôi nước Đa-vít"},
+            {"era_name": "Lưu Đày", "revelation_step": "Đa-ni-ên thấy Con Người bước đến trước Đấng Thượng Cổ để nhận lấy vương quốc bất diệt muôn đời.", "scripture": "Đa-ni-ên 7:14", "focus": "Khải tượng Khải huyền"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Chúa Giê-xu trừ quỷ, chữa lành và tuyên bố: Nước Đức Chúa Trời đã đến giữa các ngươi.", "scripture": "Ma-thi-ơ 12:28", "focus": "Quyền năng khai mạc"},
+            {"era_name": "Hội Thánh", "revelation_step": "Hội Thánh là cộng đồng công dân Nước Trời, làm đại sứ giảng đạo Nước Trời cho muôn dân.", "scripture": "Công-vụ 28:31", "focus": "Đại Mạng Lệnh vương quốc"},
+            {"era_name": "Khải Huyền", "revelation_step": "Tiếng loa thứ bảy vang lên: Các vương quốc thế gian thuộc về Đấng Christ đời đời vô cùng.", "scripture": "Khải-huyền 11:15", "focus": "Hoàn tất vinh quang"}
+        ],
+        "citations": [
+            {"author": "George Eldon Ladd", "work": "The Presence of the Future", "quote": "Nước Đức Chúa Trời vừa là một thực tại hiện diện trong thời đại này, vừa là một trật tự tương lai của thời đại sau; Đấng Christ đã đem sức mạnh của thế giới tương lai xâm nhập vào dòng lịch sử hiện tại.", "tradition": "Biblical Theology"},
+            {"author": "C.H. Spurgeon", "work": "Sermons on the Kingdom", "quote": "Đấng Christ phải là Vua tuyệt đối trên mọi ngóc ngách của tấm lòng bạn; nếu Ngài không phải là Chúa của tất cả, Ngài không phải là Chúa của bạn chút nào.", "tradition": "Baptist Heritage"}
+        ],
+        "homiletical_outline": {
+            "title": "Tìm Kiếm Vương Quốc: Ưu Tiên Tuyệt Đối Giữa Đời Tạm",
+            "scripture_main": "Ma-thi-ơ 6:25-34 & Đa-ni-ên 2:44",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Bản Chất Bền Vững Của Nước Trời So Với Sự Hư Hoại Của Thế Gian",
+                    "scripture": "Đa-ni-ên 2:44; I Giăng 2:17",
+                    "exposition": "Mọi đế chế quyền lực, danh vọng và của cải trần gian rồi sẽ qua đi như rơm rác; chỉ có Vương quốc của Đức Chúa Trời tồn tại đời đời.",
+                    "application": "Dừng việc đặt nền tảng đời sống trên những điều tạm bợ; chuyển dời trung tâm đầu tư cuộc đời vào cõi vĩnh hằng."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Mệnh Lệnh Tìm Kiếm: Đặt Nước Chúa Lên Trên Mọi Lo Lắng Cơm Áo",
+                    "scripture": "Ma-thi-ơ 6:31-33",
+                    "exposition": "Chúa Giê-xu thấu hiểu nhu cầu của con cái Ngài. Mệnh lệnh 'Hãy tìm kiếm trước hết' là một lời cam kết thần thượng: Chúa sẽ chu cấp mọi nhu cầu thuộc thể khi ta ưu tiên ý chỉ Ngài.",
+                    "application": "Chữa lành căn bệnh lo âu bằng sự tin cậy Đấng Cha nuôi chim trời và mặc đẹp cho hoa huệ ngoài đồng."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Lối Sống Công Dân Nước Trời: Thể Hiện Quyền Cai Trị Của Vua Giê-xu",
+                    "scripture": "Ma-thi-ơ 5:13-16; Rô-ma 14:17",
+                    "exposition": "Nước Đức Chúa Trời không phải là ăn uống, mà là sự công bình, bình an và vui mừng trong Đức Thánh Linh. Chúng ta là muối của đất và ánh sáng soi rọi tình yêu Chúa.",
+                    "application": "Thực thi công lý, lòng thương xót và sự khiêm nhường trong gia đình, nơi làm việc và xã hội."
+                }
+            ],
+            "reflection_questions": [
+                "Lĩnh vực nào trong đời sống bạn (tài chính, thời gian, tham vọng) đang cạnh tranh với quyền làm Vua của Chúa Giê-xu?",
+                "Quan niệm 'Nước Trời đã đến nhưng chưa hoàn tất' giúp bạn giữ sự vững lòng như thế nào khi đối diện với đau khổ và bất công?"
+            ]
+        }
+    },
+    "paschal_atonement": {
+        "id": "paschal_atonement",
+        "title_vi": "Chiên Con Lễ Vượt Qua & Sự Chuộc Tội Thay Thế",
+        "title_en": "The Paschal Lamb & Substitutionary Atonement",
+        "category": "Kitô Học & Tế Tự (Christology & Typology)",
+        "color": "#f43f5e",
+        "badge_class": "rose",
+        "golden_verse": "Xuất Ê-díp-tô Ký 12:13 / Ê-sai 53:5 / Giăng 1:29 / I Cô-rinh-tô 5:7",
+        "summary": "Dòng chảy huyết chuộc tội xuyên suốt Kinh Thánh: Chiên con A-bên, chiên con núi Mô-ri-a, Lễ Vượt Qua, Chiên Con câm nín Ê-sai 53, và Chiên Con trên ngai Khải Huyền.",
+        "redemptive_thesis": "Đức Chúa Trời là Đấng công bình tuyệt đối không thể bỏ qua tội lỗi; Ngài đã tự mình chu cấp Chiên Con trọn vẹn là chính Con Độc Sanh của Ngài để gánh chịu cơn thịnh nộ thay thế cho nhân loại tội lỗi.",
+        "scriptures": [
+            {"ref": "Sáng-thế Ký 22:7-8", "testament": "OT", "role": "Lời Tiên Tri Đức Chúa Trời Tự Sắm Sẵn", "key_phrase": "Đức Chúa Trời sẽ tự sắm sẵn chiên con cho của lễ thiêu"},
+            {"ref": "Xuất Ê-díp-tô Ký 12:3-13", "testament": "OT", "role": "Huyết Chiên Con Lễ Vượt Qua", "key_phrase": "Khi Ta thấy huyết đó, thì sẽ vượt qua các ngươi"},
+            {"ref": "Lê-vi Ký 16:21-22", "testament": "OT", "role": "Con Dê Gánh Tội Ngày Đại Lễ Chuộc Tội", "key_phrase": "Con dê đực nầy sẽ mang trên mình mọi tội ác của họ"},
+            {"ref": "Ê-sai 53:4-7", "testament": "OT", "role": "Đầy Tớ Chịu Khổ Như Chiên Con", "key_phrase": "Ngài vì tội lỗi chúng ta mà bị vết, người như chiên con bị dắt đến hàng làm thịt"},
+            {"ref": "Giăng 1:29", "testament": "NT", "role": "Lời Nhận Diện Của Giăng Báp-tít", "key_phrase": "Kìa, Chiên Con của Đức Chúa Trời, là Đấng cất tội lỗi thế gian đi"},
+            {"ref": "I Cô-rinh-tô 5:7", "testament": "NT", "role": "Đấng Christ Là Chiên Con Lễ Vượt Qua", "key_phrase": "Vì Đấng Christ là con sinh Lễ Vượt Qua của chúng ta, đã bị hi sinh rồi"},
+            {"ref": "I Phi-e-rơ 1:18-19", "testament": "NT", "role": "Giá Chuộc Bằng Huyết Báu", "key_phrase": "Bằng huyết báu Đấng Christ, dường như huyết chiên con không lỗi không vít"},
+            {"ref": "Khải-huyền 5:6-12", "testament": "NT", "role": "Chiên Con Đã Bị Giết Trên Ngai", "key_phrase": "Chiên Con đã chịu chết là xứng đáng nhận lấy quyền thế, giàu có và khôn ngoan"}
+        ],
+        "characters": [
+            {"name": "A-bên", "role": "Người dâng sinh tế chiên đầu lòng", "testament": "OT", "era": "Thuở Ban Đầu", "significance": "Dâng sinh tế đức tin được Chúa nhậm lời."},
+            {"name": "Áp-ra-ham & Y-sác", "role": "Hình bóng phụ tử trên núi Mô-ri-a", "testament": "OT", "era": "Tổ Phụ", "significance": "Đức Chúa Trời chu cấp con chiên đực mắc sừng trong bụi cây thay thế cho Y-sác."},
+            {"name": "Môi-se", "role": "Người truyền lệnh bôi huyết chiên con", "testament": "OT", "era": "Xuất Hành", "significance": "Thiết lập Lễ Vượt Qua cho toàn dân tộc Y-sơ-ra-ên."},
+            {"name": "Chúa Giê-xu", "role": "Chiên Con Thật Của Đức Chúa Trời", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Chết trên thập tự giá đúng vào giờ dâng chiên tế lễ Vượt Qua."}
+        ],
+        "events": [
+            {"name": "Lễ Vượt Qua Đêm Thoát Khỏi Ai Cập", "period": "Xuất Hành", "significance": "Huyết chiên con cứu sống các con đầu lòng của tuyển dân khỏi thiên sứ hủy diệt."},
+            {"name": "Ngày Đại Lễ Chuộc Tội (Yom Kippur)", "period": "Xuất Hành", "significance": "Thầy tế lễ thượng phẩm đem huyết vào nơi Chí Thánh rưới lên nắp thi ân."},
+            {"name": "Sự Đóng Đinh Trên Đồi Gô-gô-tha", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Bức màn đền thờ xé đôi từ trên xuống dưới; con đường vào nơi Chí Thánh được mở ra."}
+        ],
+        "doctrines": [
+            {"name": "Sự Chuộc Tội Thay Thế Hình Phạt (Penal Substitutionary Atonement)", "summary": "Chúa Giê-xu chịu chết thay cho kẻ có tội, gánh chịu cơn thạnh nộ công chính của Đức Chúa Trời đối với tội nhân."},
+            {"name": "Nắp Thi Ân & Sự Nguôi Giận (Propitiation)", "summary": "Huyết Đấng Christ làm thỏa mãn trọn vẹn đức thánh khiết và biến cơn thạnh nộ thành ân điển thương xót."},
+            {"name": "Sự Cứu Chuộc Đời Đời (Eternal Redemption)", "summary": "Chỉ một lần dâng chính mình làm của lễ trọn vẹn, Ngài đã sắm sẵn sự cứu rỗi đời đời không bao giờ phải lặp lại."}
+        ],
+        "eras_progression": [
+            {"era_name": "Sáng Tạo", "revelation_step": "A-bên dâng chiên đầu lòng; sự đổ huyết của sinh tế vô tội làm đẹp lòng Chúa.", "scripture": "Sáng-thế Ký 4:4", "focus": "Bình minh tế tự"},
+            {"era_name": "Tổ Phụ", "revelation_step": "Trên núi Mô-ri-a, Đức Chúa Trời chu cấp chiên đực thay thế cho Y-sác: 'Đức Giê-hô-va Di-rê'.", "scripture": "Sáng-thế Ký 22:13-14", "focus": "Đấng Chu Cấp sinh tế"},
+            {"era_name": "Xuất Hành", "revelation_step": "Chiên con không tì vít bị giết, huyết bôi trên mày cửa để che chở khỏi sự chết.", "scripture": "Xuất Ê-díp-tô Ký 12:5-7", "focus": "Huyết bảo toàn"},
+            {"era_name": "Tiên Tri", "revelation_step": "Ê-sai mặc khải Đầy tớ chịu khổ như chiên con bị dắt đến hàng làm thịt vì tội ác chúng ta.", "scripture": "Ê-sai 53:7", "focus": "Chiên Con cam chịu"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Chúa Giê-xu bị đóng đinh đúng kỳ Lễ Vượt Qua: 'Mọi sự đã trọn!'.", "scripture": "Giăng 19:30", "focus": "Sự hy sinh tối thượng"},
+            {"era_name": "Hội Thánh", "revelation_step": "Sứ đồ công bố Huyết Chiên Con không tì vít cứu chuộc người tin khỏi nếp sống hư không.", "scripture": "I Phi-e-rơ 1:19", "focus": "Nền tảng niềm tin"},
+            {"era_name": "Khải Huyền", "revelation_step": "Toàn thể thiên sứ và thánh đồ sấp mình thờ lạy Chiên Con đã bị giết nay ngự trên ngôi vinh hiển muôn đời.", "scripture": "Khải-huyền 5:12", "focus": "Sự tôn vinh vĩnh cửu"}
+        ],
+        "citations": [
+            {"author": "Leon Morris", "work": "The Apostolic Preaching of the Cross", "quote": "Nếu tước bỏ ý niệm về sự thay thế hình phạt ra khỏi cái chết của Đấng Christ, thập tự giá sẽ biến thành một bi kịch vô nghĩa thay vì là chiến thắng vĩ đại cứu chuộc thế gian.", "tradition": "Biblical Theology"},
+            {"author": "John Stott", "work": "The Cross of Christ", "quote": "Tại thập tự giá, Đức Chúa Trời trong sự thánh khiết không khoan nhượng tội lỗi, nhưng trong tình yêu vô bờ bến, chính Ngài đã mang lấy án phạt ấy thay cho chúng ta.", "tradition": "Anglican Evangelical"}
+        ],
+        "homiletical_outline": {
+            "title": "Huyết Chiên Con: Con Đường Duy Nhất Thoát Khỏi Sự Phán Xét",
+            "scripture_main": "Xuất Ê-díp-tô Ký 12:1-13 & I Phi-e-rơ 1:18-21",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Mọi Người Đều Ở Dưới Cơn Thịnh Nộ Của Sự Phán Xét Công Bình",
+                    "scripture": "Xuất 12:12; Rô-ma 1:18",
+                    "exposition": "Đêm Lễ Vượt Qua, cơn phán xét của Đức Chúa Trời đi qua toàn xứ Ai Cập. Không một gia đình nào an toàn nhờ đạo đức hay vị thế xã hội; sự phán xét không chừa một ai nếu không có huyết.",
+                    "application": "Nhận biết tính chất nghiêm trọng của sự phán xét đời đời và nhu cầu cấp thiết phải có sự che chở của Huyết Chúa."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Chiên Con Vô Tội Chịu Chết Thay Cho Kẻ Có Tội",
+                    "scripture": "Xuất 12:5; Ê-sai 53:5-6",
+                    "exposition": "Chiên con phải hoàn toàn không tật nguyền, chịu chết để con đầu lòng được sống. Chúa Giê-xu là Đấng vô tội tuyệt đối đã mang lấy hình phạt thay cho chúng ta.",
+                    "application": "Chiêm ngưỡng tình yêu hy sinh vô điều kiện của Chúa Cứu Thế; sống với lòng biết ơn và sự kính sợ thánh khiết."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Sự An Nghỉ Đời Đời Dưới Lời Hứa: 'Khi Ta Thấy Huyết, Ta Sẽ Vượt Qua'",
+                    "scripture": "Xuất 12:13; Rô-ma 8:1",
+                    "exposition": "Sự an toàn của người Y-sơ-ra-ên không nằm ở cảm xúc hay mức độ tự tin của họ bên trong ngôi nhà, mà nằm ở Huyết Chiên Con đã bôi ngoài cửa trước mắt Đức Chúa Trời.",
+                    "application": "Đặt sự tin quyết救rỗi vào Lời Hứa bất biến của Chúa chứ không nương dựa vào cảm xúc lên xuống thất thường của bản thân."
+                }
+            ],
+            "reflection_questions": [
+                "Tại sao chỉ có Huyết Chiên Con mới có thể làm dịu cơn thạnh nộ thánh khiết của Đức Chúa Trời đối với tội lỗi?",
+                "Sự chiêm ngưỡng Chiên Con bị giết trên ngai trong Khải Huyền 5 khích lệ tinh thần thờ phượng của bạn ra sao?"
+            ]
+        }
+    },
+    "holy_spirit": {
+        "id": "holy_spirit",
+        "title_vi": "Đức Thánh Linh: Sự Hiện Diện, Quyền Năng & Tái Sinh",
+        "title_en": "The Holy Spirit: Presence, Power & Regeneration",
+        "category": "Thánh Linh Học (Pneumatology)",
+        "color": "#10b981",
+        "badge_class": "emerald",
+        "golden_verse": "Ê-xê-chi-ên 36:26-27 / Giăng 14:16-17 / Công-vụ 1:8 / Ga-la-ti 5:22-23",
+        "summary": "Thần khí Đức Chúa Trời từ sự sáng tạo ban đầu, xức dầu cho các quan xét và tiên tri, ngự xuống ngày Lễ Ngũ Tuần, ấn chứng và sinh bông trái trong đời sống môn đồ.",
+        "redemptive_thesis": "Đức Thánh Linh là Đấng Thần Hựu hiện thực hóa công trình cứu chuộc của Đấng Christ trong lòng người tin, ban quyền năng làm chứng, tái sinh tấm lòng và gìn giữ Hội Thánh đến ngày vinh quang.",
+        "scriptures": [
+            {"ref": "Sáng-thế Ký 1:2", "testament": "OT", "role": "Thần Linh Sáng Tạo Ban Đầu", "key_phrase": "Thần Đức Chúa Trời vận hành trên mặt nước"},
+            {"ref": "Giô-ên 2:28-29", "testament": "OT", "role": "Lời Hứa Tuôn Đổ Thần Linh", "key_phrase": "Ta sẽ đổ Thần Ta trên các loài xác thịt"},
+            {"ref": "Ê-xê-chi-ên 36:26-27", "testament": "OT", "role": "Tấm Lòng Mới Và Thần Mới", "key_phrase": "Ta sẽ ban lòng mới và đặt Thần mới trong các ngươi"},
+            {"ref": "Giăng 14:16-17", "testament": "NT", "role": "Đấng An Ủi & Chân Lý Đời Đời", "key_phrase": "Ngài sẽ ban cho các ngươi một Đấng Yên ủi khác, để ở với các ngươi đời đời"},
+            {"ref": "Công-vụ 1:8", "testament": "NT", "role": "Quyền Phép Để Làm Chứng Nhân", "key_phrase": "Các ngươi sẽ nhận lấy quyền phép, và làm chứng về Ta"},
+            {"ref": "Công-vụ 2:1-4", "testament": "NT", "role": "Sự Tuôn Đổ Ngày Ngũ Tuần", "key_phrase": "Hết thảy đều được đầy dẫy Đức Thánh Linh"},
+            {"ref": "Rô-ma 8:14-16", "testament": "NT", "role": "Thần Linh Nhận Làm Con (Abba, Cha)", "key_phrase": "Thần Linh làm chứng cho lòng chúng ta rằng chúng ta là con cái Đức Chúa Trời"},
+            {"ref": "Ga-la-ti 5:22-23", "testament": "NT", "role": "Bông Trái Thánh Linh Trong Nếp Sống", "key_phrase": "Trái của Thánh Linh là lòng yêu thương, vui mừng, bình an, nhịn nhục..."}
+        ],
+        "characters": [
+            {"name": "Bết-sa-lê-ên", "role": "Thợ thủ công được Thần Chúa ban sự khôn ngoan", "testament": "OT", "era": "Xuất Hành", "significance": "Được đầy dẫy Thần Đức Chúa Trời để xây dựng Đền Tạm."},
+            {"name": "Đa-vít", "role": "Vua được Thần Chúa cảm động", "testament": "OT", "era": "Vương Quốc Thống Nhất", "significance": "Cầu xin Chúa đừng cất Thánh Linh khỏi người sau khi vấp ngã (Thi thiên 51)."},
+            {"name": "Sứ đồ Phi-e-rơ", "role": "Nhân chứng ngày Ngũ Tuần", "testament": "NT", "era": "Hội Thánh Ban Đầu", "significance": "Được đầy dẫy Thánh Linh dạn dĩ giảng đạo dẫn dắt 3.000 người tin Chúa."},
+            {"name": "Sứ đồ Phao-lô", "role": "Giảng giải thần học về Thánh Linh", "testament": "NT", "era": "Hội Thánh Ban Đầu", "significance": "Viết về ân tứ, ấn chứng và nếp sống bước đi theo Thánh Linh."}
+        ],
+        "events": [
+            {"name": "Lễ Ngũ Tuần Tại Phòng Cao Giê-ru-sa-lem", "period": "Hội Thánh Ban Đầu", "significance": "Thánh Linh ngự xuống như gió thổi ào ào và lưỡi như lửa; Hội Thánh Đấng Christ khai sinh."},
+            {"name": "Thánh Linh Ngự Xuống Trên Nhà Cọt-nây", "period": "Hội Thánh Ban Đầu", "significance": "Ân điển Thánh Linh tuôn đổ trên người ngoại bang, phá vỡ mọi rào cản phân biệt."}
+        ],
+        "doctrines": [
+            {"name": "Sự Thân Vị Của Thánh Linh (Personality of the Spirit)", "summary": "Đức Thánh Linh là Thân Vị thứ ba của Ba Ngôi Đức Chúa Trời, có lý trí, cảm xúc và ý chí, không phải là một lực lượng vô tri."},
+            {"name": "Sự Tái Sinh (Regeneration)", "summary": "Công tác siêu nhiên của Thánh Linh ban sự sống mới từ cõi chết thuộc linh cho người tin Chúa."},
+            {"name": "Ấn Chứng & Bảo Chứng (Sealing & Guarantee)", "summary": "Thánh Linh ngự vào lòng người tin như chiếc ấn sở hữu của Chúa và là tiền cọc bảo chứng cho cơ nghiệp vinh quang."}
+        ],
+        "eras_progression": [
+            {"era_name": "Sáng Tạo", "revelation_step": "Thần Đức Chúa Trời vận hành đem lại trật tự và sự sống cho cõi vũ trụ hỗn mang.", "scripture": "Sáng-thế Ký 1:2", "focus": "Sáng tạo ban đầu"},
+            {"era_name": "Quan Xét & Vương Quốc", "revelation_step": "Thánh Linh ngự trên từng cá nhân (Ghi-đê-ôn, Sam-sôn, Đa-vít) để hoàn thành sứ mạng đặc biệt.", "scripture": "Quan Xét 6:34", "focus": "Xức dầu quyền năng"},
+            {"era_name": "Tiên Tri", "revelation_step": "Lời hứa về một ngày Thần Chúa sẽ ngự vào trong lòng mọi con cái Chúa và thay đổi bản tính.", "scripture": "Ê-xê-chi-ên 36:27", "focus": "Lời hứa nội trú"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Chúa Giê-xu chịu phép báp-tem bởi Thánh Linh, thi hành chức vụ trong Thánh Linh và hứa ban Đấng Yên Ủi.", "scripture": "Giăng 14:16", "focus": "Gương mẫu trọn vẹn"},
+            {"era_name": "Ngũ Tuần & Hội Thánh", "revelation_step": "Thánh Linh ngự xuống nội trú vĩnh viễn trong mọi tín hữu, hiệp nhất thành một Thân Thể.", "scripture": "Công-vụ 2:4", "focus": "Tuôn đổ dồi dào"},
+            {"era_name": "Khải Huyền", "revelation_step": "Thánh Linh và Vợ Mới (Hội Thánh) cùng cất tiếng kêu mời: 'Hãy đến!'.", "scripture": "Khải-huyền 22:17", "focus": "Mời gọi cứu rỗi cuối cùng"}
+        ],
+        "citations": [
+            {"author": "Sinclair Ferguson", "work": "The Holy Spirit", "quote": "Đức Thánh Linh không bao giờ hướng sự chú ý về chính Ngài; mục đích tối thượng của Ngài trong cõi đời đời và trong lịch sử là làm sáng danh Chúa Giê-xu Christ và biến đổi chúng ta nên giống hình ảnh Ngài.", "tradition": "Reformed Pneumatology"},
+            {"author": "A.W. Tozer", "work": "The Counselor", "quote": "Hội Thánh không thể tồn tại bằng tổ chức hay tài khéo của con người; nếu Đức Thánh Linh rút đi, Hội Thánh sẽ chết ngay tức khắc cho dù mọi bộ máy vẫn quay đều.", "tradition": "Evangelical Devotional"}
+        ],
+        "homiletical_outline": {
+            "title": "Đầy Dẫy Đức Thánh Linh: Đời Sống Năng Quyền và Bông Trái Thuộc Linh",
+            "scripture_main": "Ga-la-ti 5:16-26 & Công-vụ 1:8",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Mệnh Lệnh Bước Đi Theo Thánh Linh Thay Vì Chiều Theo Xác Thịt",
+                    "scripture": "Ga-la-ti 5:16-18; Rô-ma 8:5-8",
+                    "exposition": "Có một trận chiến thuộc linh thường trực giữa bản tính xác thịt cũ và sự hướng dẫn của Thánh Linh. Sức mạnh để chiến thắng không đến từ ý chí con người mà từ sự đầu phục Thánh Linh.",
+                    "application": "Từ bỏ những ham muốn bất khiết; nuôi dưỡng tâm linh bằng Lời Chúa và lời cầu nguyện hằng ngày."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Bông Trái Của Thánh Linh: Bản Tính Đấng Christ Nở Hoa Trong Môn Đồ",
+                    "scripture": "Ga-la-ti 5:22-23; Giăng 15:4-5",
+                    "exposition": "Bông trái Thánh Linh là một thể thống nhất (danh từ số ít) phản chiếu trọn vẹn mỹ đức của Chúa Giê-xu: yêu thương, vui mừng, bình an, nhẫn nhục, nhân từ, hiền lành, trung tín, nhu mì, tiết độ.",
+                    "application": "Duyệt xét các mối quan hệ trong gia đình và Hội Thánh: bông trái nào đang cần được Thánh Linh vun trồng thêm?"
+                },
+                {
+                    "point_number": 3,
+                    "title": "Quyền Phép Để Làm Chứng Nhân Sống Động Cho Nước Trời",
+                    "scripture": "Công-vụ 1:8; 4:31",
+                    "exposition": "Thánh Linh không được ban cho để chúng ta thỏa mãn cảm xúc cá nhân, mà để ban thẩm quyền và lòng dạn dĩ rao truyền Phúc Âm của Đấng Christ cho đến cùng trái đất.",
+                    "application": "Cầu xin Chúa ban lòng can đảm để chia sẻ tình yêu và sự cứu rỗi của Chúa cho những người xung quanh ngay trong tuần này."
+                }
+            ],
+            "reflection_questions": [
+                "Làm thế nào để nhận biết bạn đang 'bước đi theo Thánh Linh' thay vì nương cậy sức riêng?",
+                "Sự hiện diện của Thánh Linh an ủi bạn thế nào trong những giai đoạn cô đơn hay thử thách đức tin?"
+            ]
+        }
+    },
+    "resurrection_hope": {
+        "id": "resurrection_hope",
+        "title_vi": "Sự Phục Sinh & Hy Vọng Sống Đời Đời",
+        "title_en": "The Resurrection & Living Hope",
+        "category": "Cánh Chung Học (Eschatology & Hope)",
+        "color": "#06b6d4",
+        "badge_class": "cyan",
+        "golden_verse": "Gióp 19:25 / Giăng 11:25 / I Cô-rinh-tô 15:20 / I Phi-e-rơ 1:3",
+        "summary": "Chiến thắng lịch sử của Đấng Christ trên sự chết và mộ mả, nền tảng cho sự phục sinh thân thể của tín hữu và sự vinh hiển trong trời mới đất mới.",
+        "redemptive_thesis": "Sự sống lại của Chúa Giê-xu là sự kiện lịch sử làm đảo lộn trật tự thế giới, bảo chứng cho sự xưng công bình của chúng ta và là bằng chứng không thể chối cãi rằng sự chết đã bị nuốt mất trong sự đắc thắng.",
+        "scriptures": [
+            {"ref": "Gióp 19:25-27", "testament": "OT", "role": "Lời Tuyên Xưng Niềm Tin Phục Sinh Sớm Nhất", "key_phrase": "Tôi biết rằng Đấng Cứu Chuộc tôi hằng sống"},
+            {"ref": "Thi-thiên 16:9-11", "testament": "OT", "role": "Lời Tiên Tri Thân Thể Không Hư Nát", "key_phrase": "Chúa sẽ chẳng để người thánh Chúa thấy sự hư nát"},
+            {"ref": "Đa-ni-ên 12:2-3", "testament": "OT", "role": "Sự Sống Lại Cuối Cùng", "key_phrase": "Nhiều kẻ ngủ trong bụi đất sẽ thức dậy, kẻ nầy để được sự sống đời đời"},
+            {"ref": "Giăng 11:25-26", "testament": "NT", "role": "Lời Tuyên Bố Thần Thượng Của Chúa Cứu Thế", "key_phrase": "Ta là sự sống lại và sự sống; kẻ nào tin Ta sẽ sống, dẫu đã chết rồi"},
+            {"ref": "Ma-thi-ơ 28:1-7", "testament": "NT", "role": "Ngôi Mộ Trống Buổi Sáng Phục Sinh", "key_phrase": "Ngài không ở đây đâu; Ngài đã sống lại rồi"},
+            {"ref": "I Cô-rinh-tô 15:20-26", "testament": "NT", "role": "Trái Đầu Mùa Của Kẻ Ngủ", "key_phrase": "Nhưng bây giờ, Đấng Christ đã từ kẻ chết sống lại, là trái đầu mùa của những kẻ ngủ"},
+            {"ref": "I Phi-e-rơ 1:3-4", "testament": "NT", "role": "Hy Vọng Sống Bởi Sự Sống Lại", "key_phrase": "Ngài đã tái sanh chúng ta vào một hy vọng sống, bởi sự sống lại của Đức Chúa Giê-xu"},
+            {"ref": "Khải-huyền 20:4-6", "testament": "NT", "role": "Sự Sống Lại Đầu Tiên", "key_phrase": "Phước thay và thánh thay cho những kẻ có phần trong sự sống lại thứ nhất"}
+        ],
+        "characters": [
+            {"name": "Gióp", "role": "Gương kiên trì giữa đau khổ", "testament": "OT", "era": "Tổ Phụ", "significance": "Tuyên bố đức tin thấy Đấng Cứu Chuộc trong xác thịt sau khi da thịt bị tiêu hủy."},
+            {"name": "Ma-ri Ma-đơ-len", "role": "Sứ giả đầu tiên của buổi sáng phục sinh", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Người đầu tiên gặp Chúa phục sinh tại ngôi mộ vườn."},
+            {"name": "Thô-ma", "role": "Môn đồ được cất bỏ nghi ngờ", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Chạm vào vết thương phục sinh và kêu lên: 'Lạy Chúa tôi và Đức Chúa Trời tôi!'."},
+            {"name": "Sứ đồ Phao-lô", "role": "Người luận chứng chương 15 I Cô-rinh-tô", "testament": "NT", "era": "Hội Thánh Ban Đầu", "significance": "Chứng minh nếu Đấng Christ không sống lại thì đức tin chúng ta là vô ích."}
+        ],
+        "events": [
+            {"name": "Ngôi Mộ Trống Ngày Thứ Nhất Trong Tuần", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Hòn đá lấp mộ bị lăn ra, thiên sứ loan báo Đấng Christ đã sống lại."},
+            {"name": "Chúa Phục Sinh Hiện Ra Cho Hơn 500 Anh Em", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Bằng chứng lịch sử xác thực với vô số nhân chứng sống thời bấy giờ."}
+        ],
+        "doctrines": [
+            {"name": "Sự Phục Sinh Thân Thể (Bodily Resurrection)", "summary": "Chúa Giê-xu sống lại trong một thân thể thực hữu bằng thịt và xương, không phải một bóng ma hay ảo ảnh."},
+            {"name": "Bảo Chứng Xưng Công Bình", "summary": "Sự sống lại chứng minh của lễ của Chúa Giê-xu đã được Đức Chúa Cha nhậm lời hoàn toàn (Rô-ma 4:25)."},
+            {"name": "Thân Thể Hóa Hình Vinh Hiển", "summary": "Thân thể yếu đuối hèn mạt của người tin sẽ được biến hóa nên giống thân thể vinh quang của Đấng Christ."}
+        ],
+        "eras_progression": [
+            {"era_name": "Tổ Phụ & Gióp", "revelation_step": "Niềm tin mãnh liệt vào Đấng Cứu Chuộc hằng sống giữa tro bụi hoạn nạn.", "scripture": "Gióp 19:25", "focus": "Niềm hy vọng sơ khởi"},
+            {"era_name": "Vương Quốc & Thi Ca", "revelation_step": "Đa-vít tiên tri Đấng Thánh của Chúa sẽ không bao giờ thấy sự hư nát.", "scripture": "Thi-thiên 16:10", "focus": "Lời hứa thi ca"},
+            {"era_name": "Lưu Đày & Tiên Tri", "revelation_step": "Đa-ni-ên thấy ngày phục sinh toàn thể: Kẻ thức dậy hưởng sự sống đời đời, kẻ bị sỉ nhục muôn đời.", "scripture": "Đa-ni-ên 12:2", "focus": "Sự công lý tối hậu"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Ngôi mộ trống sáng Chúa Nhật; Đấng Christ đánh tan quyền lực âm phủ và sự chết.", "scripture": "Ma-thi-ơ 28:6", "focus": "Đắc thắng lịch sử"},
+            {"era_name": "Hội Thánh Ban Đầu", "revelation_step": "Trọng tâm bài giảng của các sứ đồ là Đấng Christ đã sống lại từ cõi chết.", "scripture": "Công-vụ 2:32", "focus": "Lõi của Kerygma"},
+            {"era_name": "Khải Huyền", "revelation_step": "Đấng Phục Sinh tuyên bố: 'Ta là Đấng Hằng Sống, Ta đã chết, kìa nay Ta sống đời đời, cầm chìa khóa của sự chết và âm phủ'.", "scripture": "Khải-huyền 1:18", "focus": "Chủ tể sự sống"}
+        ],
+        "citations": [
+            {"author": "N.T. Wright", "work": "The Resurrection of the Son of God", "quote": "Sự phục sinh không phải là một cách nói ẩn dụ cho sự tiếp nối tư tưởng của Chúa Giê-xu; nó là sự tái sáng tạo vật lý cụ thể, khởi đầu cho trời mới đất mới của Đức Chúa Trời ngay trong lòng thế giới cũ.", "tradition": "Biblical Studies"},
+            {"author": "C.S. Lewis", "work": "Miracles", "quote": "Người Cơ Đốc không rao giảng về một triết lý luân lý đạo đức; họ loan báo một biến cố lịch sử: Đấng Christ đã đội mồ sống lại và cánh cửa nhà tù của tử thần đã bị đạp đổ từ bên trong.", "tradition": "Christian Apologetics"}
+        ],
+        "homiletical_outline": {
+            "title": "Ngôi Mộ Trống và Hy Vọng Bất Diệt: Chiến Thắng Của Đấng Phục Sinh",
+            "scripture_main": "I Cô-rinh-tô 15:12-26 & I Phi-e-rơ 1:3-5",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Tầm Quan Trọng Tuyệt Đối Của Sự Kiện Phục Sinh Trong Đức Tin",
+                    "scripture": "I Cô-rinh-tô 15:14-19",
+                    "exposition": "Nếu Đấng Christ không sống lại, việc giảng dạy là vô ích, đức tin là hão huyền và chúng ta vẫn còn nguyên trong tội lỗi mình. Sự phục sinh là trụ cột xác thực toàn bộ Cơ Đốc giáo.",
+                    "application": "Xây dựng đức tin trên thực tế lịch sử vững chắc chứ không phải trên những huyền thoại hay cảm xúc chủ quan."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Đấng Christ Là Trái Đầu Mùa Bảo Chứng Cho Sự Phục Sinh Của Kẻ Tin",
+                    "scripture": "I Cô-rinh-tô 15:20-23",
+                    "exposition": "Trái đầu mùa bảo đảm rằng cả mùa gặt chắc chắn sẽ đến. Sự sống lại của Chúa Giê-xu là lời hứa chắc chắn rằng mọi kẻ an giấc trong Ngài sẽ được phục sinh với thân thể vinh quang.",
+                    "application": "Xua tan nỗi sợ hãi sự chết; nhìn nhận cái chết của người tin Chúa chỉ là một giấc ngủ tạm chờ ngày kèn thổi vinh quang."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Đời Sống Mới Ngay Hôm Nay Dưới Năng Quyền Của Sự Phục Sinh",
+                    "scripture": "Rô-ma 6:4; Phi-líp 3:10",
+                    "exposition": "Năng quyền đã khiến Chúa Giê-xu sống lại từ cõi chết đang hành động trong lòng người tin để đắc thắng tội lỗi, vượt qua nghịch cảnh và kiên trì phục vụ Chúa.",
+                    "application": "Sống can đảm, dấn thân hầu việc Chúa với sự biết chắc rằng mọi công khó của chúng ta trong Chúa không bao giờ là vô ích."
+                }
+            ],
+            "reflection_questions": [
+                "Lẽ thật về sự sống lại của Chúa Giê-xu thay đổi cách bạn đối diện với mất mát và tang chế như thế nào?",
+                "Bạn đang kinh nghiệm 'năng quyền phục sinh' của Chúa thế nào trong việc đắc thắng những cám dỗ thường ngày?"
+            ]
+        }
+    },
+    "prayer_communion": {
+        "id": "prayer_communion",
+        "title_vi": "Sự Cầu Nguyện, Cầu Thay & Tương Giao Mật Thiết",
+        "title_en": "Prayer, Intercession & Intimate Communion",
+        "category": "Linh Đạo (Spiritual Life & Intercession)",
+        "color": "#14b8a6",
+        "badge_class": "teal",
+        "golden_verse": "Sáng-thế Ký 18:23 / Thi-thiên 51:10 / Ma-thi-ơ 6:9-13 / Hê-bơ-rơ 4:16",
+        "summary": "Mạch suối cầu nguyện xuyên suốt lịch sử cứu rỗi: Lời cầu thay của Áp-ra-ham cho Sô-đôm, Môi-se trên đỉnh núi, Bài Cầu Nguyện Chung của Chúa Giê-xu và ngai ân điển.",
+        "redemptive_thesis": "Cầu nguyện không phải là cố gắng bẻ cong ý muốn của Đức Chúa Trời theo ý con người, mà là sự tương giao thân mật của người con thảo với Cha Thiên Thượng, bước vào quyền cầu thay trong danh Đấng Christ.",
+        "scriptures": [
+            {"ref": "Sáng-thế Ký 18:22-33", "testament": "OT", "role": "Mẫu Mực Cầu Thay Của Áp-ra-ham", "key_phrase": "Đấng đoán xét toàn thế gian, há lại không làm sự công bình sao?"},
+            {"ref": "Xuất Ê-díp-tô Ký 32:30-32", "testament": "OT", "role": "Lời Cầu Thay Quên Mình Của Môi-se", "key_phrase": "Xin Chúa tha tội cho họ; bằng không, xin xóa tên tôi khỏi sách Chúa"},
+            {"ref": "I Các Vua 18:36-39", "testament": "OT", "role": "Lời Cầu Nguyện Lửa Giáng Trên Núi Cạt-mên", "key_phrase": "Hỡi Đức Giê-hô-va, xin nhậm lời tôi, để dân nầy biết rằng Ngài là Đức Chúa Trời"},
+            {"ref": "Thi-thiên 51:1-12", "testament": "OT", "role": "Bài Ca Ăn Năn Thống Hối Của Đa-vít", "key_phrase": "Đức Chúa Trời ôi! xin dựng nên trong tôi một lòng trong sạch"},
+            {"ref": "Đa-ni-ên 9:3-19", "testament": "OT", "role": "Cầu Thay Theo Lời Hứa Kinh Thánh", "key_phrase": "Lạy Chúa, xin nghe! Lạy Chúa, xin tha thứ! Lạy Chúa, xin đoái xem và hành động!"},
+            {"ref": "Ma-thi-ơ 6:9-13", "testament": "NT", "role": "Bài Cầu Nguyện Kiểu Mẫu Của Chúa Giê-xu", "key_phrase": "Lạy Cha chúng tôi ở trên trời, Danh Cha được thánh, Nước Cha được đến"},
+            {"ref": "Giăng 17:1-26", "testament": "NT", "role": "Lời Cầu Nguyện Thầy Tế Lễ Thượng Phẩm", "key_phrase": "Con cầu nguyện cho họ, để họ hiệp làm một như Cha ở trong Con và Con ở trong Cha"},
+            {"ref": "Hê-bơ-rơ 4:14-16", "testament": "NT", "role": "Vững Vàng Đến Gần Ngai Ân Điển", "key_phrase": "Hãy vững lòng đến gần ngai ân điển, để nhận được sự thương xót và tìm được ơn giúp đỡ"}
+        ],
+        "characters": [
+            {"name": "Áp-ra-ham", "role": "Bạn của Đức Chúa Trời", "testament": "OT", "era": "Tổ Phụ", "significance": "Đứng trước mặt Chúa cầu thay kiên trì cho thành Sô-đôm."},
+            {"name": "Môi-se", "role": "Người nói chuyện với Chúa mặt đối mặt", "testament": "OT", "era": "Xuất Hành", "significance": "Đứng vào chỗ sứt mẻ cầu thay để cơn thạnh nộ Chúa lìa khỏi dân sự."},
+            {"name": "An-ne", "role": "Người mẹ cầu nguyện dốc đổ tâm hồn", "testament": "OT", "era": "Quan Xét & Sa-mu-ên", "significance": "Cầu xin một người con trong nước mắt và dâng Sa-mu-ên trọn đời cho Chúa."},
+            {"name": "Chúa Giê-xu", "role": "Đấng Cầu Thay Đời Đời", "testament": "NT", "era": "Chúa Giê-xu", "significance": "Dành nhiều đêm cầu nguyện trên núi và hiện đang cầu thay cho chúng ta bên hữu Cha."}
+        ],
+        "events": [
+            {"name": "Tiên Tri Ê-li Cầu Nguyện Tại Núi Cạt-mên", "period": "Vương Quốc Phân Chia", "significance": "Lửa từ trời giáng xuống thiêu rụi của lễ chứng minh Giê-hô-va là Chân Thần duy nhất."},
+            {"name": "Chúa Giê-xu Cầu Nguyện Tại Vườn Ghết-sê-ma-nê", "period": "Cuộc Đời Chúa Giê-xu", "significance": "Mồ hôi trở nên như giọt máu lớn: 'Xin ý Cha được nên, chớ không theo ý Con'."}
+        ],
+        "doctrines": [
+            {"name": "Tương Giao Với Ba Ngôi (Trinitarian Communion)", "summary": "Cầu nguyện hướng lên Đức Chúa Cha, nhân danh Đức Con Giê-xu, trong quyền năng soi dẫn của Đức Thánh Linh."},
+            {"name": "Quyền Cầu Thay (Ministry of Intercession)", "summary": "Đặc ân đứng vào chỗ sứt mẻ vì tha nhân, Hội Thánh và các dân tộc chưa được cứu rỗi."},
+            {"name": "Sự Dạn Dĩ Nơi Ngai Ân Điển", "summary": "Nhờ Huyết báu Chúa Giê-xu xé bức màn ngăn cách, con cái Chúa được quyền bước thẳng vào nơi Chí Thánh tương giao với Cha."}
+        ],
+        "eras_progression": [
+            {"era_name": "Tổ Phụ", "revelation_step": "Áp-ra-ham bước đi và đàm đạo thân mật với Chúa như một người bạn tri kỷ.", "scripture": "Sáng-thế Ký 18:23", "focus": "Tương giao bạn hữu"},
+            {"era_name": "Xuất Hành", "revelation_step": "Môi-se lên núi nói chuyện với Chúa mặt đối mặt như người ta nói chuyện với bạn mình.", "scripture": "Xuất Ê-díp-tô Ký 33:11", "focus": "Mặt đối mặt"},
+            {"era_name": "Vương Quốc & Thi Ca", "revelation_step": "Các bài Thi Thiên trở thành sách cầu nguyện muôn đời với mọi cung bậc cảm xúc chân thật.", "scripture": "Thi-thiên 62:8", "focus": "Dốc đổ tâm hồn"},
+            {"era_name": "Lưu Đày", "revelation_step": "Đa-ni-ên mở cửa sổ hướng về Giê-ru-sa-lem mỗi ngày ba lần quỳ gối tạ ơn Chúa bất chấp hầm sư tử.", "scripture": "Đa-ni-ên 6:10", "focus": "Kỷ luật trung kiên"},
+            {"era_name": "Cuộc Đời Chúa Giê-xu", "revelation_step": "Chúa Giê-xu dạy môn đồ gọi Đấng Tối Cao là 'A-ba, Cha' và ban Bài Cầu Nguyện Kiểu Mẫu.", "scripture": "Ma-thi-ơ 6:9", "focus": "Mối liên hệ phụ tử"},
+            {"era_name": "Hội Thánh", "revelation_step": "Hội Thánh ban đầu dốc lòng cầu nguyện chung; nơi họ nhóm lại rúng động và đầy dẫy Thánh Linh.", "scripture": "Công-vụ 4:31", "focus": "Quyền năng hiệp nhất"},
+            {"era_name": "Khải Huyền", "revelation_step": "Lời cầu nguyện của các thánh đồ như hương thơm dâng lên trước ngai Đức Chúa Trời từ tay thiên sứ.", "scripture": "Khải-huyền 8:3-4", "focus": "Hương thơm thánh khiết"}
+        ],
+        "citations": [
+            {"author": "E.M. Bounds", "work": "Power Through Prayer", "quote": "Đức Chúa Trời không tìm kiếm những phương pháp tốt hơn, Ngài đang tìm kiếm những con người cầu nguyện tốt hơn — những người mà qua họ Thánh Linh có thể vận hành quyền năng.", "tradition": "Spiritual Classic"},
+            {"author": "Timothy Keller", "work": "Prayer: Experiencing Awe and Intimacy with God", "quote": "Cầu nguyện vừa là cuộc trò chuyện thân mật vừa là cuộc gặp gỡ quyền năng với Đấng Tạo Hóa; trong cầu nguyện, ta khám phá sự vĩ đại của Chúa và sự bình an sâu sắc nhất của linh hồn.", "tradition": "Contemporary Expository"}
+        ],
+        "homiletical_outline": {
+            "title": "Bước Vào Nơi Chí Thánh: Quyền Năng Của Đời Sống Cầu Nguyện Chân Thật",
+            "scripture_main": "Hê-bơ-rơ 4:14-16 & Ma-thi-ơ 6:5-13",
+            "points": [
+                {
+                    "point_number": 1,
+                    "title": "Đặc Ân Tiếp Cận Ngai Ân Điển Nhờ Đấng Trung Bảo Giê-xu",
+                    "scripture": "Hê-bơ-rơ 4:14-16; 10:19-22",
+                    "exposition": "Chúng ta không đến trước một vị quan tòa xa cách hay một vị thần vô cảm, mà đến trước 'Ngai Ân Điển' qua Thầy Tế Lễ Thượng Phẩm vĩ đại là Đấng đã cảm thông mọi nỗi yếu đuối của chúng ta.",
+                    "application": "Dẹp bỏ sự tự ti hay nghi ngờ; dạn dĩ thưa chuyện với Chúa mỗi ngày trong sự nhận biết địa vị con cái yêu dấu."
+                },
+                {
+                    "point_number": 2,
+                    "title": "Cầu Nguyện Trong Sự Chân Thật: Không Hình Thức Giả Hình",
+                    "scripture": "Ma-thi-ơ 6:5-8; Thi-thiên 51:6",
+                    "exposition": "Chúa Giê-xu cảnh báo thói cầu nguyện khoe khoang nơi góc phố để người ta khen ngợi. Cầu nguyện thật diễn ra nơi 'phòng riêng kín nhiệm', nơi tấm lòng trần trụi trước mắt Cha.",
+                    "application": "Thiết lập một góc cầu nguyện tĩnh lặng hằng ngày; thành thật dãi bày mọi nỗi niềm, thất vọng và tội lỗi trước mặt Chúa."
+                },
+                {
+                    "point_number": 3,
+                    "title": "Lời Cầu Thay Hiệu Nghiệm: Đồng Lao Cùng Mục Đích Của Nước Chúa",
+                    "scripture": "Ma-thi-ơ 6:9-10; I Ti-mô-thê 2:1-4",
+                    "exposition": "Cầu nguyện đạt đến đỉnh cao khi ta hướng về Danh Cha được thánh, Nước Cha được đến và Ý Cha được nên. Chúng ta được mời gọi đứng vào vị trí cầu thay cho người khác và cho thế giới.",
+                    "application": "Lập danh sách cầu thay cho gia đình, bạn hữu chưa tin Chúa, Hội Thánh và những người đang chịu hoạn nạn."
+                }
+            ],
+            "reflection_questions": [
+                "Điều gì đang cản trở đời sống cầu nguyện cá nhân của bạn nhiều nhất: sự bận rộn, nỗi nghi ngờ hay tính hình thức?",
+                "Kinh nghiệm nào đã giúp bạn nhận thấy rõ nhất lời hứa 'tìm được ơn giúp đỡ trong lúc cần dùng' của Chúa?"
+            ]
+        }
+    }
+}
+
+
+def _extract_verse_from_db(db: Session, ref: str) -> str:
+    """
+    Helper to fetch verse text from bible_verses table by reference.
+    """
+    try:
+        parts = re.findall(r'(\d+)', ref)
+        if len(parts) >= 2:
+            ch_num, v_num = int(parts[0]), int(parts[1])
+            b_name = re.sub(r'[\d:\.\-\s]+$', '', ref).strip()
+            sql = text("""
+                SELECT v.text
+                FROM bible_verses v
+                JOIN bible_books b ON v.book_id = b.id
+                WHERE b.name_vi ILIKE :b_name AND v.chapter = :ch AND v.verse = :v
+                LIMIT 1
+            """)
+            row = db.execute(sql, {"b_name": f"%{b_name}%", "ch": ch_num, "v": v_num}).fetchone()
+            if row and row[0]:
+                return row[0].strip()
+    except Exception as e:
+        logger.warning(f"Error fetching verse for ref '{ref}': {e}")
+    return ""
+
+
+@router.get("/themes")
+def get_thematic_catalog():
+    """
+    §17, §18 — Get catalogue of foundational Biblical & Covenantal Themes.
+    """
+    summaries = []
+    for tid, t in THEMATIC_CATALOG.items():
+        summaries.append({
+            "id": t["id"],
+            "title_vi": t["title_vi"],
+            "title_en": t["title_en"],
+            "category": t["category"],
+            "color": t["color"],
+            "badge_class": t.get("badge_class", "amber"),
+            "golden_verse": t["golden_verse"],
+            "summary": t["summary"],
+            "scriptures_count": len(t.get("scriptures", [])),
+            "characters_count": len(t.get("characters", [])),
+            "events_count": len(t.get("events", [])),
+            "doctrines_count": len(t.get("doctrines", []))
+        })
+    return {
+        "total_themes": len(summaries),
+        "themes": summaries
+    }
+
+
+@router.get("/theme-map")
+def get_thematic_map(
+    theme_id: str = Query("covenant_redemption", description="Theme ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    §17, §18 — Generates an interactive Thematic Knowledge Graph for a chosen theme.
+    Returns SVG/Cytoscape coordinates, nodes, typed links, era progression, commentary citations, and sermon outline.
+    """
+    if theme_id not in THEMATIC_CATALOG:
+        theme_id = "covenant_redemption"
+
+    t = THEMATIC_CATALOG[theme_id]
+
+    # Center coordinates
+    center_x = 460
+    center_y = 320
+
+    nodes = []
+    edges = []
+
+    # 1. Central Theme Hub Node
+    hub_id = f"hub-{t['id']}"
+    nodes.append({
+        "id": hub_id,
+        "type": "central_theme",
+        "label": t["title_vi"],
+        "color": t["color"],
+        "x": center_x,
+        "y": center_y,
+        "radius": 36,
+        "metadata": {
+            "title_en": t["title_en"],
+            "category": t["category"],
+            "golden_verse": t["golden_verse"],
+            "summary": t["summary"],
+            "redemptive_thesis": t["redemptive_thesis"]
+        }
+    })
+
+    # 2. Doctrinal Pillars (Inner Orbit: radius 150)
+    doctrines = t.get("doctrines", [])
+    doc_count = len(doctrines)
+    doc_nodes = []
+    for idx, doc in enumerate(doctrines):
+        angle = (2 * math.pi * idx) / max(1, doc_count) - (math.pi / 2)
+        r = 150
+        nx = round(center_x + r * math.cos(angle))
+        ny = round(center_y + r * math.sin(angle))
+        nid = f"doc-{idx+1}"
+        doc_node = {
+            "id": nid,
+            "type": "doctrine_pillar",
+            "label": doc["name"],
+            "color": "#a855f7",
+            "x": nx,
+            "y": ny,
+            "radius": 20,
+            "metadata": {
+                "name": doc["name"],
+                "summary": doc["summary"],
+                "role": "Trụ cột tín lý thần học"
+            }
+        }
+        nodes.append(doc_node)
+        doc_nodes.append(nid)
+
+        # Edge from central hub to doctrine
+        edges.append({
+            "id": f"e-hub-{nid}",
+            "source": hub_id,
+            "target": nid,
+            "relation": "theological_foundation",
+            "label": "Trụ cột"
+        })
+
+    # 3. Scripture Anchors (Middle Orbit: radius 265)
+    scriptures = t.get("scriptures", [])
+    sc_count = len(scriptures)
+    sc_nodes = []
+    ot_nodes = []
+    nt_nodes = []
+
+    for idx, sc in enumerate(scriptures):
+        angle = (2 * math.pi * idx) / max(1, sc_count) - (math.pi / 4)
+        r = 265
+        nx = round(center_x + r * math.cos(angle))
+        ny = round(center_y + r * math.sin(angle))
+        nid = f"sc-{idx+1}"
+
+        verse_text = _extract_verse_from_db(db, sc["ref"])
+        if not verse_text:
+            verse_text = sc.get("key_phrase", "")
+
+        is_ot = sc["testament"] == "OT"
+        sc_node = {
+            "id": nid,
+            "type": "scripture_anchor",
+            "label": sc["ref"],
+            "color": "#38bdf8" if is_ot else "#34d399",
+            "x": nx,
+            "y": ny,
+            "radius": 22,
+            "metadata": {
+                "reference": sc["ref"],
+                "testament": sc["testament"],
+                "role": sc["role"],
+                "key_phrase": sc["key_phrase"],
+                "verse_text": verse_text
+            }
+        }
+        nodes.append(sc_node)
+        sc_nodes.append(nid)
+        if is_ot:
+            ot_nodes.append(nid)
+        else:
+            nt_nodes.append(nid)
+
+        # Edge from central hub to scripture
+        edges.append({
+            "id": f"e-hub-{nid}",
+            "source": hub_id,
+            "target": nid,
+            "relation": "covenant_scripture",
+            "label": "Bản văn chính kinh"
+        })
+
+    # Inter-testament links (OT Shadow -> NT Fulfillment)
+    for i in range(min(len(ot_nodes), len(nt_nodes))):
+        edges.append({
+            "id": f"e-fulfill-{ot_nodes[i]}-{nt_nodes[i]}",
+            "source": ot_nodes[i],
+            "target": nt_nodes[i],
+            "relation": "typological_fulfillment",
+            "label": "Ứng nghiệm"
+        })
+
+    # 4. Key Characters & Events (Outer Orbit: radius 370)
+    characters = t.get("characters", [])
+    events = t.get("events", [])
+    outer_items = []
+    for c in characters:
+        outer_items.append({"item": c, "item_type": "character", "label": c["name"], "color": "#60a5fa"})
+    for ev in events:
+        outer_items.append({"item": ev, "item_type": "event", "label": ev["name"], "color": "#fbbf24"})
+
+    out_count = len(outer_items)
+    for idx, out in enumerate(outer_items):
+        angle = (2 * math.pi * idx) / max(1, out_count)
+        r = 370
+        nx = round(center_x + r * math.cos(angle))
+        ny = round(center_y + r * math.sin(angle))
+        nid = f"out-{idx+1}"
+
+        nodes.append({
+            "id": nid,
+            "type": out["item_type"],
+            "label": out["label"],
+            "color": out["color"],
+            "x": nx,
+            "y": ny,
+            "radius": 18,
+            "metadata": out["item"]
+        })
+
+        # Link outer item to closest scripture or central hub
+        target_sc = sc_nodes[idx % len(sc_nodes)] if sc_nodes else hub_id
+        edges.append({
+            "id": f"e-out-{nid}-{target_sc}",
+            "source": target_sc,
+            "target": nid,
+            "relation": "historical_manifestation",
+            "label": "Bối cảnh"
+        })
+
+    return {
+        "theme": {
+            "id": t["id"],
+            "title_vi": t["title_vi"],
+            "title_en": t["title_en"],
+            "category": t["category"],
+            "color": t["color"],
+            "golden_verse": t["golden_verse"],
+            "summary": t["summary"],
+            "redemptive_thesis": t["redemptive_thesis"]
+        },
+        "stats": {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "scriptures_count": len(scriptures),
+            "characters_count": len(characters),
+            "events_count": len(events),
+            "doctrines_count": len(doctrines)
+        },
+        "nodes": nodes,
+        "edges": edges,
+        "eras_trajectory": t.get("eras_progression", []),
+        "commentary_citations": t.get("citations", []),
+        "homiletical_outline": t.get("homiletical_outline", {})
+    }
+
 
 

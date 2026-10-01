@@ -303,6 +303,15 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 - **Description**: Returns 22 chronological redemptive history milestones covering the entire narrative from Creation to Revelation.
 - **Payload Structure**: Each event item contains `id`, `slug`, `title`, `approximate_date`, `date_type` (`exact`, `approximate`, `range`, `disputed`, `unknown`), `period`, `description`, `scripture`, `era_order`, `people` (array of historical figures), `places` (geographic settings), and `theological_significance` (Christological typology and redemptive impact).
 
+### 4.4 Foundational Biblical & Covenantal Thematic Catalog (§17, §18)
+- **Endpoint**: `GET /api/graph/themes`
+- **Description**: Returns 7 foundational biblical thematic master catalogs (`covenant_redemption`, `grace_faith`, `kingdom_god`, `paschal_atonement`, `holy_spirit`, `resurrection_hope`, `prayer_communion`) with category classifications, golden verses, redemptive summaries, and component counts (scriptures, characters, events, doctrinal pillars).
+
+### 4.5 Thematic Knowledge Graph & Covenant Trajectories Visualizer (§17, §18)
+- **Endpoint**: `GET /api/graph/theme-map?theme_id={theme_id}`
+- **Parameters**: `theme_id` (e.g. `covenant_redemption`, `grace_faith`, `kingdom_god`, `paschal_atonement`, `holy_spirit`, `resurrection_hope`, `prayer_communion`).
+- **Description**: Computes interactive SVG/Cytoscape radial coordinates (Center Hub, Inner Orbit Doctrines r=150, Middle Orbit Scripture Anchors r=265 with OT/NT typological fulfillment links, Outer Orbit Historical Characters & Events r=370). Dynamically retrieves authentic 1925 Vietnamese Bible verses from PostgreSQL `bible_verses`, an 8-era progressive revelation trajectory track, scholarly citations from 275 commentary volumes, and a 3-point homiletical preaching outline with pastoral life applications.
+
 ---
 
 ## 5. Learning & Memorization Engine (`/api/learn`)
