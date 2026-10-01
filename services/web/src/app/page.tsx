@@ -24,7 +24,8 @@ import {
   Copy,
   Check,
   ChevronRight,
-  BookMarked
+  BookMarked,
+  Library
 } from "lucide-react";
 
 interface HealthStatus {
@@ -275,6 +276,12 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
             >
               <BrainCircuit className="w-4 h-4" /> Nghiên Cứu AI (RAG) →
+            </Link>
+            <Link 
+              href="/library"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-sm transition-all shadow-lg shadow-amber-600/30"
+            >
+              <Library className="w-4 h-4" /> Thư Viện 275 Sách (/library) →
             </Link>
           </div>
         </div>

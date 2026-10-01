@@ -13,7 +13,8 @@ import {
   Server, 
   Sparkles,
   Menu,
-  X
+  X,
+  Library
 } from "lucide-react";
 
 export default function Navbar() {
@@ -40,10 +41,11 @@ export default function Navbar() {
   const navLinks = [
     { href: "/", label: "Trang Chủ", icon: Home },
     { href: "/bible", label: "Kinh Thánh", icon: BookOpen },
-    { href: "/learn", label: "Học Tập (Quiz)", icon: GraduationCap },
-    { href: "/explore", label: "Đồ Thị (Graph)", icon: Network },
-    { href: "/study", label: "Nguyên Ngữ (Study)", icon: BookMarked },
-    { href: "/research", label: "Nghiên Cứu AI", icon: BrainCircuit }
+    { href: "/learn", label: "Học Tập", icon: GraduationCap },
+    { href: "/explore", label: "Khám Phá", icon: Network },
+    { href: "/study", label: "Dự Án Học", icon: BookMarked },
+    { href: "/research", label: "Nghiên Cứu", icon: BrainCircuit },
+    { href: "/library", label: "Thư Viện", icon: Library }
   ];
 
   return (
