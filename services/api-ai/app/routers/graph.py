@@ -392,3 +392,215 @@ def list_biblical_journeys():
     ]
     return journeys
 
+
+# ==============================================================================
+# Cross-Bible Connections & Typology (§18)
+# ==============================================================================
+
+class CrossBibleConnection(BaseModel):
+    id: str
+    connection_type: str  # explicit | quotation | allusion | parallel | scholarly_interpretation | AI_suggested
+    title: str
+    typology_theme: str
+    ot_anchor_ref: str
+    ot_anchor_text: str
+    nt_fulfillment_ref: str
+    nt_fulfillment_text: str
+    revelation_chain: List[str]
+    theological_synthesis: str
+    confidence_score: float
+    scholarly_source: Optional[str]
+
+
+CONNECTIONS_DATA = [
+    {
+        "id": "typology-passover-lamb",
+        "connection_type": "explicit",
+        "title": "Chiên Con Lễ Vượt Qua → Chiên Con Của Đức Chúa Trời",
+        "typology_theme": "Đấng Cứu Thế / Chiên Con Đền Tội",
+        "ot_anchor_ref": "Xuất Ê-díp-tô Ký 12:5-7, 13",
+        "ot_anchor_text": "Các ngươi hãy bắt một con chiên đực, không tì vít, được một tuổi... Huyết bôi nơi nhà các ngươi ở sẽ dùng làm dấu hiệu; khi ta hành hại xứ Ê-díp-tô, thấy huyết đó, thì sẽ vượt qua.",
+        "nt_fulfillment_ref": "1 Cô-rinh-tô 5:7; Giăng 1:29; 1 Phi-e-rơ 1:18-19",
+        "nt_fulfillment_text": "Vì Đấng Christ là con sinh Lễ Vượt Qua của chúng ta, đã chịu sát tế... Kìa, Chiên Con của Đức Chúa Trời, là Đấng cất tội lỗi thế gian đi!",
+        "revelation_chain": [
+            "Sáng-thế Ký 22:8 (Đức Chúa Trời Tự Sắm Sẵn Chiên Con)",
+            "Xuất Ê-díp-tô Ký 12:5 (Chiên Vượt Qua Không Tì Vết)",
+            "Ê-sai 53:7 (Chiên Câm Trước Kẻ Hớt Lông)",
+            "Giăng 1:29 (Kìa, Chiên Con Của Đức Chúa Trời)",
+            "1 Cô-rinh-tô 5:7 (Đấng Christ Là Chiên Lễ Vượt Qua)",
+            "Khải-huyền 5:6-12 (Chiên Con Đã Chịu Giết Nay Nhận Lấy Vinh Hiển)"
+        ],
+        "theological_synthesis": "Huyết chiên con không tì vết bôi trên mày cửa bảo vệ dân Y-sơ-ra-ên khỏi thiên sứ hủy diệt là hình bóng tiên tri trực tiếp về sự chết chuộc tội của Chúa Cứu Thế Giê-xu trên thập tự giá. Không một xương nào của Ngài bị gãy (Xuất 12:46; Giăng 19:36).",
+        "confidence_score": 1.0,
+        "scholarly_source": "Thần Học Giao Ước Cựu & Tân Ước (Covenant Theology) & Luận văn Cứu Chuộc Luận"
+    },
+    {
+        "id": "typology-protoevangelium",
+        "connection_type": "explicit",
+        "title": "Dòng Dõi Người Nữ → Đấng Đạp Dập Đầu Con Rắn",
+        "typology_theme": "Tin Lành Ban Đầu (Protoevangelium)",
+        "ot_anchor_ref": "Sáng-thế Ký 3:15",
+        "ot_anchor_text": "Ta sẽ làm cho mầy cùng người nữ, dòng dõi mầy cùng dòng dõi người nghịch thù nhau. Người sẽ giày đạp đầu mầy, còn mầy sẽ cắn gót chân người.",
+        "nt_fulfillment_ref": "Ga-la-ti 4:4; Rô-ma 16:20; Khải-huyền 12:9-10",
+        "nt_fulfillment_text": "Nhưng khi kỳ hạn đã được trọn, Đức Chúa Trời bèn sai Con Ngài bởi một người nữ sanh ra... Đức Chúa Trời bình an sẽ kíp giày đạp quỷ Sa-tan dưới chân anh em.",
+        "revelation_chain": [
+            "Sáng-thế Ký 3:15 (Lời Hứa Dòng Dõi Đạp Đầu Rắn)",
+            "Ê-sai 7:14 (Nữ Đồng Trinh Sẽ Chịu Thai Sanh Con Trai)",
+            "Ma-thi-ơ 1:20-23 (Ứng Nghiệm Sự Sinh Ra Bởi Trinh Nữ Ma-ri)",
+            "Ga-la-ti 4:4 (Sai Con Ngài Sinh Bởi Người Nữ)",
+            "Rô-ma 16:20 (Chúa Giày Đạp Sa-tan Dưới Chân)",
+            "Khải-huyền 20:2, 10 (Con Rắn Xưa Bị Quăng Vào Hồ Lửa Đời Đời)"
+        ],
+        "theological_synthesis": "Tin Lành đầu tiên (Protoevangelium) được công bố ngay sau khi loài người sa ngã. Đấng Christ chịu thương tổn nơi gót chân (chịu thương khó thập tự) nhưng đã giáng đòn hủy diệt đạp dập đầu ma quỷ qua sự sống lại vinh hiển.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Khảo Cứu Sáng Thế Ký & Lời Tiên Tri Về Đấng Mê-si"
+    },
+    {
+        "id": "typology-melchizedek",
+        "connection_type": "explicit",
+        "title": "Mên-chi-xê-đéc → Thầy Tế Lễ Thượng Phẩm Đời Đời",
+        "typology_theme": "Chức Vụ Thầy Tế Lễ Thượng Phẩm Vượt Trội",
+        "ot_anchor_ref": "Sáng-thế Ký 14:18-20; Thi-thiên 110:4",
+        "ot_anchor_text": "Mên-chi-xê-đéc, vua Sa-lem, sai đem bánh và rượu ra. Vua nầy là thầy tế lễ của Đức Chúa Trời Chí Cao... Đức Giê-hô-va đã thề: Ngươi là thầy tế lễ đời đời, tùy theo ban Mên-chi-xê-đéc.",
+        "nt_fulfillment_ref": "Hê-bơ-rơ 5:6, 10; 7:1-17, 24-28",
+        "nt_fulfillment_text": "Đức Chúa Trời đã xưng Ngài là thầy tế lễ thượng phẩm theo ban Mên-chi-xê-đéc... Ngài vì hằng sống đời đời, nên chức tế lễ của Ngài không hề đổi thay.",
+        "revelation_chain": [
+            "Sáng-thế Ký 14:18 (Vua Sa-lem Kiêm Thầy Tế Lễ Đem Bánh Và Rượu)",
+            "Thi-thiên 110:4 (Lời Thề Đời Đời Theo Ban Mên-chi-xê-đéc)",
+            "Hê-bơ-rơ 5:6-10 (Chúa Giê-xu Chịu Khổ Để Trở Nên Thầy Tế Lễ Đời Đời)",
+            "Hê-bơ-rơ 7:1-28 (Chức Tế Lễ Vượt Trội Hơn Dòng Lê-vi & A-rôn)"
+        ],
+        "theological_synthesis": "Mên-chi-xê-đéc kết hợp cả hai vương quyền (Vua Công Bình, Vua Bình An) và thần quyền (Thầy Tế Lễ Chí Cao) không lệ thuộc vào dòng dõi gia phổ Lê-vi. Đây là hình ảnh tiên tri hoàn hảo về chức vụ Thầy Tế Lễ Thượng Phẩm đời đời của Chúa Cứu Thế Giê-xu.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Giải Kinh Thư Hê-bơ-rơ & Luận đề Thần Học Giao Ước"
+    },
+    {
+        "id": "typology-bronze-serpent",
+        "connection_type": "quotation",
+        "title": "Con Rắn Đồng Trong Đồng Vắng → Chúa Bị Treo Lên Thập Tự",
+        "typology_theme": "Sự Cứu Rỗi Bởi Đức Tin & Nhìn Xem Đấng Chịu Treo",
+        "ot_anchor_ref": "Dân-số Ký 21:8-9",
+        "ot_anchor_text": "Đức Giê-hô-va phán cùng Môi-se rằng: Hãy làm một con rắn lửa, rồi treo nó trên một cây sào. Hễ ai bị cắn ngó nó, thì sẽ được sống. Môi-se bèn đúc một con rắn bằng đồng.",
+        "nt_fulfillment_ref": "Giăng 3:14-15; 8:28; 12:32",
+        "nt_fulfillment_text": "Xưa Môi-se treo con rắn lên nơi đồng vắng thể nào, thì Con người cũng phải bị treo lên dường ấy, hầu cho hễ ai tin đến Ngài đều được sự sống đời đời.",
+        "revelation_chain": [
+            "Dân-số Ký 21:8-9 (Con Rắn Đồng Treo Nơi Cây Sào)",
+            "2 Các Vua 18:4 (Dân Chúng Làm Biến Chất Thành Thần Tượng Nê-húc-than)",
+            "Giăng 3:14-15 (Chính Chúa Giê-xu Tự Dẫn Ứng Nghiệm Về Mình)",
+            "Giăng 12:32 (Khi Ta Được Nhấc Lên Khỏi Đất Sẽ Kéo Mọi Người Đến Cùng Ta)"
+        ],
+        "theological_synthesis": "Chính Chúa Giê-xu đối chiếu cái chết của Ngài với con rắn đồng: phương thuốc cứu mạng mang hình dáng của nguyên nhân gây chết chóc (rắn độc mang hình tội lỗi), nhưng hoàn toàn không mang nọc độc (Đấng vô tội trở nên tội lỗi thế cho chúng ta - 2 Cô 5:21).",
+        "confidence_score": 0.95,
+        "scholarly_source": "Phúc Âm Giăng & Các Biểu Tượng Tiên Tri Phúc Âm"
+    },
+    {
+        "id": "typology-manna-bread-of-life",
+        "connection_type": "allusion",
+        "title": "Ma-na Từ Trời → Bánh Hằng Sống Cho Thế Gian",
+        "typology_theme": "Bánh Sự Sống Nuôi Dưỡng Tâm Linh Đời Đời",
+        "ot_anchor_ref": "Xuất Ê-díp-tô Ký 16:4, 14-15; Thi-thiên 78:24-25",
+        "ot_anchor_text": "Nầy, ta sẽ từ trên trời mưa bánh xuống cho các ngươi... Dân Y-sơ-ra-ên thấy, bèn hỏi nhau rằng: Ma-na? Vì chẳng biết là vật chi. Môi-se bèn nói rằng: Ấy là bánh mà Đức Giê-hô-va ban cho các ngươi làm lương thực.",
+        "nt_fulfillment_ref": "Giăng 6:31-35, 48-51",
+        "nt_fulfillment_text": "Tổ phụ các ngươi đã ăn ma-na trong đồng vắng, rồi cũng chết. Đây là bánh từ trời xuống, hầu cho ai ăn không hề chết. Ta là bánh hằng sống từ trên trời xuống.",
+        "revelation_chain": [
+            "Xuất Ê-díp-tô Ký 16:4 (Mưa Bánh Từ Trên Trời Nuôi Dân Tộc)",
+            "Thi-thiên 78:24 (Bánh Kẻ Sang Trọng - Bánh Thiên Sứ)",
+            "Giăng 6:31-35 (Chúa Giê-xu Tuyên Bố: Ta Là Bánh Hằng Sống)",
+            "1 Cô-rinh-tô 10:3 (Đều Đã Ăn Một Thứ Lương Thực Thiêng Liêng)",
+            "Khải-huyền 2:17 (Kẻ Nào Thắng Ta Sẽ Ban Cho Ma-na Đang Giấu Kín)"
+        ],
+        "theological_synthesis": "Ma-na nuôi sống thể xác tạm thời trong đồng vắng trần gian, nhưng Đấng Christ là Ma-na thật từ Đức Chúa Cha ban xuống để ban sự sống tâm linh đời đời cho bất kỳ ai tiếp nhận Ngài qua đức tin.",
+        "confidence_score": 0.90,
+        "scholarly_source": "Khảo Luận Phúc Âm Giăng Đoạn 6 & Thần Học Bánh Sự Sống"
+    },
+    {
+        "id": "typology-sign-of-jonah",
+        "connection_type": "quotation",
+        "title": "Giô-na Trong Bụng Cá Ba Ngày Ba Đêm → Sự Chết & Sống Lại Vinh Hiển",
+        "typology_theme": "Dấu Lạ Sự Phục Sinh Của Đấng Christ",
+        "ot_anchor_ref": "Giô-na 1:17; 2:1-10",
+        "ot_anchor_text": "Đức Giê-hô-va sắm sẵn một con cá lớn đặng nuốt Giô-na; Giô-na ở trong bụng cá ba ngày và ba đêm... Đức Giê-hô-va bèn phán cùng con cá, và nó mửa Giô-na ra trên đất khô.",
+        "nt_fulfillment_ref": "Ma-thi-ơ 12:39-40; 16:4; Lu-ca 11:29-30",
+        "nt_fulfillment_text": "Dòng dõi dữ tợn và gian dâm nầy xin một dấu lạ; nhưng sẽ chẳng cho dấu lạ nào khác ngoài dấu lạ của đấng tiên tri Giô-na. Vì Giô-na đã ở trong bụng cá lớn ba ngày ba đêm, thì Con người cũng sẽ ở trong lòng đất ba ngày ba đêm thể ấy.",
+        "revelation_chain": [
+            "Giô-na 1:17 (Giô-na Trong Bụng Cá Ba Ngày Ba Đêm)",
+            "Giô-na 2:1-10 (Lời Cầu Nguyện Từ Chốn Âm Phủ & Được Cứu Ra Đất Khô)",
+            "Ma-thi-ơ 12:39-40 (Chúa Giê-xu Dẫn Dấu Lạ Giô-na Ứng Vào Sự Phục Sinh)",
+            "1 Cô-rinh-tô 15:3-4 (Đấng Christ Chịu Chết, Chôn Và Đến Ngày Thứ Ba Sống Lại)"
+        ],
+        "theological_synthesis": "Sự cứu rỗi kỳ diệu của Giô-na sau ba ngày ba đêm như từ cõi chết sống lại là bằng cớ lịch sử tiên tri mà Chúa Giê-xu ấn chứng cho sự kiện chôn cất và sống lại khải hoàn của chính mình vào ngày thứ ba.",
+        "confidence_score": 0.95,
+        "scholarly_source": "Khảo Cứu Tiên Tri Nhỏ & Tin Lành Ma-thi-ơ"
+    },
+    {
+        "id": "typology-tabernacle-incarnation",
+        "connection_type": "parallel",
+        "title": "Đền Tạm Nơi Đồng Vắng → Ngôi Lời Hóa Thân Thành Nhục Thể",
+        "typology_theme": "Đức Chúa Trời Cư Ngụ Giữa Tuyển Dân (Shekinah)",
+        "ot_anchor_ref": "Xuất Ê-díp-tô Ký 25:8; 40:34-35",
+        "ot_anchor_text": "Họ sẽ làm cho ta một đền thánh và ta sẽ ở giữa họ... Áng mây bao phủ hội mạc, và sự vinh hiển của Đức Giê-hô-va đầy dẫy đền tạm.",
+        "nt_fulfillment_ref": "Giăng 1:14; Hê-bơ-rơ 9:11; Khải-huyền 21:3",
+        "nt_fulfillment_text": "Ngôi Lời đã trở nên xác thịt, ở giữa chúng ta, đầy ơn và lẽ thật; chúng ta đã ngắm xem sự vinh hiển của Ngài, thật như vinh hiển của Con một đến từ Nơi Cha.",
+        "revelation_chain": [
+            "Xuất Ê-díp-tô Ký 25:8 (Lập Đền Tạm Để Chúa Ngự Giữa Dân Sự)",
+            "1 Các Vua 8:10-11 (Vinh Quang Chúa Đầy Dẫy Đền Thờ Sa-lô-môn)",
+            "Giăng 1:14 (Ngôi Lời Cắm Trại [eskēnōsen] Giữa Loài Người)",
+            "Hê-bơ-rơ 9:11 (Đấng Christ Đi Qua Đền Tạm Lớn Hơn & Trọn Vẹn Hơn)",
+            "Khải-huyền 21:3 (Đền Tạm Đức Chúa Trời Ở Cùng Loài Người)"
+        ],
+        "theological_synthesis": "Trong tiếng Hy Lạp, từ 'ở giữa chúng ta' tại Giăng 1:14 mang nghĩa đen là 'cắm trại/dựng đền tạm' (eskēnōsen). Toàn bộ cấu trúc Đền Tạm, Bàn Thờ Khảo Của Lễ, Thùng Rửa, Chân Đèn Vàng, Bàn Bánh Trưng Bày, Bàn Thờ Xông Hương và Hòm Giao Ước đều là bức tranh sống động mô tả các phương diện cứu rỗi của Đấng Christ.",
+        "confidence_score": 0.85,
+        "scholarly_source": "Khảo Luận Đền Tạm Môi-se & Ý Nghĩa Thuộc Linh Tân Ước"
+    },
+    {
+        "id": "typology-suffering-servant",
+        "connection_type": "explicit",
+        "title": "Người Đầy Tớ Chịu Khổ Trong Ê-sai → Đấng Chịu Đóng Đinh Đền Tội",
+        "typology_theme": "Sự Đền Tội Thay Thế Của Đấng Cứu Thế (Penal Substitution)",
+        "ot_anchor_ref": "Ê-sai 53:4-7, 11-12",
+        "ot_anchor_text": "Thật người đã mang sự tật nguyền của chúng ta, đã gánh sự đau ốm của chúng ta... Nhưng người đã vì tội phạm chúng ta mà bị vết, vì sự gian ác chúng ta mà bị thương. Bởi sự sửa phạt người chịu chúng ta được bình an, bởi lằn đòn người chúng ta được lành bịnh.",
+        "nt_fulfillment_ref": "Công-vụ 8:32-35; 1 Phi-e-rơ 2:22-25; Ma-thi-ơ 8:17",
+        "nt_fulfillment_text": "Phi-líp bèn mở miệng, khởi từ chỗ Kinh Thánh đó, mà giảng dạy Đức Chúa Giê-xu cho người... Ngài gánh tội lỗi chúng ta trong thân thể Ngài trên cây gỗ, hầu cho chúng ta là kẻ đã chết về tội lỗi, được sống cho sự công bình.",
+        "revelation_chain": [
+            "Ê-sai 53:4-7 (Bị Vết Vì Tội Lỗi Chúng Ta, Như Chiên Câm Lặng)",
+            "Ma-thi-ơ 8:17 (Gánh Lấy Sự Tật Nguyền Yếu Đuối Của Chúng Ta)",
+            "Công-vụ 8:32-35 (Quan Hoạn Ê-thi-ô-bi Nhận Biết Đấng Christ Qua Ê-sai 53)",
+            "Rô-ma 4:25 (Ngài Đã Bị Nộp Vì Tội Lỗi Chúng Ta)",
+            "1 Phi-e-rơ 2:24 (Bởi Lằn Đòn Của Ngài Mà Anh Em Được Lành Bệnh)"
+        ],
+        "theological_synthesis": "Ê-sai 53 là 'Chương Tin Lành thứ năm' chép trước hơn 700 năm, mô tả tường tận sự thương khó, im lặng trước kẻ kết án, chôn cùng người giàu (Giô-sép người A-ri-ma-thê) và sự tôn cao đắc thắng của Chúa Giê-xu.",
+        "confidence_score": 1.0,
+        "scholarly_source": "Bài Hát Về Người Đầy Tớ (Servant Songs) & Luận đề Chuộc Tội"
+    }
+]
+
+
+@router.get("/connections", response_model=List[CrossBibleConnection])
+def get_cross_bible_connections(
+    connection_type: Optional[str] = Query(None, description="explicit, quotation, allusion, parallel, scholarly_interpretation, AI_suggested"),
+    search: Optional[str] = Query(None, description="Search keyword in title, theme or references"),
+    limit: int = Query(20, ge=1, le=50)
+):
+    """
+    Fetch canonical Typological and Prophetic Cross-Bible Connections (§18).
+    Distinguishes strictly between explicit, quotation, allusion, parallel,
+    scholarly interpretation and AI suggestions.
+    """
+    results = CONNECTIONS_DATA
+
+    if connection_type and connection_type != "all":
+        results = [c for c in results if c["connection_type"] == connection_type]
+
+    if search:
+        s = search.lower()
+        results = [
+            c for c in results
+            if s in c["title"].lower()
+            or s in c["typology_theme"].lower()
+            or s in c["ot_anchor_ref"].lower()
+            or s in c["nt_fulfillment_ref"].lower()
+            or s in c["theological_synthesis"].lower()
+        ]
+
+    return results[:limit]
+

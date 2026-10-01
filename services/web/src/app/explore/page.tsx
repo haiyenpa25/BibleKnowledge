@@ -27,8 +27,26 @@ import {
   Pause,
   Volume2,
   ArrowRight,
-  HelpCircle
+  HelpCircle,
+  Layers,
+  GitBranch,
+  ShieldAlert
 } from "lucide-react";
+
+interface CrossBibleConnection {
+  id: string;
+  connection_type: string;
+  title: string;
+  typology_theme: string;
+  ot_anchor_ref: string;
+  ot_anchor_text: string;
+  nt_fulfillment_ref: string;
+  nt_fulfillment_text: string;
+  revelation_chain: string[];
+  theological_synthesis: string;
+  confidence_score: number;
+  scholarly_source?: string;
+}
 
 interface GraphNode {
   id: string;
@@ -143,7 +161,7 @@ interface CharacterStudyData {
 }
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "timeline" | "map" | "entities" | "typology">("graph");
 
   // Character Dossier Modal State (§7)
   const [isDossierOpen, setIsDossierOpen] = useState(false);
@@ -151,6 +169,13 @@ export default function ExplorePage() {
   const [loadingDossier, setLoadingDossier] = useState(false);
   const [dossierError, setDossierError] = useState<string | null>(null);
   const [isDossierSpeaking, setIsDossierSpeaking] = useState(false);
+
+  // Cross-Bible Connections & Typology State (§18)
+  const [connections, setConnections] = useState<CrossBibleConnection[]>([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [connectionTypeFilter, setConnectionTypeFilter] = useState<string>("all");
+  const [connectionSearch, setConnectionSearch] = useState<string>("");
+  const [selectedConnection, setSelectedConnection] = useState<CrossBibleConnection | null>(null);
 
   // Graph State
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -330,11 +355,46 @@ export default function ExplorePage() {
     }
   };
 
+  // Fetch Typology Connections (§18)
+  const fetchConnections = async (typeFilter?: string, query?: string) => {
+    setLoadingConnections(true);
+    try {
+      let url = `${apiUrl}/api/graph/connections?`;
+      const curType = typeFilter !== undefined ? typeFilter : connectionTypeFilter;
+      const curQuery = query !== undefined ? query : connectionSearch;
+      if (curType && curType !== "all") url += `connection_type=${encodeURIComponent(curType)}&`;
+      if (curQuery) url += `search=${encodeURIComponent(curQuery)}&`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setConnections(data);
+        if (data.length > 0) {
+          setSelectedConnection((prev) => {
+            if (!prev) return data[0];
+            const found = data.find((d: CrossBibleConnection) => d.id === prev.id);
+            return found || data[0];
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load connections:", err);
+    } finally {
+      setLoadingConnections(false);
+    }
+  };
+
   useEffect(() => {
     fetchGraph();
     fetchTimeline();
     fetchMapData();
+    fetchConnections();
   }, [apiUrl]);
+
+  useEffect(() => {
+    if (activeTab === "typology" && connections.length === 0) {
+      fetchConnections();
+    }
+  }, [activeTab]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -455,6 +515,26 @@ export default function ExplorePage() {
     };
   }, []);
 
+  // Typology connection styling helper (§18)
+  const getConnectionTypeInfo = (type: string) => {
+    switch (type) {
+      case "explicit":
+        return { label: "Trích dẫn minh định", bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/40" };
+      case "quotation":
+        return { label: "Dẫn chiếu Tân Ước", bg: "bg-blue-500/20", text: "text-blue-300", border: "border-blue-500/40" };
+      case "allusion":
+        return { label: "Ám chỉ / Hình tượng", bg: "bg-purple-500/20", text: "text-purple-300", border: "border-purple-500/40" };
+      case "parallel":
+        return { label: "Tương đồng kết cấu", bg: "bg-cyan-500/20", text: "text-cyan-300", border: "border-cyan-500/40" };
+      case "scholarly_interpretation":
+        return { label: "Giải nghĩa học giả", bg: "bg-amber-500/20", text: "text-amber-300", border: "border-amber-500/40" };
+      case "AI_suggested":
+        return { label: "Gợi ý phân tích AI", bg: "bg-rose-500/20", text: "text-rose-300", border: "border-rose-500/40" };
+      default:
+        return { label: "Mối liên hệ", bg: "bg-slate-500/20", text: "text-slate-300", border: "border-slate-500/40" };
+    }
+  };
+
   return (
     <main className="min-h-screen px-4 py-8 md:px-12 lg:px-20 max-w-7xl mx-auto flex flex-col gap-8">
       {/* Header */}
@@ -518,6 +598,16 @@ export default function ExplorePage() {
             }`}
           >
             <Users className="w-4 h-4" /> Thư Mục Thực Thể
+          </button>
+          <button
+            onClick={() => setActiveTab("typology")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "typology"
+                ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" /> Hình Bóng & Tiên Tri (§18)
           </button>
         </div>
       </header>
@@ -1279,6 +1369,290 @@ export default function ExplorePage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 5. CROSS-BIBLE CONNECTIONS & TYPOLOGY EXPLORER (§18) */}
+      {/* ===================================================================== */}
+      {activeTab === "typology" && (
+        <div className="flex flex-col gap-6">
+          {/* Header & Notice */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Thần Học Hình Bóng & Mặc Khải Cứu Chuộc • §18
+                </span>
+                <span className="text-xs text-slate-400">8 Mối liên kết quy chiếu chuẩn mực</span>
+              </div>
+              <h2 className="text-xl font-bold text-white mt-1">
+                Mối Liên Hệ Xuyên Suốt & Hình Bóng Tiên Tri (Typology & Prophecy)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Khảo cứu những khuôn mẫu Cựu Ước (Type) ứng nghiệm trọn vẹn trong Đấng Christ & Tân Ước (Antitype)
+              </p>
+            </div>
+
+            {/* Search Input */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={connectionSearch}
+                  onChange={(e) => {
+                    setConnectionSearch(e.target.value);
+                    fetchConnections(connectionTypeFilter, e.target.value);
+                  }}
+                  placeholder="Tìm chủ đề, câu gốc, từ khóa..."
+                  className="bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 w-64"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 18 Canonical Disclaimer Alert */}
+          <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-800/40 flex items-start gap-3 text-xs text-amber-200">
+            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-amber-300">Nguyên tắc Thần học & Kiểm chứng §18</span>
+              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                Hệ thống phân định rạch ròi giữa <strong>trích dẫn Kinh Thánh minh định</strong> (Canonical Scripture citations) và các giả thuyết học giả hoặc gợi ý phân tích AI. Các liên kết được đánh dấu mức độ xác thực và nguồn tra cứu tương ứng để bảo toàn sự trung thực đối với Lời Chúa.
+              </p>
+            </div>
+          </div>
+
+          {/* Connection Type Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span className="text-slate-400 whitespace-nowrap">Phân loại liên kết:</span>
+            {[
+              { id: "all", label: "Tất cả kiểu" },
+              { id: "explicit", label: "Trích dẫn minh định" },
+              { id: "quotation", label: "Dẫn chiếu Tân Ước" },
+              { id: "allusion", label: "Ám chỉ / Hình tượng" },
+              { id: "parallel", label: "Tương đồng kết cấu" },
+              { id: "scholarly_interpretation", label: "Giải nghĩa học giả" }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => {
+                  setConnectionTypeFilter(f.id);
+                  fetchConnections(f.id, connectionSearch);
+                }}
+                className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold ${
+                  connectionTypeFilter === f.id
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm"
+                    : "bg-slate-800/70 text-slate-400 hover:text-white border border-transparent"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Main Grid: Left List + Right Inspector */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Connections List (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col gap-3">
+              {loadingConnections ? (
+                <div className="p-12 rounded-2xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                  <p className="text-xs">Đang tải danh mục hình bóng tiên tri...</p>
+                </div>
+              ) : connections.length === 0 ? (
+                <div className="p-8 rounded-2xl glass-panel border border-slate-800 text-center text-xs text-slate-400">
+                  Không tìm thấy mối liên kết nào phù hợp với bộ lọc hiện tại.
+                </div>
+              ) : (
+                connections.map((c) => {
+                  const typeInfo = getConnectionTypeInfo(c.connection_type);
+                  const isSelected = selectedConnection?.id === c.id;
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedConnection(c)}
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col gap-2.5 relative group ${
+                        isSelected
+                          ? "bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/10"
+                          : "glass-card border-slate-800 hover:border-slate-700 bg-slate-900/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${typeInfo.bg} ${typeInfo.text} ${typeInfo.border}`}>
+                          {typeInfo.label}
+                        </span>
+                        <span className="text-[10px] text-amber-400/90 font-mono font-bold">
+                          Độ chuẩn xác: {Math.round(c.confidence_score * 100)}%
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-white text-sm group-hover:text-amber-300 transition-colors">
+                        {c.title}
+                      </h3>
+
+                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                        {c.theological_synthesis}
+                      </p>
+
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                        <span className="text-amber-300/90 truncate max-w-[45%] font-medium">
+                          📜 {c.ot_anchor_ref}
+                        </span>
+                        <ArrowRight className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span className="text-emerald-300/90 truncate max-w-[45%] font-medium text-right">
+                          ✨ {c.nt_fulfillment_ref}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right Column: Deep Typological Inspector (7 cols) */}
+            <div className="lg:col-span-7">
+              {selectedConnection ? (
+                <div className="rounded-3xl glass-panel border border-slate-700 p-6 flex flex-col gap-6 shadow-xl">
+                  {/* Top Card Header */}
+                  <div className="flex flex-col gap-2 pb-5 border-b border-slate-800">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const t = getConnectionTypeInfo(selectedConnection.connection_type);
+                          return (
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${t.bg} ${t.text} ${t.border}`}>
+                              {t.label}
+                            </span>
+                          );
+                        })()}
+                        <span className="text-xs px-2.5 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+                          {selectedConnection.typology_theme}
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-800/50">
+                        Độ xác thực: {Math.round(selectedConnection.confidence_score * 100)}%
+                      </span>
+                    </div>
+
+                    <h2 className="text-xl sm:text-2xl font-black text-white leading-snug">
+                      {selectedConnection.title}
+                    </h2>
+                    {selectedConnection.scholarly_source && (
+                      <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Nguồn đối chiếu học thuật: <strong className="text-slate-300">{selectedConnection.scholarly_source}</strong></span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Dual Anchor Comparison (Cựu Ước & Tân Ước) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Old Testament Anchor */}
+                    <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-800/40 flex flex-col justify-between gap-3">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                            📜 Cựu Ước Làm Hình Bóng (Type)
+                          </span>
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(selectedConnection.ot_anchor_ref.split(';')[0])}`}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold"
+                            target="_blank"
+                          >
+                            Đọc câu gốc <ExternalLink className="w-2.5 h-2.5" />
+                          </Link>
+                        </div>
+                        <span className="text-xs font-bold text-amber-200">
+                          {selectedConnection.ot_anchor_ref}
+                        </span>
+                        <blockquote className="text-xs text-slate-300 italic border-l-2 border-amber-500/60 pl-2.5 my-1 leading-relaxed">
+                          "{selectedConnection.ot_anchor_text}"
+                        </blockquote>
+                      </div>
+                    </div>
+
+                    {/* New Testament Fulfillment */}
+                    <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-800/40 flex flex-col justify-between gap-3">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                            ✨ Tân Ước Ứng Nghiệm (Antitype)
+                          </span>
+                          <Link
+                            href={`/bible?ref=${encodeURIComponent(selectedConnection.nt_fulfillment_ref.split(';')[0])}`}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold"
+                            target="_blank"
+                          >
+                            Đọc câu gốc <ExternalLink className="w-2.5 h-2.5" />
+                          </Link>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-200">
+                          {selectedConnection.nt_fulfillment_ref}
+                        </span>
+                        <blockquote className="text-xs text-slate-300 italic border-l-2 border-emerald-500/60 pl-2.5 my-1 leading-relaxed">
+                          "{selectedConnection.nt_fulfillment_text}"
+                        </blockquote>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Revelation Chain (Tiến trình Mặc khải Cứu chuộc) */}
+                  <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
+                      Tiến Trình Mặc Khải Tiệm Tiến Xuyên Suốt Lịch Sử (Chain of Revelation)
+                    </h3>
+                    <div className="flex flex-col gap-2 mt-1">
+                      {selectedConnection.revelation_chain.map((step, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300"
+                        >
+                          <span className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-[10px] font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-sans leading-relaxed">{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Theological Synthesis */}
+                  <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col gap-2.5">
+                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Tổng Hợp Thần Học & Trọng Tâm Cơ Đốc (Christocentric Synthesis)
+                    </h3>
+                    <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                      {selectedConnection.theological_synthesis}
+                    </p>
+                  </div>
+
+                  {/* Deep Navigation Links */}
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <Link
+                      href="/bible"
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-400" /> Tra Xem Toàn Bộ Kinh Thánh
+                    </Link>
+                    <Link
+                      href="/study"
+                      className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-amber-600/20"
+                    >
+                      <Layers className="w-3.5 h-3.5" /> Phân Tích & Chú Giải Ngữ Cảnh
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-16 rounded-3xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <BookOpen className="w-8 h-8 text-slate-600" />
+                  <p className="text-xs">Chọn một cặp liên kết bên trái để mở rộng phân tích chi tiết.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
