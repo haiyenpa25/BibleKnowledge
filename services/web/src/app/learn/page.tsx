@@ -26,8 +26,32 @@ import {
   Shuffle,
   Check,
   Undo2,
-  Volume2
+  Volume2,
+  AlertCircle,
+  UserCheck,
+  Eye,
+  Compass
 } from "lucide-react";
+
+interface WhoAmIClue {
+  order: number;
+  text: string;
+  difficulty_label: string;
+  points: number;
+}
+
+interface WhoAmIQuestion {
+  id: string;
+  clues: WhoAmIClue[];
+  options: string[];
+  correct_option: number;
+  correct_name: string;
+  character_slug: string;
+  title_or_role: string;
+  scripture_reference: string;
+  explanation: string;
+  era_or_testament: string;
+}
 
 interface QuizQuestion {
   id: string;
@@ -97,7 +121,7 @@ interface TimelineChallenge {
 }
 
 export default function LearnPage() {
-  const [activeTab, setActiveTab] = useState<"quiz" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
+  const [activeTab, setActiveTab] = useState<"quiz" | "who_am_i" | "flashcards" | "fill_in_blank" | "timeline" | "generator">("quiz");
 
   // User Profile Gamification State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -112,6 +136,14 @@ export default function LearnPage() {
   const [loadingQuiz, setLoadingQuiz] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
   const [quizFinished, setQuizFinished] = useState(false);
+
+  // Who Am I? State (§3)
+  const [whoAmIList, setWhoAmIList] = useState<WhoAmIQuestion[]>([]);
+  const [whoAmIIndex, setWhoAmIIndex] = useState(0);
+  const [revealedCluesCount, setRevealedCluesCount] = useState(1);
+  const [whoAmISelected, setWhoAmISelected] = useState<number | null>(null);
+  const [whoAmIAnswered, setWhoAmIAnswered] = useState(false);
+  const [whoAmILoading, setWhoAmILoading] = useState(false);
 
   // Flashcards State
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -152,6 +184,7 @@ export default function LearnPage() {
   useEffect(() => {
     fetchProfile();
     fetchQuiz();
+    fetchWhoAmI();
     fetchFlashcards();
     fetchFib();
     fetchTimelineChallenges();
@@ -447,6 +480,92 @@ export default function LearnPage() {
     }
   };
 
+  // --- Who Am I? Handlers (§3) ---
+  const currentWhoAmI = whoAmIList[whoAmIIndex];
+
+  const fetchWhoAmI = async () => {
+    setWhoAmILoading(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/learn/who-am-i`);
+      if (res.ok) {
+        const data = await res.json();
+        setWhoAmIList(data);
+        setWhoAmIIndex(0);
+        setRevealedCluesCount(1);
+        setWhoAmISelected(null);
+        setWhoAmIAnswered(false);
+      }
+    } catch (err) {
+      console.error("Failed to load Who Am I challenges:", err);
+    } finally {
+      setWhoAmILoading(false);
+    }
+  };
+
+  const speakText = (text: string) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "vi-VN";
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleRevealNextClue = () => {
+    if (!currentWhoAmI) return;
+    if (revealedCluesCount < currentWhoAmI.clues.length) {
+      const nextCount = revealedCluesCount + 1;
+      setRevealedCluesCount(nextCount);
+      const newlyRevealed = currentWhoAmI.clues[nextCount - 1];
+      if (newlyRevealed) {
+        speakText(`Gợi ý ${newlyRevealed.order}: ${newlyRevealed.text}`);
+      }
+    }
+  };
+
+  const handleSelectWhoAmIOption = async (optionIdx: number) => {
+    if (whoAmIAnswered || !currentWhoAmI) return;
+    setWhoAmISelected(optionIdx);
+    setWhoAmIAnswered(true);
+
+    const isCorrect = optionIdx === currentWhoAmI.correct_option;
+    if (isCorrect) {
+      const currentClue = currentWhoAmI.clues[revealedCluesCount - 1];
+      const earned = currentClue ? currentClue.points : 20;
+      setScore((prev) => prev + earned);
+      setStreak((prev) => prev + 1);
+
+      try {
+        await fetch(`${apiUrl}/api/learn/quiz/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correct_count: 1,
+            total_questions: 1,
+            topic: "WhoAmI"
+          })
+        });
+        fetchProfile();
+      } catch (err) {
+        console.error("Failed to submit score:", err);
+      }
+    } else {
+      setStreak(0);
+    }
+  };
+
+  const handleNextWhoAmI = () => {
+    if (whoAmIIndex + 1 < whoAmIList.length) {
+      setWhoAmIIndex((prev) => prev + 1);
+      setRevealedCluesCount(1);
+      setWhoAmISelected(null);
+      setWhoAmIAnswered(false);
+    } else {
+      fetchWhoAmI();
+    }
+  };
+
   // AI Generator Handler
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -603,6 +722,22 @@ export default function LearnPage() {
           }`}
         >
           <HelpCircle className="w-4 h-4" /> Trắc Nghiệm ABCD
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("who_am_i");
+            if (whoAmIList.length === 0) fetchWhoAmI();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+            activeTab === "who_am_i"
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+          }`}
+        >
+          <UserCheck className="w-4 h-4 text-rose-300" />
+          <span>Tôi Là Ai? (Who Am I?)</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-400/20 text-rose-300 font-bold">Hot §3</span>
         </button>
 
         <button
@@ -787,6 +922,193 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="p-12 text-center text-slate-500">Chưa có câu hỏi nào.</div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 1.5. WHO AM I? (TÔI LÀ AI? - MULTI-CLUE CHARACTER RIDDLE §3)          */}
+      {/* ===================================================================== */}
+      {activeTab === "who_am_i" && (
+        <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+          {whoAmILoading ? (
+            <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+              <p className="text-sm">Đang nạp các câu đố nhân vật bí ẩn...</p>
+            </div>
+          ) : currentWhoAmI ? (
+            <div className="flex flex-col gap-6">
+              {/* Header Status Bar */}
+              <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                  <span className="font-semibold text-white">Câu Đố {whoAmIIndex + 1} / {whoAmIList.length}</span>
+                  <span className="text-slate-600">&bull;</span>
+                  <span className="text-amber-400 font-medium">{currentWhoAmI.era_or_testament}</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-1 rounded-xl border border-emerald-800/40">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>+{currentWhoAmI.clues[revealedCluesCount - 1]?.points || 20} XP</span>
+                </div>
+              </div>
+
+              {/* Riddle Clues Card Deck */}
+              <div className="glass-panel p-6 md:p-8 rounded-3xl border border-slate-700/60 flex flex-col gap-5 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 shadow-2xl relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-rose-400" />
+                    <h3 className="text-base font-extrabold text-white">
+                      Danh Tính Bí Ẩn: Tôi Là Ai?
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Đã mở {revealedCluesCount} / {currentWhoAmI.clues.length} gợi ý
+                  </span>
+                </div>
+
+                {/* Progressive Clues */}
+                <div className="flex flex-col gap-3.5">
+                  {currentWhoAmI.clues.slice(0, revealedCluesCount).map((clue) => (
+                    <div
+                      key={clue.order}
+                      className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-2 transition-all animate-in fade-in slide-in-from-top-2"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center font-bold text-[10px]">
+                            {clue.order}
+                          </span>
+                          <span className="font-semibold text-rose-300">Gợi Ý {clue.order}: {clue.difficulty_label}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => speakText(`Gợi ý ${clue.order}: ${clue.text}`)}
+                          title="Đọc to gợi ý này"
+                          className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-sm md:text-base text-slate-200 font-serif leading-relaxed italic pl-7">
+                        &ldquo;{clue.text}&rdquo;
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Unlock Next Clue Action */}
+                {!whoAmIAnswered && revealedCluesCount < currentWhoAmI.clues.length && (
+                  <button
+                    type="button"
+                    onClick={handleRevealNextClue}
+                    className="self-center px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md group"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span>Mở Thêm Gợi Ý {revealedCluesCount + 1} (Điểm giảm xuống {currentWhoAmI.clues[revealedCluesCount]?.points}đ)</span>
+                  </button>
+                )}
+
+                {/* 4 Candidate Options Grid */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+                  <span className="text-xs text-slate-400 font-medium">Chọn nhân vật bạn đoán:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {currentWhoAmI.options.map((opt, idx) => {
+                      let btnStyle = "bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-200 hover:border-slate-700";
+                      if (whoAmIAnswered) {
+                        if (idx === currentWhoAmI.correct_option) {
+                          btnStyle = "bg-emerald-950/80 border-emerald-500 text-emerald-200 font-bold shadow-lg shadow-emerald-950/40";
+                        } else if (idx === whoAmISelected) {
+                          btnStyle = "bg-rose-950/80 border-rose-500 text-rose-200 line-through";
+                        } else {
+                          btnStyle = "bg-slate-950/40 border-slate-900 text-slate-600 opacity-50";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectWhoAmIOption(idx)}
+                          disabled={whoAmIAnswered}
+                          className={`p-3.5 rounded-2xl border text-left text-sm flex items-center justify-between transition-all ${btnStyle}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-6 h-6 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-xs font-bold text-slate-300">
+                              {String.fromCharCode(65 + idx)}
+                            </span>
+                            <span className="font-medium">{opt}</span>
+                          </div>
+                          {whoAmIAnswered && idx === currentWhoAmI.correct_option && (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          )}
+                          {whoAmIAnswered && idx === whoAmISelected && idx !== currentWhoAmI.correct_option && (
+                            <XCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Identity Revealed & Explanation Card */}
+                {whoAmIAnswered && (
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-rose-950/30 border border-slate-700/80 flex flex-col gap-3 mt-2 animate-in fade-in zoom-in-95">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                            whoAmISelected === currentWhoAmI.correct_option
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                              : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                          }`}>
+                            {whoAmISelected === currentWhoAmI.correct_option ? "Chính xác tuyệt vời!" : "Chưa chính xác"}
+                          </span>
+                          <span className="text-xs text-amber-400 font-medium">
+                            👑 {currentWhoAmI.title_or_role}
+                          </span>
+                        </div>
+                        <h4 className="text-xl font-extrabold text-white mt-1">
+                          {currentWhoAmI.correct_name}
+                        </h4>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleNextWhoAmI}
+                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-lg shadow-rose-600/30 flex-shrink-0"
+                      >
+                        <span>{whoAmIIndex + 1 < whoAmIList.length ? "Câu Đố Tiếp Theo" : "Chơi Lại Từ Đầu"}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans pt-1 border-t border-slate-800">
+                      {currentWhoAmI.explanation}
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60 text-xs">
+                      <Link
+                        href={`/bible?ref=${encodeURIComponent(currentWhoAmI.scripture_reference)}`}
+                        className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Kinh Thánh: {currentWhoAmI.scripture_reference} →</span>
+                      </Link>
+
+                      <Link
+                        href="/explore"
+                        className="text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition-colors"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Mở trên Đồ Thị Tri Thức →</span>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-slate-500">Chưa có câu đố nào.</div>
           )}
         </div>
       )}

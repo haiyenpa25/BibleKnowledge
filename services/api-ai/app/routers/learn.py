@@ -852,3 +852,205 @@ def get_timeline_challenges(db: Session = Depends(get_db)):
     return results
 
 
+# ==============================================================================
+# Who Am I? Interactive Multi-Clue Character Riddles (§3, §5)
+# ==============================================================================
+
+class WhoAmIClue(BaseModel):
+    order: int
+    text: str
+    difficulty_label: str
+    points: int
+
+
+class WhoAmIQuestion(BaseModel):
+    id: str
+    clues: List[WhoAmIClue]
+    options: List[str]
+    correct_option: int
+    correct_name: str
+    character_slug: str
+    title_or_role: str
+    scripture_reference: str
+    explanation: str
+    era_or_testament: str
+
+
+@router.get("/who-am-i", response_model=List[WhoAmIQuestion])
+def get_who_am_i_challenges():
+    """Retrieve multi-stage 'Who Am I?' character guessing challenges (§3)."""
+    challenges = [
+        WhoAmIQuestion(
+            id="wai-1",
+            correct_name="Si-môn Phi-e-rơ",
+            character_slug="si-mon-phi-e-ro",
+            title_or_role="Ngư phủ & Sứ đồ trưởng của Chúa Giê-xu",
+            era_or_testament="Tân Ước (Gospels & Early Church)",
+            scripture_reference="Ma-thi-ơ 14:28-31; 26:69-75; Công vụ 2:14-41",
+            explanation="Phi-e-rơ là người nhiệt thành, từng đi trên mặt biển, vấp ngã chối Chúa nhưng được Chúa phục hồi và trở thành trụ cột lãnh đạo Hội Thánh ban đầu.",
+            options=["Anh-rê", "Si-môn Phi-e-rơ", "Gia-cơ", "Giu-đa Ít-ca-ri-ốt"],
+            correct_option=1,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi là một ngư phủ bình dị sinh sống bên bờ Biển Ga-li-lê, được anh trai mình dẫn đến gặp Chúa Cứu Thế.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Tôi từng bước đi trên mặt nước sóng gió, nhưng vì sợ hãi mà bắt đầu chìm xuống cho đến khi được bàn tay Thầy nắm lấy.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Trong đêm bi thương trước khi Chúa chịu đóng đinh, tôi đã chối Ngài 3 lần trước khi gà gáy, sau đó khóc lóc thảm thiết.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi được Chúa phục hồi bên đống lửa than với câu hỏi 'Ngươi yêu ta chăng?' và trở thành người giảng luận cảm hóa 3,000 người trong ngày Ngũ Tuần.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-2",
+            correct_name="Môi-se",
+            character_slug="moi-se",
+            title_or_role="Người Giải Phóng Tuyển Dân & Ban Luật Pháp",
+            era_or_testament="Cựu Ước (Exodus & Wilderness)",
+            scripture_reference="Xuất Ê-díp-tô Ký 2:1-10; 3:1-12; 14:21-22; 20:1-17",
+            explanation="Môi-se là vị tiên tri khiêm nhường nhất trên đất, người được diện đối diện với Đức Chúa Trời và dẫn dắt Y-sơ-ra-ên ra khỏi ách nô lệ Ai Cập.",
+            options=["A-rôn", "Giô-suê", "Môi-se", "Ghi-đê-ôn"],
+            correct_option=2,
+            clues=[
+                WhoAmIClue(order=1, text="Lúc sơ sinh, tôi được giấu trong chiếc nôi mây trét chai thả nổi giữa đám sậy dòng sông Nin và được công chúa Ai Cập vớt lên nuôi nấng.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Sau 40 năm chăn chiên nơi đồng vắng Ma-đi-an, tôi kinh ngạc thấy một bụi gai cháy hừng hực nhưng không hề tàn rụi bên chân núi Hô-rếp.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Đức Chúa Trời dùng cây gậy nơi tay tôi giáng 10 tai vạ xuống Pha-ra-ôn và rẽ đôi Biển Đỏ cho tuyển dân bước qua như trên đất khô.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi lên đỉnh núi Si-na-i giữa mây mù sấm sét trong 40 ngày đêm và nhận lãnh Hai Bảng Chứng Mười Điều Răn do chính ngón tay Chúa khắc ghi.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-3",
+            correct_name="Sứ đồ Phao-lô",
+            character_slug="su-do-phao-lo",
+            title_or_role="Sứ đồ cho Dân Ngoại & Nhà Thần Học Tiên Phong",
+            era_or_testament="Tân Ước (Apostolic Age)",
+            scripture_reference="Công vụ 9:1-19; 22:3; 2 Ti-mô-thê 4:7-8",
+            explanation="Từ một người nhiệt thành bắt bớ đạo Chúa, Sau-lơ đã được ánh sáng từ trời biến cải để trở thành nhà truyền giáo vĩ đại nhất của Tân Ước.",
+            options=["Sứ đồ Phao-lô", "Ba-na-ba", "Phi-líp", "A-bô-lô"],
+            correct_option=0,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi sinh ra tại Tạt-sơ, là công dân La-mã và được thụ giáo dưới chân đại giáo sư danh tiếng Ga-ma-li-ên.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Thuở thanh niên, tôi nhiệt thành lùng bắt các tín hữu theo Đạo và tán thành việc ném đá xử tử thầy phó tế Ê-tiên trung tín.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Một luồng ánh sáng chói lòa hơn mặt trời giáng xuống khiến tôi mù mắt trên đường đến Đa-mách, cùng tiếng phán: 'Sau-lơ, Sau-lơ, sao ngươi bắt bớ Ta?'", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Sau khi được Chúa biến cải, tôi đi 3 chuyến truyền giáo khắp Đế quốc La-mã, lập nên vô số Hội Thánh và viết nên 13 bức thư tín bất hủ.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-4",
+            correct_name="Vua Đa-vít",
+            character_slug="vua-da-vit",
+            title_or_role="Vua vĩ đại của Y-sơ-ra-ên & Người đẹp lòng Chúa",
+            era_or_testament="Cựu Ước (United Monarchy)",
+            scripture_reference="1 Sa-mu-ên 16:11-13; 17:40-50; Thi-thiên 23",
+            explanation="Đa-vít khởi đầu là kẻ chăn chiên nghèo, đánh bại tướng Gô-li-át bằng đức tin, thống nhất vương quốc và lập nên dòng dõi của Đấng Mê-si-a.",
+            options=["Vua Sau-lơ", "Vua Sa-lô-môn", "Vua Đa-vít", "Giô-na-than"],
+            correct_option=2,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi là con út trong gia đình tại Bết-lê-hem, từng làm kẻ chăn chiên đàn hát thi ca ca ngợi Đấng Tạo Hóa nơi đồng nội.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Chỉ với một cái trành ném đá và năm hòn sỏi bóng láng, tôi đã hạ gục tên tướng khổng lồ Gô-li-át đang buông lời sỉ nhục quân đội Đức Chúa Trời.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Dù bị vua Sau-lơ truy sát ghen ghét suốt nhiều năm trong hang đá, tôi hai lần từ chối tra tay làm hại người được xức dầu của Chúa.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi được Đức Chúa Trời gọi là 'người đẹp lòng Ta', thống nhất toàn cõi Y-sơ-ra-ên, định đô Giê-ru-sa-lem và sáng tác phần lớn các bài Thi Thiên.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-5",
+            correct_name="Áp-ra-ham",
+            character_slug="ap-ra-ham",
+            title_or_role="Tổ phụ của đức tin & Bạn của Đức Chúa Trời",
+            era_or_testament="Cựu Ước (Patriarchal Era)",
+            scripture_reference="Sáng-thế Ký 12:1-4; 17:1-8; 22:1-14; Rô-ma 4:11",
+            explanation="Áp-ra-ham vì đức tin đã vâng lời Chúa rời quê hương, nhận lãnh giao ước về dòng dõi đông như sao trên trời, cát dưới biển.",
+            options=["Lót", "Áp-ra-ham", "Y-sác", "Nô-ê"],
+            correct_option=1,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi rời bỏ quê hương văn minh phồn thịnh U-rơ của người Canh-đê để đi đến một xứ sở mà thuở ban đầu tôi chưa từng biết rõ.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Khi tôi 99 tuổi và vợ tôi son sẻ đã già, Đức Chúa Trời lập giao ước đời đời và đổi tên tôi với lời hứa trở nên 'cha của nhiều dân tộc'.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Trên đỉnh núi Mô-ri-a, tôi đã vâng phục dâng đứa con một duy nhất mà mình yêu dấu, trước khi Chúa chuẩn bị con chiên đực mắc sừng thay thế.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi được Kinh Thánh tôn vinh là 'Tổ Phụ Của Mọi Kẻ Tin' và là người duy nhất được gọi là 'Bạn Của Đức Chúa Trời'.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-6",
+            correct_name="Giô-sép",
+            character_slug="gio-sep",
+            title_or_role="Quan Tể Tướng Ai Cập & Vị cứu tinh của gia tộc",
+            era_or_testament="Cựu Ước (Patriarchal Era)",
+            scripture_reference="Sáng-thế Ký 37:3-28; 39:1-20; 41:39-44; 50:20",
+            explanation="Dù bị các anh bán làm nô lệ và bị giam oan, Giô-sép nhờ sự kính sợ Chúa đã được cất nhắc lên làm Tể tướng cứu sống muôn dân qua nạn đói.",
+            options=["Bên-gia-min", "Giu-đa", "Giô-sép", "Đa-ni-ên"],
+            correct_option=2,
+            clues=[
+                WhoAmIClue(order=1, text="Cha tôi may tặng tôi chiếc áo dài nhiều màu rực rỡ, khiến các anh ruột sinh lòng ghen ghét và tìm cách hãm hại.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Tôi bị chính các anh ném xuống hố cạn rồi bán làm nô lệ sang xứ Ai Cập xa xôi với giá hai mươi miếng bạc.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Dù bị vợ quan Phô-ti-pha vu cáo và bị giam cầm oan uổng trong ngục tối, tôi vẫn giữ lòng thanh sạch kính sợ Đức Chúa Trời.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Nhờ giải mộng 7 năm được mùa và đói kém cho Pha-ra-ôn, tôi được phong làm Tể tướng trị nước Ai Cập và tha thứ cứu sống cả gia đình.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-7",
+            correct_name="Tiên tri Ê-li",
+            character_slug="e-li",
+            title_or_role="Tiên tri của Lửa & Người bảo vệ Đức tin chân thật",
+            era_or_testament="Cựu Ước (Divided Monarchy)",
+            scripture_reference="1 Các Vua 17:1-16; 18:20-40; 2 Các Vua 2:11",
+            explanation="Tiên tri Ê-li dũng cảm đối đầu vua A-háp và hoàng hậu Giê-sa-bên, thách thức tiên tri Ba-anh trên núi Cạt-mên và được cất lên trời trên xe lửa.",
+            options=["Tiên tri Ê-li-sê", "Tiên tri Ê-li", "Tiên tri Giê-rê-mi", "Tiên tri Ê-sai"],
+            correct_option=1,
+            clues=[
+                WhoAmIClue(order=1, text="Trong những ngày hạn hán khốc liệt 3 năm rưỡi, tôi được Đức Chúa Trời sai chim quạ đem bánh và thịt đến nuôi dưỡng bên khe suối Kê-rít.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Tại nhà người đàn bà góa Sa-rép-ta, nhờ lời cầu nguyện của tôi, hũ bột chẳng hề vơi và bình dầu không bao giờ cạn.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Một mình tôi thách thức 450 tiên tri Ba-anh trên núi Cạt-mên; lửa từ trời đã giáng xuống thiêu rụi của lễ đẫm nước chứng minh Chúa là chân thật.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi không trải qua sự chết nhưng được đưa thẳng lên trời bằng xe lửa và ngựa lửa giữa luồng gió lốc diệu kỳ.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-8",
+            correct_name="Đa-ni-ên",
+            character_slug="da-ni-en",
+            title_or_role="Quan Triều Đình & Nhà Tiên Tri Thời Lưu Đày",
+            era_or_testament="Cựu Ước (Babylonian Exile)",
+            scripture_reference="Đa-ni-ên 1:8; 2:1-45; 5:25-28; 6:10-23",
+            explanation="Đa-ni-ên giữ trọn sự thánh khiết nơi đất khách quê người, được ban sự khôn ngoan giải mộng và được Chúa gìn giữ trong hang sư tử đói.",
+            options=["Nê-hê-mi", "Ê-xơ-ra", "Đa-ni-ên", "Mạc-đô-chê"],
+            correct_option=2,
+            clues=[
+                WhoAmIClue(order=1, text="Thuở niên thiếu, tôi bị bắt lưu đày sang Ba-by-lôn nhưng quyết chí trong lòng không để mình bị ô uế bởi đồ ăn và rượu của vua ban.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Đức Chúa Trời ban cho tôi sự khôn ngoan gấp 10 lần các thuật sĩ và giải thích được giấc chiêm bao về pho tượng khổng lồ bằng kim loại cho vua Nê-bu-cát-nết-sa.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Chính tôi đã đọc và giải nghĩa những dòng chữ bí ẩn 'MÊ-NÊ, MÊ-NÊ, TÊ-KHEU, U-PHÁC-SIN' xuất hiện trên vách tường hoàng cung vua Bên-xát-sa.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Vì trung tín cầu nguyện 3 lần mỗi ngày hướng về Giê-ru-sa-lem, tôi bị ném vào hang sư tử đói, nhưng thiên sứ của Chúa đã bịt miệng sư tử gìn giữ tôi.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-9",
+            correct_name="Ma-ri (Mẹ Chúa Giê-xu)",
+            character_slug="ma-ri",
+            title_or_role="Người Nữ Được Ơn & Mẹ của Đấng Cứu Thế",
+            era_or_testament="Tân Ước (Gospels)",
+            scripture_reference="Lu-ca 1:26-56; 2:7; Giăng 19:25",
+            explanation="Ma-ri khiêm nhường vâng phục ý chỉ Thiên Chúa, trở thành người mẹ sinh hạ Đấng Cứu Thế và đồng hành suốt cuộc đời Ngài đến tận chân thập tự giá.",
+            options=["Ê-li-sa-bét", "Ma-thê", "Ma-ri Ma-đơ-len", "Ma-ri (Mẹ Chúa Giê-xu)"],
+            correct_option=3,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi là một thiếu nữ khiêm nhường sống tại thành Na-xa-rét nghèo nàn xứ Ga-li-lê, đã đính hôn cùng chàng thợ mộc Giô-sép.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Thiên sứ Gáp-ri-ên hiện ra chào tôi: 'Hỡi người được ơn, Chúa ở cùng ngươi!' và báo tin tôi sẽ mang thai bởi quyền phép Đức Thánh Linh.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Tôi đáp lại với đức tin trọn vẹn: 'Tôi là tôi tớ Chúa; xin sự ấy xảy ra cho tôi theo lời người!' và hát bài ca Ngợi Khen (Magnificat) bất hủ.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi đã sinh Đấng Cứu Thế nơi máng cỏ chuồng chiên Bết-lê-hem và đứng nghẹn ngào dưới chân thập tự giá chứng kiến Con mình chịu chết.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        ),
+        WhoAmIQuestion(
+            id="wai-10",
+            correct_name="Tiên tri Giô-na",
+            character_slug="gio-na",
+            title_or_role="Tiên tri trốn chạy & Bài học về lòng thương xót",
+            era_or_testament="Cựu Ước (Divided Monarchy)",
+            scripture_reference="Giô-na 1:1-17; 2:1-10; 3:1-5",
+            explanation="Giô-na tìm cách trốn chạy khỏi tiếng gọi Chúa, trải qua 3 ngày 3 đêm trong bụng cá lớn trước khi vâng phục đến Ni-ni-ve rao giảng sự ăn năn.",
+            options=["Tiên tri Giô-na", "Tiên tri Na-hum", "Tiên tri Ha-ba-cúc", "Tiên tri Ô-sê"],
+            correct_option=0,
+            clues=[
+                WhoAmIClue(order=1, text="Tôi là tiên tri được Chúa truyền lệnh đi đến cảnh cáo thành phố lớn Ni-ni-ve gian ác, nhưng tôi lại tìm cách trốn tránh tiếng gọi Ngài.", difficulty_label="Khởi Đầu (100đ)", points=100),
+                WhoAmIClue(order=2, text="Tôi xuống cảng Giốp-pê mua vé lên một chiếc thuyền chạy sang Ta-rê-sơ để trốn khỏi mặt Đức Giê-hô-va.", difficulty_label="Bối Cảnh (70đ)", points=70),
+                WhoAmIClue(order=3, text="Một trận bão biển dữ dội ập đến; các thủy thủ rút thăm trúng tôi và theo lời tôi, họ ném tôi xuống biển thì sóng gió lập tức yên lặng.", difficulty_label="Quyết Định (40đ)", points=40),
+                WhoAmIClue(order=4, text="Tôi ở trong bụng một con cá lớn suốt ba ngày ba đêm cầu nguyện ăn năn trước khi được mửa ra trên đất khô và tiếp tục sứ mạng.", difficulty_label="Rõ Nét (20đ)", points=20)
+            ]
+        )
+    ]
+    return challenges
+
+
