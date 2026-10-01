@@ -400,6 +400,128 @@ def get_daily_insight(db: Session = Depends(get_db)):
     }
 
 
+def format_verse_academic_citations(book_name: str, chapter: int, verse: int, text_content: str) -> Dict[str, str]:
+    """Generates 5 standard academic citation formats for a biblical verse (§38)."""
+    ref = f"{book_name} {chapter}:{verse}"
+    clean = text_content.strip()
+    cite_key = f"vie1925_{re.sub(r'[^a-zA-Z0-9]', '', book_name.lower())}_{chapter}_{verse}"
+    return {
+        "reference": ref,
+        "sbl": f"Kinh Thánh (Bản Dịch Truyền Thống 1925), {ref}.",
+        "chicago": f"Kinh Thánh: Bản Truyền Thống 1925. Hà Nội: Thánh Kinh Hội, 1925. {ref}.",
+        "apa": f"Thánh Kinh Hội. (1925). Kinh Thánh Tiếng Việt Bản Truyền Thống ({ref}). Văn Phẩm Cơ Đốc.",
+        "mla": f"Kinh Thánh Bản Truyền Thống 1925. {ref}. Thánh Kinh Hội, 1925.",
+        "bibtex": f"""@misc{{{cite_key},
+  title        = {{Kinh Thánh Tiếng Việt 1925: {ref}}},
+  publisher    = {{Thánh Kinh Hội}},
+  year         = {{1925}},
+  note         = {{{clean[:80]}...}}
+}}""",
+        "markdown": f"> \"{clean}\" — **{ref}** (Bản Truyền Thống 1925)"
+    }
+
+
+def classify_cross_reference(source_book: str, target_ref: str, source_testament: str) -> Dict[str, str]:
+    """
+    Classifies cross-reference according to ROADMAP1 §18 connection types:
+    - quotation (trích dẫn nguyên văn)
+    - explicit (liên chiếu trực tiếp)
+    - parallel (đối chiếu song song)
+    - allusion (ám chỉ / hình bóng tiên tri)
+    - theological_connection (kết nối thần học & giáo lý)
+    """
+    target_clean = target_ref.strip()
+    target_lower = target_clean.lower()
+    source_lower = source_book.lower()
+
+    gospel_names = ["ma-thi-ơ", "mác", "lu-ca", "giăng", "mat", "mac", "lu", "gi"]
+    is_source_gospel = any(s in source_lower for s in gospel_names)
+    is_target_gospel = any(target_lower.startswith(s) or f" {s}" in target_lower for s in ["mat", "mac", "lu", "gi", "ma-thi-ơ", "mác", "lu-ca", "giăng"])
+
+    if is_source_gospel and is_target_gospel:
+        return {
+            "type": "parallel",
+            "type_label": "Đối Chiếu Song Song (Gospel Parallel)",
+            "badge_color": "purple"
+        }
+
+    ot_hist = ["sa-mu-ên", "các vua", "sử ký", "1sm", "2sm", "1ki", "2ki", "1ch", "2ch", "1su", "2su", "1vua", "2vua"]
+    if any(h in source_lower for h in ot_hist) and any(h in target_lower for h in ot_hist):
+        return {
+            "type": "parallel",
+            "type_label": "Đối Chiếu Sử Thi Cựu Ước",
+            "badge_color": "indigo"
+        }
+
+    is_source_nt = source_testament == "NT"
+    ot_keywords = ["sáng thế", "xuất", "lê-vi", "dân số", "phục truyền", "thi thiên", "ê-sai", "giê-rê-mi", "ê-xê-chi-ên", "đa-ni-ên", "ô-sê", "mi-chê", "xa-cha-ri", "ma-la-chi", "ha-ba-cúc", "ha ", "hab ", "am ", "na ", "so ", "sa ", "xu ", "le ", "dan ", "phuc ", "thi ", "es ", "gie ", "da "]
+    nt_keywords = ["ma-thi-ơ", "mác", "lu-ca", "giăng", "công vụ", "rô-ma", "cô-rinh-tô", "hê-bơ-rơ", "khải huyền", "mat ", "mac ", "lu ", "gi ", "cv ", "ro ", "1co ", "2co ", "he ", "kh "]
+
+    if is_source_nt and any(ot in target_lower for ot in ot_keywords):
+        return {
+            "type": "quotation",
+            "type_label": "Trích Dẫn / Ứng Nghiệm Lời Tiên Tri Cựu Ước",
+            "badge_color": "amber"
+        }
+    if not is_source_nt and any(nt in target_lower for nt in nt_keywords):
+        return {
+            "type": "allusion",
+            "type_label": "Hình Bóng Ứng Nghiệm Trong Tân Ước",
+            "badge_color": "emerald"
+        }
+
+    epistles = ["rô-ma", "cô-rinh-tô", "ga-la-ti", "ê-phê-sô", "phi-líp", "cô-lô-se", "tê-sa-lô-ni-ca", "ti-mô-thê", "tít", "hê-bơ-rơ", "gia-cơ", "phi-e-rơ", "giăng", "ro", "co", "ga", "ep", "phi", "cl", "te", "ti", "tit", "he", "gia"]
+    if any(ep in source_lower for ep in epistles):
+        return {
+            "type": "theological_connection",
+            "type_label": "Liên Kết Giáo Lý & Thần Học Tân Ước",
+            "badge_color": "blue"
+        }
+
+    return {
+        "type": "explicit",
+        "type_label": "Liên Chiếu Bản Văn Trực Tiếp",
+        "badge_color": "slate"
+    }
+
+
+def find_harmony_event_for_verse(book_code: str, chapter: int, verse: int) -> Optional[Dict[str, Any]]:
+    """Finds if a verse belongs to any Gospel Harmony or OT Parallel event in HARMONY_EVENTS_CATALOG (§8, §18)."""
+    b_code = book_code.lower().strip()
+    # HARMONY_EVENTS_CATALOG is defined globally in this module
+    catalog = globals().get("HARMONY_EVENTS_CATALOG", [])
+    for ev in catalog:
+        passages = ev.get("passages", {})
+        for g_key, p_info in passages.items():
+            if p_info.get("book_code", "").lower() == b_code:
+                if p_info.get("chapter") == chapter:
+                    start_v = p_info.get("start_verse", 1)
+                    end_v = p_info.get("end_verse", 999)
+                    if start_v <= verse <= end_v:
+                        parallel_list = []
+                        for other_g, other_p in passages.items():
+                            parallel_list.append({
+                                "key": other_g,
+                                "book_name": other_p.get("book_name"),
+                                "ref": other_p.get("ref"),
+                                "theological_focus": other_p.get("theological_focus"),
+                                "is_current": other_g == g_key
+                            })
+                        return {
+                            "event_id": ev["id"],
+                            "title_vi": ev["title_vi"],
+                            "title_en": ev["title_en"],
+                            "category": ev["category"],
+                            "period_date": ev.get("period_date", ""),
+                            "location": ev.get("location", ""),
+                            "summary": ev.get("summary", ""),
+                            "current_focus": p_info.get("theological_focus", ""),
+                            "parallels": parallel_list,
+                            "synoptic_distinctives": ev.get("synoptic_distinctives")
+                        }
+    return None
+
+
 @router.get("/verse-details")
 def get_verse_details(
     verse_code: Optional[int] = Query(None, description="Exact verse code, e.g. 43003016"),
@@ -633,11 +755,10 @@ def get_verse_details(
         for n in notes_rows
     ]
 
-    # 5. Cross Reference Previews
+    # 5. Cross Reference Previews with ROADMAP1 §18 Connection Classification
     raw_cross = v_row.cross_references or []
     cross_previews = []
-    for ref_str in raw_cross[:4]:
-        # Try to find preview verse text
+    for ref_str in raw_cross[:6]:
         preview_text = ""
         try:
             from app.routers.bible import get_verse_range
@@ -646,10 +767,21 @@ def get_verse_details(
                 preview_text = cr_res["verses"][0]["text"]
         except Exception:
             preview_text = ""
+        
+        classification = classify_cross_reference(v_row.book_name, ref_str, v_row.testament)
         cross_previews.append({
             "reference": ref_str,
-            "preview_text": preview_text
+            "preview_text": preview_text,
+            "connection_type": classification["type"],
+            "connection_label": classification["type_label"],
+            "badge_color": classification["badge_color"]
         })
+
+    # 6. Gospel Harmony & Cross-Passage Parallel Passages Engine (§8, §18)
+    harmony_match = find_harmony_event_for_verse(v_row.book_code, v_row.chapter, v_row.verse)
+
+    # 7. Academic Citation Engine (§38)
+    citations = format_verse_academic_citations(v_row.book_name, v_row.chapter, v_row.verse, v_row.text)
 
     return {
         "verse": {
@@ -674,7 +806,9 @@ def get_verse_details(
         "lexicon": matched_lexicon,
         "bookmark": bookmark_info,
         "user_notes": user_notes,
-        "cross_references": cross_previews
+        "cross_references": cross_previews,
+        "harmony_event": harmony_match,
+        "citations": citations
     }
 
 

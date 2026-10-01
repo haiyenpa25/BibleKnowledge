@@ -185,7 +185,42 @@ interface VerseDetails {
   cross_references: {
     reference: string;
     preview_text: string;
+    connection_type?: string;
+    connection_label?: string;
+    badge_color?: string;
   }[];
+  harmony_event?: {
+    event_id: string;
+    title_vi: string;
+    title_en: string;
+    category: string;
+    period_date?: string;
+    location?: string;
+    summary?: string;
+    current_focus?: string;
+    parallels: Array<{
+      key: string;
+      book_name: string;
+      ref: string;
+      theological_focus: string;
+      is_current: boolean;
+    }>;
+    synoptic_distinctives?: {
+      shared_elements: string[];
+      unique_details: Record<string, string>;
+      theological_significance: string;
+      key_themes: string[];
+    };
+  } | null;
+  citations?: {
+    reference: string;
+    sbl: string;
+    chicago: string;
+    apa: string;
+    mla: string;
+    bibtex: string;
+    markdown: string;
+  } | null;
 }
 
 interface CrossRefPreviewData {
@@ -277,7 +312,8 @@ export default function BibleReaderPage() {
   // Verse Details (Entities, Strong Lexicon, Notes, Bookmark)
   const [verseDetails, setVerseDetails] = useState<VerseDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "lexicon" | "entities" | "notes">("insight");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<"insight" | "harmony" | "citations" | "lexicon" | "entities" | "notes">("insight");
+  const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
 
   // AI Explain State
   const [aiLoading, setAiLoading] = useState(false);
@@ -468,6 +504,13 @@ export default function BibleReaderPage() {
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function copyCitationText(key: string, text: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedCitationKey(key);
+    setTimeout(() => setCopiedCitationKey(null), 2500);
   }
 
   // Persistent Bookmark Toggle
@@ -1623,12 +1666,33 @@ export default function BibleReaderPage() {
             &ldquo;{selectedVerse.text}&rdquo;
           </p>
 
+          {/* Harmony Banner Prompt if verse belongs to an event */}
+          {verseDetails?.harmony_event && (
+            <div 
+              onClick={() => setActiveDrawerTab("harmony")}
+              className="p-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-purple-950/60 via-slate-900/80 to-indigo-950/60 border border-purple-500/40 flex items-center justify-between gap-2 cursor-pointer hover:border-purple-400 transition-all group shadow-md"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                  <span>✨</span> Đối Chiếu Tin Lành Đồng Quan (§8, §18)
+                </span>
+                <span className="text-xs font-semibold text-white group-hover:text-purple-200 transition-colors">
+                  {verseDetails.harmony_event.title_vi}
+                </span>
+              </div>
+              <span className="text-[11px] text-purple-400 font-bold flex items-center gap-1 group-hover:underline">
+                <span>Xem {verseDetails.harmony_event.parallels?.length || 4} bản song song</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          )}
+
           {/* Drawer Navigation Tabs */}
           <div className="flex items-center gap-1.5 pt-1 overflow-x-auto text-xs font-medium border-b border-slate-800/60 pb-2">
             <button
               type="button"
               onClick={() => setActiveDrawerTab("insight")}
-              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
                 activeDrawerTab === "insight"
                   ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
                   : "bg-slate-900 text-slate-400 hover:text-slate-200"
@@ -1640,8 +1704,39 @@ export default function BibleReaderPage() {
 
             <button
               type="button"
+              onClick={() => setActiveDrawerTab("harmony")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                activeDrawerTab === "harmony"
+                  ? "bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30"
+                  : verseDetails?.harmony_event
+                    ? "bg-purple-950/40 text-purple-300 border border-purple-500/40 hover:text-white"
+                    : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-purple-400" />
+              <span>Đối Chiếu Song Song (§8, §18)</span>
+              {verseDetails?.harmony_event && (
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveDrawerTab("citations")}
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                activeDrawerTab === "citations"
+                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Trích Dẫn Học Thuật (§38)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveDrawerTab("lexicon")}
-              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
                 activeDrawerTab === "lexicon"
                   ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
                   : "bg-slate-900 text-slate-400 hover:text-slate-200"
@@ -1654,7 +1749,7 @@ export default function BibleReaderPage() {
             <button
               type="button"
               onClick={() => setActiveDrawerTab("entities")}
-              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
                 activeDrawerTab === "entities"
                   ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
                   : "bg-slate-900 text-slate-400 hover:text-slate-200"
@@ -1667,7 +1762,7 @@ export default function BibleReaderPage() {
             <button
               type="button"
               onClick={() => setActiveDrawerTab("notes")}
-              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
                 activeDrawerTab === "notes"
                   ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
                   : "bg-slate-900 text-slate-400 hover:text-slate-200"
@@ -1730,6 +1825,25 @@ export default function BibleReaderPage() {
                     <BrainCircuit className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Nghiên Cứu Đa Tầng</span>
                   </Link>
+
+                  <Link
+                    href={`/research?ref=${encodeURIComponent(`${currentBook?.name_vi || ''} ${selectedVerse.chapter}:${selectedVerse.verse}`)}`}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-xs font-semibold text-amber-300 flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Phân tích bối cảnh lịch sử, địa lý, thần học (§15)"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Bối Cảnh Đa Chiều</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawerTab("citations")}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium flex items-center gap-1.5 transition-colors"
+                    title="Xem trích dẫn học thuật tự động SBL, Chicago, APA"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Trích Dẫn (§38)</span>
+                  </button>
                 </div>
 
                 {/* AI Explanation Box */}
@@ -1776,6 +1890,252 @@ export default function BibleReaderPage() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: GOSPEL HARMONY & CROSS-PASSAGE PARALLEL PASSAGES (§8, §18) */}
+            {activeDrawerTab === "harmony" && (
+              <div className="flex flex-col gap-4">
+                {verseDetails?.harmony_event ? (
+                  <div className="flex flex-col gap-3">
+                    {/* Harmony Card Header */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/50 via-slate-900/80 to-indigo-950/50 border border-purple-500/40 flex flex-col gap-2 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          {verseDetails.harmony_event.category}
+                        </span>
+                        <Link
+                          href={`/explore?tab=harmony&eventId=${verseDetails.harmony_event.event_id}`}
+                          className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold flex items-center gap-1 transition-colors shadow-sm"
+                        >
+                          <span>Mở Bảng Đối Chiếu Toàn Cảnh</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
+                      <h4 className="text-sm font-bold text-white">
+                        {verseDetails.harmony_event.title_vi}
+                      </h4>
+                      {verseDetails.harmony_event.summary && (
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                          {verseDetails.harmony_event.summary}
+                        </p>
+                      )}
+                      {verseDetails.harmony_event.current_focus && (
+                        <div className="p-2.5 rounded-xl bg-purple-950/80 border border-purple-800/60 text-xs text-purple-200">
+                          <strong className="text-purple-300">Đặc thù phân đoạn hiện tại: </strong>
+                          {verseDetails.harmony_event.current_focus}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Parallel Gospels List */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Các phân đoạn song song tương ứng ({verseDetails.harmony_event.parallels.length} bản văn):
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {verseDetails.harmony_event.parallels.map((p, pIdx) => (
+                          <div
+                            key={pIdx}
+                            className={`p-3 rounded-2xl border flex flex-col justify-between gap-2 transition-all ${
+                              p.is_current
+                                ? "bg-purple-950/50 border-purple-500/60 shadow-md ring-1 ring-purple-500/30"
+                                : "bg-slate-900/60 border-slate-800 hover:border-purple-500/30"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-white flex items-center gap-1.5">
+                                <span>📖</span>
+                                <span>{p.ref}</span>
+                              </span>
+                              {p.is_current ? (
+                                <span className="text-[10px] font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-md border border-purple-500/30">
+                                  Đang xem
+                                </span>
+                              ) : (
+                                <Link
+                                  href={`/bible?ref=${encodeURIComponent(p.ref)}`}
+                                  className="text-[10px] font-semibold text-purple-400 hover:text-purple-300 underline"
+                                >
+                                  Đọc đoạn này →
+                                </Link>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-300 leading-snug line-clamp-2">
+                              {p.theological_focus}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400 text-center">
+                    Câu này không nằm trong danh mục các sự kiện Tin Lành Đồng Quan (Gospel Harmony). Dưới đây là các liên chiếu thần học được phân loại của câu:
+                  </div>
+                )}
+
+                {/* Cross References Classified (§18) */}
+                {verseDetails?.cross_references && verseDetails.cross_references.length > 0 && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Mạng lưới liên chiếu thần học đã phân loại (§18):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {verseDetails.cross_references.map(cr => (
+                        <div
+                          key={cr.reference}
+                          onClick={() => handleOpenCrossReference(cr.reference)}
+                          className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/50 cursor-pointer text-xs flex flex-col gap-1.5 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-blue-400 flex items-center gap-1">
+                              <span>⚓</span>
+                              <span>{cr.reference}</span>
+                            </span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
+                              cr.badge_color === 'purple' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                              cr.badge_color === 'amber' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                              cr.badge_color === 'emerald' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                              cr.badge_color === 'indigo' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' :
+                              cr.badge_color === 'blue' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                              'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}>
+                              {cr.connection_label || "Liên Chiếu Trực Tiếp"}
+                            </span>
+                          </div>
+                          {cr.preview_text ? (
+                            <p className="font-serif text-slate-300 italic line-clamp-2">
+                              &ldquo;{cr.preview_text}&rdquo;
+                            </p>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">Nhấp để xem đoạn Kinh Thánh</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: ACADEMIC CITATION SYSTEM (§38) */}
+            {activeDrawerTab === "citations" && (
+              <div className="flex flex-col gap-3">
+                <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/30 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-slate-200">
+                      Trích dẫn học thuật tự động cho: <strong className="text-white">{verseDetails?.citations?.reference || `${currentBook?.name_vi} ${selectedVerse.chapter}:${selectedVerse.verse}`}</strong>
+                    </span>
+                  </div>
+                  <Link
+                    href="/library"
+                    className="px-2.5 py-1 rounded-xl bg-amber-600/80 hover:bg-amber-600 text-white font-bold text-[11px] flex items-center gap-1 transition-colors shrink-0"
+                  >
+                    <span>Thư Viện Thần Học</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                {verseDetails?.citations && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                    {/* SBL Style */}
+                    <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                          SBL Handbook of Style (Kinh Viện)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyCitationText("sbl_verse", verseDetails.citations?.sbl || "")}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                        >
+                          {copiedCitationKey === "sbl_verse" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedCitationKey === "sbl_verse" ? "Đã chép!" : "Sao chép"}</span>
+                        </button>
+                      </div>
+                      <p className="text-slate-300 font-serif leading-relaxed italic">
+                        {verseDetails.citations.sbl}
+                      </p>
+                    </div>
+
+                    {/* Chicago Style */}
+                    <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          Chicago / Turabian 9th
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyCitationText("chicago_verse", verseDetails.citations?.chicago || "")}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                        >
+                          {copiedCitationKey === "chicago_verse" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedCitationKey === "chicago_verse" ? "Đã chép!" : "Sao chép"}</span>
+                        </button>
+                      </div>
+                      <p className="text-slate-300 font-serif leading-relaxed">
+                        {verseDetails.citations.chicago}
+                      </p>
+                    </div>
+
+                    {/* APA 7th */}
+                    <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                          APA 7th Edition
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyCitationText("apa_verse", verseDetails.citations?.apa || "")}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                        >
+                          {copiedCitationKey === "apa_verse" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedCitationKey === "apa_verse" ? "Đã chép!" : "Sao chép"}</span>
+                        </button>
+                      </div>
+                      <p className="text-slate-300 font-sans leading-relaxed">
+                        {verseDetails.citations.apa}
+                      </p>
+                    </div>
+
+                    {/* BibTeX */}
+                    <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                          BibTeX (@misc)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyCitationText("bibtex_verse", verseDetails.citations?.bibtex || "")}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                        >
+                          {copiedCitationKey === "bibtex_verse" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedCitationKey === "bibtex_verse" ? "Đã chép!" : "Sao chép"}</span>
+                        </button>
+                      </div>
+                      <pre className="text-[10px] text-slate-400 font-mono whitespace-pre overflow-x-auto leading-relaxed">
+                        {verseDetails.citations.bibtex}
+                      </pre>
+                    </div>
+
+                    {/* Markdown Quote */}
+                    <div className="col-span-1 md:col-span-2 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                      <span className="truncate italic">
+                        Markdown: {verseDetails.citations.markdown}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyCitationText("md_verse", verseDetails.citations?.markdown || "")}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium flex items-center gap-1 shrink-0 transition-colors"
+                      >
+                        {copiedCitationKey === "md_verse" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedCitationKey === "md_verse" ? "Đã chép!" : "Chép Markdown"}</span>
+                      </button>
                     </div>
                   </div>
                 )}
