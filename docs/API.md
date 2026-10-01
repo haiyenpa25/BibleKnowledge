@@ -233,8 +233,40 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
 
 ---
 
-## 7. Performance & Resource Constraints
+## 7. Theological Library & Document Engine (`/api/library`)
+
+### 7.1 Library Overview & Statistics
+- **Endpoint**: `GET /api/library/stats`
+- **Description**: Returns global statistics across 275 volumes: 135 commentaries, 42 dictionaries/encyclopedias, 17 surveys, 81 monographs, total chapters, indexed chunks, and series counts.
+
+### 7.2 Theological Catalog & Filtering
+- **Endpoint**: `GET /api/library/catalog?category={category}&series={series}&search={query}&limit={limit}&offset={offset}`
+- **Description**: Paginated catalog of all 275 theological works with filtering by category, multi-volume series, and text search.
+
+### 7.3 Book Details & Table of Contents
+- **Endpoint**: `GET /api/library/books/{book_index}`
+- **Description**: Returns volume metadata, author, classification, and list of all chapters with section counts and previews.
+
+### 7.4 Chapter Reader & Exegesis Content
+- **Endpoint**: `GET /api/library/books/{book_index}/chapters/{chapter_index}`
+- **Description**: Retrieves full chapter text, section headings, paragraphs, and detected Scripture references.
+
+### 7.5 User Notes & Highlighting
+- **Endpoints**:
+  - `GET /api/library/notes`: List user research notes and annotations.
+  - `POST /api/library/notes`: Create new study note with target book, chapter, and tags.
+  - `DELETE /api/library/notes/{note_id}`: Remove note.
+
+### 7.6 Series & Author Indexes
+- **Endpoints**:
+  - `GET /api/library/authors`: List 171 classic theological commentators.
+  - `GET /api/library/series-catalog`: List 10 premier multi-volume commentary series (TOTC, TNTC, Wiersbe, IVP...).
+
+---
+
+## 8. Performance & Resource Constraints
 
 - **Maximum Allowed Non-Ollama Application Container RAM**: 2048 MiB (2.0 GB).
-- **Current Audited Usage**: ~965.1 MiB / 2048 MiB (47.1% headroom).
+- **Current Audited Usage**: ~961.6 MiB / 2048 MiB (46.9% headroom).
 - **Ollama LLM GPU Reservation**: Up to 8 GB VRAM on NVIDIA RTX 5050 Laptop GPU.
+
