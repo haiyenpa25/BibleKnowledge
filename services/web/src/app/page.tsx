@@ -201,6 +201,12 @@ export default function Home() {
               <Network className="w-4 h-4" /> Khám Phá & Đồ Thị (Explore) →
             </a>
             <a 
+              href="/study"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-600/30"
+            >
+              <BookOpen className="w-4 h-4" /> Tra Cứu Strong & Giải Kinh (/study) →
+            </a>
+            <a 
               href="/research"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30"
             >
