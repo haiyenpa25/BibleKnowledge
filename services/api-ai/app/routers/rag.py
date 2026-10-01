@@ -133,7 +133,7 @@ class CharacterStudyResponse(BaseModel):
     slug: str
     name_vi: str
     name_en: str
-    original_name: Optional[str]
+    original_name: Optional[str] = None
     title_or_role: str
     timeline_period: str
     summary: str
@@ -143,11 +143,15 @@ class CharacterStudyResponse(BaseModel):
     ai_theological_portrait: str
     spiritual_lessons: List[str]
     reflection_questions: List[str]
+    turning_points: Optional[List[str]] = None
+    typological_significance: Optional[str] = None
+    strengths: Optional[List[str]] = None
+    weaknesses: Optional[List[str]] = None
 
 
 # --- Theme Study Models ---
 class ThemeStudyRequest(BaseModel):
-    theme_key: str = Field(..., description="Theme key, e.g. 'faith', 'grace', 'covenant', 'kingdom', 'spirit', 'love', 'peace', 'salvation'")
+    theme_key: str = Field(..., description="Theme key, e.g. 'faith', 'grace', 'covenant', 'kingdom', 'spirit', 'love', 'peace', 'salvation', 'holiness'")
 
 
 class LexiconBrief(BaseModel):
@@ -156,6 +160,13 @@ class LexiconBrief(BaseModel):
     lemma: str
     transliteration: str
     definition: str
+
+
+class RedemptiveStage(BaseModel):
+    stage: str
+    stage_name_vi: str
+    description: str
+    scripture_ref: str
 
 
 class ThemeStudyResponse(BaseModel):
@@ -169,6 +180,8 @@ class ThemeStudyResponse(BaseModel):
     nt_fulfillment: str
     practical_application: str
     reflection_questions: List[str]
+    redemptive_stages: Optional[List[RedemptiveStage]] = None
+    theological_distinctions: Optional[List[str]] = None
 
 
 
@@ -570,14 +583,208 @@ def evaluate_guardrails(req: GuardrailEvaluationRequest, db: Session = Depends(g
 # 2. Systematic Character Study (ROADMAP1 Section 16)
 # ==============================================================================
 
+CANONICAL_CHARACTERS_EXTRA = {
+    "si-mon-phi-e-ro": {
+        "turning_points": [
+            "Tiếng gọi bên bờ biển Ga-li-lê: 'Hãy theo ta, ta sẽ khiến các ngươi nên tay đánh lưới người' (Ma-thi-ơ 4:19)",
+            "Lời xưng nhận đức tin nền tảng tại Sê-sa-rê Phi-líp: 'Thầy là Đấng Christ, Con Đức Chúa Trời hằng sống' (Ma-thi-ơ 16:16)",
+            "Vấp ngã chối Chúa 3 lần trong sân thầy tế lễ thượng phẩm và nước mắt ăn năn đắng cay (Ma-thi-ơ 26:69-75)",
+            "Được Chúa Phục Sinh phục hồi ba lần bên biển Ti-bê-ri-át: 'Hãy chăn những chiên thơ ta' (Giăng 21:15-17)",
+            "Ngày Lễ Ngũ Tuần: Đầy dẫy Đức Thánh Linh, giảng đạo dẫn dắt 3,000 người quy đạo (Công-vụ 2)",
+            "Mở cửa Tin Lành cho Dân Ngoại qua khải tượng khăn vuông và gia đình Cọt-nây tại Sê-sa-rê (Công-vụ 10)"
+        ],
+        "typological_significance": "Phi-e-rơ là mẫu mực của môn đồ bất toàn được ân điển cứu chuộc và biến đổi trở nên người chăn bầy tận tụy dưới quyền Đấng Chăn Chiên Trưởng (1 Phi-e-rơ 5:4). Sự vấp ngã và phục hồi của ông minh chứng quyền năng cứu chuộc vô song của Đấng Christ trên sự thất bại của con người.",
+        "strengths": [
+            "Lòng nhiệt thành cháy bỏng và tính quyết đoán, hành động ngay tức khắc vì Chúa",
+            "Nhạy bén thuộc linh nhận lãnh sự mạc khải trực tiếp từ Cha trên trời",
+            "Khiêm nhường tiếp nhận sự sửa phạt và phục hồi để gánh vác sứ mạng Hội Thánh"
+        ],
+        "weaknesses": [
+            "Tự tin thái quá nơi sức riêng của bản thân và xác thịt ('Dẫu mọi người vấp phạm, tôi chẳng hề vấp phạm')",
+            "Hành động bốc đồng thiếu suy xét trong vườn Ghết-sê-ma-nê (chém tai Man-chu)",
+            "Dao động trước áp lực dư luận và sợ hãi trước câu hỏi của một tớ gái"
+        ]
+    },
+    "su-do-phao-lo": {
+        "turning_points": [
+            "Biến cố ngã ngựa trên đường Đa-mách: gặp gỡ Chúa Giê-xu Phục Sinh và bị mù lòa 3 ngày (Công-vụ 9:1-9)",
+            "Thời gian biệt riêng 3 năm tại xứ A-ra-bi để tương giao sâu nhiệm và tiếp nhận lẽ thật Tin Lành (Ga-la-ti 1:17-18)",
+            "Chuyến hành trình truyền giáo đầu tiên xuất phát từ Hội Thánh An-ti-ốt cùng Ba-na-ba (Công-vụ 13)",
+            "Đại hội Giê-ru-sa-lem: đứng vững bảo vệ lẽ thật ơn cứu rỗi duy bởi ân điển cho Dân Ngoại (Công-vụ 15)",
+            "Khải tượng người Ma-xê-đoan mở lối đem Tin Lành vượt biển vào lục địa Âu Châu (Công-vụ 16:9-10)",
+            "Tuẫn đạo kiên cường tại La-mã với lời tuyên ngôn khải hoàn: 'Ta đã đánh trận tốt lành, đã xong sự chạy, đã giữ được đức tin' (2 Ti-mô-thê 4:7)"
+        ],
+        "typological_significance": "Phao-lô là hình bóng của 'kẻ có tội bậc nhất' được biến cải thành 'sứ đồ cho muôn dân' để bày tỏ sự kiên nhẫn vô hạn của Đấng Christ (1 Ti-mô-thê 1:15-16). Đời sống ông thể hiện sự đồng chết và đồng sống lại trọn vẹn với Đấng Cứu Thế (Ga-la-ti 2:20).",
+        "strengths": [
+            "Trí tuệ thần học uyên thâm, tư duy logic sắc bén gắn liền với khải thị thánh",
+            "Tinh thần dấn thân vô bờ bến, sẵn sàng chịu đòn vọt, đắm tàu, tù ngục vì Danh Chúa",
+            "Trái tim người cha thuộc linh luôn thổn thức, cầu thay ngày đêm cho các Hội Thánh"
+        ],
+        "weaknesses": [
+            "Quá khứ từng nhiệt thành mù quáng, bắt bớ và bức hại tàn bạo Hội Thánh của Chúa",
+            "Tính cách bộc trực, kiên quyết đôi lúc dẫn đến xung đột nội bộ gay gắt (với Ba-na-ba về Mác)"
+        ]
+    },
+    "vua-da-vit": {
+        "turning_points": [
+            "Được tiên tri Sa-mu-ên xức dầu làm vua tại Bết-lê-hem khi còn là chàng thiếu niên chăn chiên vô danh (1 Sa-mu-ên 16)",
+            "Chiến thắng gã khổng lồ Gô-li-át bằng dây phóng đá và niềm tin tuyệt đối nơi Đức Giê-hô-va Vạn Quân (1 Sa-mu-ên 17)",
+            "Những năm tháng lưu đày trốn chạy vua Sau-lơ trong đồng vắng nhưng hai lần từ chối tra tay hại kẻ Chúa xức dầu",
+            "Được toàn dân tôn làm vua tại Hếp-rôn và đưa Hòm Giao Ước về thành Si-ôn (2 Sa-mu-ên 5-6)",
+            "Tiếp nhận Giao Ước Đa-vít về một ngai vàng và vương quốc trường tồn đời đời (2 Sa-mu-ên 7)",
+            "Sa ngã phạm tội tà dâm cùng Bát-sê-ba và mưu hại U-ri, kéo theo sự ăn năn đau đớn tận tâm can trong Thi thiên 51"
+        ],
+        "typological_significance": "Đa-vít là hình mẫu tiên trưng (type) vĩ đại nhất về Đấng Mê-si-a trong Cựu Ước. Chúa Giê-xu được xưng tụng là 'Con Vua Đa-vít' (Ma-thi-ơ 1:1), Đấng kế vị ngai Đa-vít để trị vì vương quốc công bình đời đời.",
+        "strengths": [
+            "Tấm lòng khao khát Đức Chúa Trời ('người vừa lòng Ta' - Công-vụ 13:22)",
+            "Tâm linh thờ phượng, thi ca và cầu nguyện sâu nhiệm bậc nhất lịch sử tuyển dân",
+            "Lòng can đảm dựa trên đức tin và sự tôn trọng tuyệt đối chủ quyền xức dầu của Chúa"
+        ],
+        "weaknesses": [
+            "Bất cẩn buông thả trước cám dỗ dục vọng xác thịt tại hoàng cung trong mùa chiến trận",
+            "Thiếu quyết đoán và nuông chiều trong việc răn dạy, kỷ luật các hoàng tử con cái (Am-nôn, Áp-sa-lôm)"
+        ]
+    },
+    "moi-se": {
+        "turning_points": [
+            "Được vớt khỏi dòng sông Nin và lớn lên trong cung điện Pha-ra-ôn với mọi sự khôn ngoan của Ai Cập (Xuất 2)",
+            "40 năm chăn chiên nơi đồng vắng Ma-đi-an và biến cố khải thị nơi bụi gai cháy tại núi Hô-rếp (Xuất 3)",
+            "Lãnh đạo 10 tai vạ và dẫn dắt 2 triệu dân Y-sơ-ra-ên vượt Biển Đỏ bước vào tự do (Xuất 12-14)",
+            "Lên đỉnh núi Si-nai diện đối diện cùng Đức Chúa Trời để nhận lãnh 10 Điều Răn và Luật Pháp (Xuất 19-20)",
+            "Cầu thay xé lòng xin Chúa tha tội cho dân sự khi họ thờ bò con vàng (Xuất 32)",
+            "Vấp ngã đập hòn đá tại Mê-ri-ba và qua đời trên đỉnh núi Nê-bô trong cái nhìn hướng về Đất Hứa (Phục truyền 34)"
+        ],
+        "typological_significance": "Môi-se là hình bóng về Đấng Trung Bảo và Đấng Tiên Tri vĩ đại. Phục truyền 18:15 tiên tri: 'Giê-hô-va Đức Chúa Trời ngươi sẽ dấy lên một đấng tiên tri như ta'. Trong khi Môi-se ban Luật Pháp, thì Đấng Christ đem đến Ân Điển và Chân Lý (Giăng 1:17; Hê-bơ-rơ 3:1-6).",
+        "strengths": [
+            "Đức khiêm nhường tột bậc hơn mọi người trên mặt đất (Dân-số 12:3)",
+            "Lòng tận hiến cầu thay không mệt mỏi, sẵn sàng liều mình vì dân tộc",
+            "Sự trung tín tuyệt đối trong cả nhà Đức Chúa Trời"
+        ],
+        "weaknesses": [
+            "Từng thiếu tự tin và thoái thác trách nhiệm khi Chúa kêu gọi ban đầu (Xuất 4)",
+            "Bộc phát nóng giận đập vào vầng đá thay vì nói cùng vầng đá, làm tổn hại sự thánh khiết của Chúa trước mặt dân chúng (Dân-số 20)"
+        ]
+    },
+    "ap-ra-ham": {
+        "turning_points": [
+            "Đáp lời kêu gọi rời bỏ quê hương U-rơ để đi đến xứ Chúa chỉ cho mà không biết mình đi đâu (Sáng 12)",
+            "Tiếp nhận Lời Hứa Giao Ước về dòng dõi đông như sao trên trời và được xưng công bình bởi đức tin (Sáng 15:6)",
+            "Thử thách đức tin tột đỉnh: vâng lời đem dâng con một Y-sác trên núi Mô-ri-a (Sáng 22)",
+            "Trở nên Tổ phụ của Đức tin cho mọi kẻ tin từ muôn dân tộc trên đất"
+        ],
+        "typological_significance": "Hành động Áp-ra-ham dâng Y-sác là hình bóng tiên tri sống động về Đức Chúa Cha không tiếc chính Con Một của Ngài vì nhân loại tội lỗi. Của lễ chiên đực mắc sừng nơi bụi rậm chỉ về Chiên Con Đức Chúa Trời thay thế tội nhân.",
+        "strengths": [
+            "Đức tin kiên định nơi lời hứa vô điều kiện của Đức Chúa Trời",
+            "Sự vâng lời trọn vẹn, không do dự ngay cả khi đối diện mệnh lệnh khó khăn nhất",
+            "Mối thông công mật thiết với Chúa đến độ được gọi là 'Bạn của Đức Chúa Trời'"
+        ],
+        "weaknesses": [
+            "Hai lần nói dối Sa-ra là em gái vì lo sợ tính mạng trước các vua ngoại bang (Sáng 12, Sáng 20)",
+            "Từng thiếu kiên nhẫn chờ đợi lời hứa nên nghe theo Sa-ra ăn ở cùng A-ga sinh ra Ích-ma-ên (Sáng 16)"
+        ]
+    },
+    "gio-sep": {
+        "turning_points": [
+            "Những giấc chiêm bao thời niên thiếu bị các anh ghen ghét và bán sang Ai Cập làm nô lệ (Sáng 37)",
+            "Đắc thắng cám dỗ tà dâm trước vợ Phô-ti-pha với tâm niệm: 'Thế nào tôi dám phạm tội lớn dường ấy mà phạm cùng Đức Chúa Trời?' (Sáng 39)",
+            "Bị giam cầm oan uổng trong ngục nhưng giải mộng trung tín cho quan tửu chánh và quan ban bánh (Sáng 40)",
+            "Giải mộng 7 năm dư dật và đói kém cho Pha-ra-ôn, được cất nhắc lên làm Tể tướng toàn cõi Ai Cập (Sáng 41)",
+            "Tha thứ trọn vẹn cho các anh và cứu cả gia tộc khỏi nạn đói: 'Các anh toan hại tôi, nhưng Đức Chúa Trời lại toan làm điều ích' (Sáng 50:20)"
+        ],
+        "typological_significance": "Giô-sép là một trong những hình bóng hoàn hảo nhất về Đấng Christ trong Cựu Ước: Người con yêu dấu bị các anh mình chối bỏ, bán với giá của kẻ nô lệ, chịu khổ nạn bất công, nhưng được tôn cao lên tột đỉnh quyền uy và trở nên nguồn cứu rỗi sự sống cho muôn dân.",
+        "strengths": [
+            "Lòng thánh sạch và kính sợ Đức Chúa Trời tuyệt đối giữa cám dỗ nhục dục bí mật",
+            "Tài năng quản trị kinh tế và lãnh đạo khủng hoảng kiệt xuất",
+            "Tấm lòng bao dung, tha thứ và nhìn thấy bàn tay tể trị của Chúa trên mọi nghịch cảnh"
+        ],
+        "weaknesses": [
+            "Thời niên thiếu có phần hồn nhiên thiếu tế nhị khi thuật lại giấc mộng trước các anh vốn đang ghen tị"
+        ]
+    },
+    "ma-ri": {
+        "turning_points": [
+            "Thiên sứ Gáp-ri-ên truyền tin thụ thai bởi Đức Thánh Linh và lời vâng phục tuyệt đối: 'Tôi đây là tôi tớ Chúa, xin sự ấy xảy ra cho tôi theo lời người' (Lu-ca 1:38)",
+            "Bài ca Magnificat tôn ngợi sự công bình và lòng thương xót của Đức Chúa Trời (Lu-ca 1:46-55)",
+            "Sinh hạ Chúa Giê-xu nơi máng cỏ chuồng chiên Bết-lê-hem và tiếp nhận lời tiên tri của Si-mê-ôn về mũi gươm xé lòng (Lu-ca 2)",
+            "Đứng lặng thầm dưới chân thập tự giá chứng kiến Con Một trút hơi thở cuối cùng (Giăng 19:25)",
+            "Hiệp một cầu nguyện cùng các sứ đồ trong phòng cao trước ngày Lễ Ngũ Tuần (Công-vụ 1:14)"
+        ],
+        "typological_significance": "Ma-ri là biểu tượng của người tôi tớ khiêm nhường tiếp nhận Lời Chúa (Theotokos - Đấng mang Đấng Christ vào thế gian), đại diện cho tuyển dân trung tín sẵn sàng chịu điều sỉ nhục để chương trình cứu chuộc được thành toàn.",
+        "strengths": [
+            "Lòng đầu phục tuyệt đối trước ý muốn thiêng liêng dầu đối diện nguy cơ bị ném đá vì mang thai trước hôn nhân",
+            "Thói quen thuộc linh quý báu: ghi nhớ và suy ngẫm mọi lời phán trong lòng",
+            "Sự kiên trì trung tín đi cùng chức vụ của Chúa Giê-xu từ máng cỏ đến thập tự giá"
+        ],
+        "weaknesses": [
+            "Từng có lúc cùng các em băn khoăn về áp lực dư luận đối với chức vụ của Chúa Giê-xu (Mác 3:21)"
+        ]
+    },
+    "su-do-giang": {
+        "turning_points": [
+            "Được Chúa kêu gọi rời thuyền và cha mình tại bờ biển Ga-li-lê để trở thành môn đồ (Ma-thi-ơ 4:21)",
+            "Được ở trong nhóm môn đồ thân cận nhất (cùng Phi-e-rơ và Gia-cơ) chứng kiến Chúa hóa hình trên núi thánh và sự sống lại của con gái Giai-ru",
+            "Tựa đầu vào ngực Chúa trong Bữa Tiệc Ly và đứng trung thành dưới chân Thập Tự Giá lãnh nhận sự ủy thác chăm sóc mẹ Ma-ri (Giăng 19:26-27)",
+            "Chạy đến mộ trống vào sáng Phục Sinh, 'thấy và tin' (Giăng 20:8)",
+            "Bị lưu đày tại đảo Bát-mô vì cớ Lời Đức Chúa Trời và nhận lãnh khải tượng Khải Huyền về sự đắc thắng tối hậu của Chiên Con (Khải 1)"
+        ],
+        "typological_significance": "Giăng là môn đồ phản chiếu sự kết hợp hoàn hảo giữa Lẽ Thật và Tình Yêu (Aletheia & Agape). Ông làm chứng về Ngôi Lời (Logos) đời đời nhập thể làm người, soi sáng thần học Cơ Đốc qua mọi thời đại.",
+        "strengths": [
+            "Mối tương giao mật thiết, gắn bó sâu sắc với Chúa Giê-xu ('môn đồ Chúa yêu')",
+            "Trực giác tâm linh sâu sắc, thấu suốt thần tính của Đấng Christ",
+            "Lòng trung thành không rời bỏ Chúa ngay cả trong thời khắc nguy hiểm tột độ tại đồi Gô-gô-tha"
+        ],
+        "weaknesses": [
+            "Thời trẻ mang biệt danh 'Con của sấm sét' (Boanerges), từng nóng nảy đòi khiến lửa từ trời giáng xuống thiêu hủy làng Sa-ma-ri (Lu-ca 9:54)",
+            "Từng cùng anh mình xin hai vị trí quyền lực nhất bên hữu và bên tả Chúa trong vương quốc (Mác 10:35-37)"
+        ]
+    },
+    "vua-sa-lo-mon": {
+        "turning_points": [
+            "Kế vị vua cha Đa-vít và cầu xin Chúa ban sự khôn ngoan để cai trị dân tộc thay vì xin giàu sang trường thọ (1 Các Vua 3)",
+            "Xây dựng Đền Thờ Giê-ru-sa-lem nguy nga rực rỡ và dâng lời cầu nguyện cung hiến đầy xúc động (1 Các Vua 6-8)",
+            "Thời kỳ hoàng kim đón tiếp Nữ hoàng Sa-ba và các vương hầu khắp thế giới đến chiêm ngưỡng sự khôn ngoan (1 Các Vua 10)",
+            "Bi kịch cuối đời: lấy nhiều người nữ ngoại bang, để lòng nghiêng theo thần tượng gớm ghiếc làm chia cắt vương quốc (1 Các Vua 11)",
+            "Trước tác sách Truyền Đạo tổng kết tính hư không của cuộc đời dưới mặt trời khi lìa xa Đấng Tạo Hóa"
+        ],
+        "typological_significance": "Vương quyền hòa bình và sự khôn ngoan của Sa-lô-môn là hình bóng về Đấng Christ là 'Đấng lớn hơn Sa-lô-môn' (Ma-thi-ơ 12:42), Vua Bình An cai trị vương quốc không hề suy tàn. Sự thất bại của Sa-lô-môn chỉ ra rằng chỉ duy Đấng Christ mới giữ được sự công chính trọn vẹn.",
+        "strengths": [
+            "Sự khôn ngoan siêu việt do chính Đức Chúa Trời ban tặng, tài phán xét xuất chúng",
+            "Tài năng kiến trúc, tổ chức xã hội và sáng tác thi ca, châm ngôn lỗi lạc",
+            "Đóng góp to lớn cho kho tàng văn chương khôn ngoan của Kinh Thánh (Châm ngôn, Truyền đạo, Nhã ca)"
+        ],
+        "weaknesses": [
+            "Không vâng giữ mạng lệnh Chúa về việc không tích lũy ngựa chiến, vàng bạc và thê thiếp ngoại bang (Phục truyền 17)",
+            "Thỏa hiệp tôn giáo vì tình cảm xác thịt, dung dưỡng các bàn thờ tà thần khiến cơn thạnh nộ của Chúa nổi lên"
+        ]
+    },
+    "chua-gie-xu": {
+        "turning_points": [
+            "Nhập thể giáng sinh tại Bết-lê-hem qua trinh nữ Ma-ri (Lu-ca 2)",
+            "Chịu báp-têm tại sông Giô-đanh và đắc thắng cám dỗ của Sa-tan trong đồng vắng bởi Lời Đức Chúa Trời (Ma-thi-ơ 3-4)",
+            "Chức vụ công khai 3 năm rưỡi: rao giảng Phúc Âm Nước Trời, chữa lành kẻ đau ốm, mở mắt kẻ mù và làm kẻ chết sống lại",
+            "Biến cố Hóa Hình trên núi thánh bày tỏ vinh hiển vĩnh hằng cùng Môi-se và Ê-li (Ma-thi-ơ 17)",
+            "Đêm Ghết-sê-ma-nê thuận phục ý muốn của Cha và chịu chết chuộc tội trên Thập Tự Giá tại đồi Gô-gô-tha (Ma-thi-ơ 26-27)",
+            "Sống lại khải hoàn vào ngày thứ ba, chiến thắng sự chết và cõi âm phủ (Ma-thi-ơ 28)",
+            "Thăng thiên về trời ngự bên hữu Đức Chúa Cha và hứa ban Đức Thánh Linh cùng ngày tái lâm vinh hiển (Công-vụ 1)"
+        ],
+        "typological_significance": "Chúa Giê-xu Christ là Đấng Làm Trọn Mọi Hình Bóng (Antitype tối hậu). Ngài là A-đam Sau Cùng đem lại sự sống, là Chiên Con Lễ Vượt Qua hoàn hảo, là Thầy Tế Lễ Thượng Phẩm theo ban Mên-chi-xê-đéc, là Đấng Tiên Tri vĩ đại hơn Môi-se, và là Vua Muôn Vua cai trị đời đời.",
+        "strengths": [
+            "Hoàn hảo vô tội trong mọi tư tưởng, lời nói và hành động (Hê-bơ-rơ 4:15)",
+            "Tình yêu thương tự hiến vô điều kiện đến mức xả thân vì tội nhân",
+            "Vâng phục trọn vẹn Đức Chúa Cha cho đến chết, thậm chí chết trên cây thập tự"
+        ],
+        "weaknesses": []
+    }
+}
+
 @router.post("/character-study", response_model=CharacterStudyResponse)
 async def study_character(req: CharacterStudyRequest, db: Session = Depends(get_db)):
     """
     Produce an in-depth theological portrait of a biblical character:
     - Canonical profile & historical context
-    - Milestones, actions, turning points
+    - Milestones, actions, turning points (§16)
     - Relationship network from knowledge graph
-    - Grounded spiritual analysis synthesized via Ollama Qwen
+    - Typological significance & discipleship lessons
     """
     query_str = req.name_or_slug.strip().lower()
 
@@ -647,7 +854,6 @@ async def study_character(req: CharacterStudyRequest, db: Session = Depends(get_
     if "key_verse" in meta:
         key_verses.append(meta["key_verse"])
 
-    # Look up verse_entities
     sql_v = text("""
         SELECT DISTINCT b.name_vi, v.chapter, v.verse
         FROM verse_entities ve
@@ -662,7 +868,35 @@ async def study_character(req: CharacterStudyRequest, db: Session = Depends(get_
         if ref_s not in key_verses:
             key_verses.append(ref_s)
 
-    # 4. Synthesize AI Portrait using Ollama Qwen
+    # 4. Extract Canonical Extra Details (§16)
+    extra = CANONICAL_CHARACTERS_EXTRA.get(person.slug)
+    turning_points = []
+    typological_sig = ""
+    strengths = []
+    weaknesses = []
+
+    if extra:
+        turning_points = extra.get("turning_points", [])
+        typological_sig = extra.get("typological_significance", "")
+        strengths = extra.get("strengths", [])
+        weaknesses = extra.get("weaknesses", [])
+    else:
+        # Generic fallback based on database records
+        turning_points = [
+            f"Sự kêu gọi và định vị lịch sử trong thời kỳ {person.timeline_period}",
+            f"Vai trò lãnh đạo trung tâm: {person.title_or_role}",
+            f"Hành trình đức tin và di sản lưu truyền cho toàn bộ tuyển dân"
+        ]
+        typological_sig = f"Qua cuộc đời của {person.name_vi}, kế hoạch cứu chuộc vĩ đại của Đức Chúa Trời được bày tỏ tiệm tiến, hướng lòng người học về sự trọn vẹn và ân điển tối hậu nơi Đấng Christ."
+        strengths = [
+            f"Trung tín trong sứ mạng được giao phó trong bối cảnh {person.timeline_period}",
+            f"Sẵn sàng phục vụ cộng đồng tuyển dân với tư cách {person.title_or_role}"
+        ]
+        weaknesses = [
+            "Giới hạn xác thịt tự nhiên của con người trước quy mô kế hoạch thiêng liêng"
+        ]
+
+    # 5. Synthesize AI Portrait with 15s resilient timeout
     prompt_portrait = f"""Bạn là học giả nghiên cứu Kinh Thánh bảo thủ, chính thống. Hãy phân tích nhân vật Kinh Thánh sau:
 Nhân vật: {person.name_vi} ({person.name_en})
 Danh hiệu / Vai trò: {person.title_or_role}
@@ -677,7 +911,7 @@ Yêu cầu nội dung (viết mạch lạc, trang trọng, đầy đủ dẫn ch
 """
     ai_portrait = ""
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/generate",
                 json={
@@ -701,8 +935,8 @@ Yêu cầu nội dung (viết mạch lạc, trang trọng, đầy đủ dẫn ch
     ]
 
     reflection_questions = [
-        f"Tôi học được gì từ cách {person.name_vi} đối diện với thất bại và được Chúa phục hồi?",
-        "Trong hoàn cảnh hiện tại, Chúa đang mời gọi tôi bước ra bằng đức tin như thế nào?"
+        f"Tôi học được gì từ cách {person.name_vi} đối diện với thử thách và được Chúa dẫn dắt?",
+        "Trong hoàn cảnh hiện tại, Chúa đang mời gọi tôi bước đi bằng đức tin như thế nào?"
     ]
 
     return CharacterStudyResponse(
@@ -718,7 +952,11 @@ Yêu cầu nội dung (viết mạch lạc, trang trọng, đầy đủ dẫn ch
         relationships=relationships,
         ai_theological_portrait=ai_portrait,
         spiritual_lessons=spiritual_lessons,
-        reflection_questions=reflection_questions
+        reflection_questions=reflection_questions,
+        turning_points=turning_points,
+        typological_significance=typological_sig,
+        strengths=strengths,
+        weaknesses=weaknesses
     )
 
 
@@ -732,49 +970,180 @@ THEMES_CONFIG = {
         "name_en": "Faith",
         "roots": ["G4102", "H0539"],
         "concept": "Đức tin không phải là suy nghĩ tích cực mơ hồ, mà là sự tin cậy chắc chắn và phó thác trọn vẹn nơi bản tính, lời hứa và sự thành tín của Đức Chúa Trời.",
-        "scriptures": ["Hê-bơ-rơ 11:1", "Rô-ma 1:17", "Sáng-thế Ký 15:6", "Ê-phê-sô 2:8-9"]
+        "scriptures": ["Hê-bơ-rơ 11:1", "Rô-ma 1:17", "Sáng-thế Ký 15:6", "Ê-phê-sô 2:8-9"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Con người được tạo dựng trong mối tương giao phó thác trọn vẹn và hòa hảo với Đấng Tạo Hóa.", "scripture_ref": "Sáng-thế Ký 1:26-28"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Sự nghi ngờ lời phán của Chúa phá vỡ niềm tin cậy, dẫn đến tội lỗi và chia cắt tâm linh.", "scripture_ref": "Sáng-thế Ký 3:1-6"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Áp-ra-ham tin Đức Giê-hô-va, và điều đó được kể là công bình cho người; làm gương mẫu cho mọi thế hệ.", "scripture_ref": "Sáng-thế Ký 15:6; Ha-ba-cúc 2:4"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu là Cội Rễ và Cuối Cùng của đức tin; Ngài hoàn tất ơn cứu chuộc trên Thập Tự Giá.", "scripture_ref": "Hê-bơ-rơ 12:2; Rô-ma 3:25"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Người công bình sống bởi đức tin; đức tin không có việc làm là đức tin chết.", "scripture_ref": "Rô-ma 1:17; Gia-cơ 2:17"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Đức tin đạt đến mục đích tối hậu là sự cứu rỗi linh hồn và diện kiến Chúa trong vinh hiển.", "scripture_ref": "1 Phi-e-rơ 1:9; Khải Huyền 21:3-4"}
+        ],
+        "theological_distinctions": [
+            "Đức tin cứu rỗi (Saving Faith) khác biệt hoàn toàn với niềm tin tri thức đơn thuần (Intellectual Assent).",
+            "Đức tin là phương tiện nhận lãnh ân điển, không phải là công đức tự tạo của con người.",
+            "Đức tin thật luôn sinh ra bông trái của sự vâng phục và việc lành tôn vinh Chúa."
+        ]
     },
     "grace": {
         "name_vi": "Ân Điển",
         "name_en": "Grace",
         "roots": ["G5485", "H2617"],
         "concept": "Ơn huệ nhưng không tuyệt đối từ Đức Chúa Trời dành cho tội nhân hoàn toàn bất xứng, được thể hiện đỉnh cao qua thập tự giá của Đấng Christ.",
-        "scriptures": ["Ê-phê-sô 2:8-9", "Rô-ma 3:24", "Giăng 1:16-17", "2 Cô-rinh-tô 12:9"]
+        "scriptures": ["Ê-phê-sô 2:8-9", "Rô-ma 3:24", "Giăng 1:16-17", "2 Cô-rinh-tô 12:9"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Bản thân sự hiện hữu và hơi thở của vũ trụ cùng loài người là món quà ân sủng nhưng không từ Chúa.", "scripture_ref": "Sáng-thế Ký 2:7"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Dầu con người phản nghịch, Chúa may áo bằng da thú che sự trần truồng - tia sáng ân sủng đầu tiên.", "scripture_ref": "Sáng-thế Ký 3:21"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Ân huệ giao ước bền vững (Hesed) của Đức Chúa Trời gìn giữ một dòng dõi sót trung kiên.", "scripture_ref": "Xuất Ê-díp-tô Ký 34:6-7"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Luật pháp ban bởi Môi-se, còn ân điển và lẽ thật đến bởi Đức Chúa Giê-xu Christ.", "scripture_ref": "Giăng 1:17; Rô-ma 5:8"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Ân điển dạy dỗ chúng ta chừa bỏ sự không tin kính và sống tiết độ, công bình giữa đời này.", "scripture_ref": "Tít 2:11-12; 2 Cô-rinh-tô 12:9"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Sự bày tỏ vô hạn của sự phong phú ân điển Ngài trong các thời đại hầu đến.", "scripture_ref": "Ê-phê-sô 2:7"}
+        ],
+        "theological_distinctions": [
+            "Sola Gratia: Cứu rỗi duy bởi ân điển - loại trừ mọi sự khoe mình về công đức con người.",
+            "Ân điển cứu chuộc khác với ân huệ phổ thông (Common Grace) ban mưa nắng cho mọi người.",
+            "Ân điển tự do không phải là giấy phép dung túng tội lỗi (Antinomianism)."
+        ]
     },
     "covenant": {
         "name_vi": "Giao Ước",
         "name_en": "Covenant",
         "roots": ["H1285", "H2617"],
         "concept": "Hiệp ước thiêng liêng có tính ràng buộc vĩnh cửu được đóng ấn bằng huyết, biểu trưng cho sự thành tín vô điều kiện của Đức Chúa Trời đối với tuyển dân.",
-        "scriptures": ["Sáng-thế Ký 15:18", "Xuất Ê-díp-tô Ký 19:5", "Giê-rê-mi 31:31-34", "Hê-bơ-rơ 8:6-13"]
+        "scriptures": ["Sáng-thế Ký 15:18", "Xuất Ê-díp-tô Ký 19:5", "Giê-rê-mi 31:31-34", "Hê-bơ-rơ 8:6-13"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Giao ước Sáng tạo đặt để con người quản trị đất trong sự thuận phục thánh chỉ Đấng Tạo Hóa.", "scripture_ref": "Sáng-thế Ký 1:28-30; Ô-sê 6:7"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Giao ước Nô-ê cam kết bảo tồn trật tự thiên nhiên cho đến ngày hoàn tất chương trình cứu chuộc.", "scripture_ref": "Sáng-thế Ký 9:11-17"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Các giao ước then chốt: Áp-ra-ham (lời hứa), Si-nai (luật pháp), và Đa-vít (vương quyền vĩnh cửu).", "scripture_ref": "Sáng 15; Xuất 19-24; 2 Sa-mu-ên 7"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu thiết lập Giao Ước Mới trong huyết Ngài đổ ra cho nhiều người được tha tội.", "scripture_ref": "Ma-thi-ơ 26:28; Hê-bơ-rơ 9:15"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Tuyển dân Giao Ước Mới bao gồm cả người Do Thái lẫn Dân Ngoại được hiệp một trong Hội Thánh.", "scripture_ref": "Ê-phê-sô 2:12-19"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Lời hứa giao ước thành toàn trọn vẹn: 'Ta sẽ làm Đức Chúa Trời họ, và họ sẽ làm dân Ta'.", "scripture_ref": "Khải Huyền 21:3"}
+        ],
+        "theological_distinctions": [
+            "Giao ước có điều kiện (conditional) vs Giao ước ân điển vô điều kiện (unconditional).",
+            "Sự tiếp nối và ứng nghiệm của Giao Ước Cũ trong Giao Ước Mới nơi Đấng Christ.",
+            "Dấu ấn giao ước: Cắt bì thân xác trong Cựu Ước chỉ về sự cắt bì tấm lòng trong Tân Ước."
+        ]
     },
     "love": {
         "name_vi": "Tình Yêu Thương (Agapē)",
         "name_en": "Divine Love",
         "roots": ["G0026", "H2617"],
         "concept": "Tình yêu hy sinh, tự nguyện vô điều kiện bắt nguồn từ chính bản tính của Đức Chúa Trời ('Đức Chúa Trời là sự yêu thương', 1 Giăng 4:8).",
-        "scriptures": ["Giăng 3:16", "1 Giăng 4:8-10", "1 Cô-rinh-tô 13:4-8", "Rô-ma 5:8"]
+        "scriptures": ["Giăng 3:16", "1 Giăng 4:8-10", "1 Cô-rinh-tô 13:4-8", "Rô-ma 5:8"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Mọi vật thụ tạo phản ánh sự trù phú và tình yêu tuôn tràn giữa các Thân Vị trong Ba Ngôi.", "scripture_ref": "Châm-ngôn 8:30-31"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Dẫu loài người quay lưng, tình yêu Chúa vẫn tìm kiếm: 'A-đam, ngươi ở đâu?'", "scripture_ref": "Sáng-thế Ký 3:9"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Tình yêu sắt son kiên định (Hesed) của Đấng giải cứu tuyển dân ra khỏi nhà nô lệ.", "scripture_ref": "Phục-truyền 7:7-8; Ô-sê 11:1-4"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa bày tỏ tình yêu thương Ngài: khi chúng ta còn là người có tội, Đấng Christ vì chúng ta chịu chết.", "scripture_ref": "Rô-ma 5:8; Giăng 3:16"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Ấn chứng người môn đồ thật: 'Nếu các ngươi yêu thương nhau, thì bởi đó ai nấy sẽ nhận biết các ngươi là môn đồ ta'.", "scripture_ref": "Giăng 13:34-35; 1 Cô-rinh-tô 13"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Tình yêu thương không hề hư mất bao giờ; trường tồn qua cõi đời đời.", "scripture_ref": "1 Cô-rinh-tô 13:8, 13"}
+        ],
+        "theological_distinctions": [
+            "Agape (Tình yêu tự hiến thiêng liêng) vượt trội hơn Philia (tình bạn) và Eros (ái tình tự nhiên).",
+            "Tình yêu của Chúa luôn song hành cùng sự thánh khiết và công bình, không dung thứ điều ác.",
+            "Tình yêu đích thực được kiểm chứng qua hành động cụ thể và sự vâng giữ điều răn."
+        ]
     },
     "peace": {
         "name_vi": "Sự Bình An (Shalom)",
         "name_en": "Peace / Wholeness",
-        "roots": ["H7965"],
+        "roots": ["H7965", "G1515"],
         "concept": "Không chỉ là sự vắng bóng xung đột, mà là trạng thái trọn vẹn, thịnh vượng tâm linh và hòa thuận hoàn toàn trong mối liên hệ với Đấng Tạo Hóa.",
-        "scriptures": ["Giăng 14:27", "Phi-líp 4:6-7", "Ê-sai 9:6", "Dân-số Ký 6:24-26"]
+        "scriptures": ["Giăng 14:27", "Phi-líp 4:6-7", "Ê-sai 9:6", "Dân-số Ký 6:24-26"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Vườn Ê-đen là hiện thân của Shalom: hài hòa trọn vẹn giữa con người, thiên nhiên và Chúa.", "scripture_ref": "Sáng-thế Ký 2:8-15"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Shalom bị phá vỡ: con người sợ hãi lẩn trốn, đổ lỗi cho nhau và đất đai sinh chông gai.", "scripture_ref": "Sáng-thế Ký 3:10-18"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Lời chúc phước A-rôn ban bình an; tiên tri báo trước Chúa Bình An (Sar Shalom) sẽ đến.", "scripture_ref": "Dân-số 6:26; Ê-sai 9:6"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Sự trừng phạt đem lại bình an cho chúng ta đã đổ trên Ngài; hòa giải chúng ta với Đức Chúa Trời.", "scripture_ref": "Ê-sai 53:5; Rô-ma 5:1"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Sự bình an của Đức Chúa Trời vượt quá mọi sự hiểu biết gìn giữ lòng và ý tưởng trong Đấng Christ.", "scripture_ref": "Phi-líp 4:7; Giăng 14:27"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Muôn vật được phục hồi trọn vẹn: không còn chiến tranh, nước mắt, đau đớn hay sự chết.", "scripture_ref": "Ê-sai 11:6-9; Khải Huyền 21:4"}
+        ],
+        "theological_distinctions": [
+            "Hòa thuận với Đức Chúa Trời (Peace with God - vị thế cứu rỗi) dẫn đến sự bình an của Đức Chúa Trời (Peace of God - kinh nghiệm nội tâm).",
+            "Shalom là trọn vẹn sức khỏe thuộc linh lẫn công lý xã hội, không phải là sự thỏa hiệp tiêu cực.",
+            "Sự bình an của Chúa tương phản với sự bình an giả tạo của trần gian."
+        ]
     },
     "spirit": {
         "name_vi": "Đức Thánh Linh",
         "name_en": "Holy Spirit",
         "roots": ["G4151", "H7307"],
         "concept": "Ngôi Ba của Đức Chúa Trời Ba Ngôi, Đấng Tái Sinh, Đấng Yên Ủi, Đấng Dạy Dỗ và ban quyền năng để Hội Thánh làm chứng nhân khắp đất.",
-        "scriptures": ["Sáng-thế Ký 1:2", "Giăng 14:16-17", "Công-vụ 1:8", "Ga-la-ti 5:22-23"]
+        "scriptures": ["Sáng-thế Ký 1:2", "Giăng 14:16-17", "Công-vụ 1:8", "Ga-la-ti 5:22-23"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Thần Đức Chúa Trời vận hành trên mặt nước; ban sinh khí sự sống cho muôn loài.", "scripture_ref": "Sáng-thế Ký 1:2; Gióp 33:4"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Con người trở nên xác thịt; Thần Chúa không ở cùng mãi trong sự chống nghịch.", "scripture_ref": "Sáng-thế Ký 6:3"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Thần Chúa ngự trên các quan xét, vua và tiên tri cho những sứ mạng đặc biệt; hứa ban Thần Mới.", "scripture_ref": "Ê-xê-chi-ên 36:26-27; Giô-ên 2:28"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu thụ thai bởi Thánh Linh, chịu xức dầu thi hành chức vụ và dâng mình qua Thánh Linh đời đời.", "scripture_ref": "Lu-ca 1:35; 4:18; Hê-bơ-rơ 9:14"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Thánh Linh giáng lâm ngày Ngũ Tuần: ngự trị trong lòng tín hữu, ban ân tứ và sinh trái Thánh Linh.", "scripture_ref": "Công-vụ 2; 1 Cô-rinh-tô 12; Ga-la-ti 5:22-23"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Thánh Linh và Vợ Mới cùng kêu gọi: 'Hãy đến!'; Ngài phục sinh thân thể bất hoại trong ngày sau rốt.", "scripture_ref": "Khải Huyền 22:17; Rô-ma 8:11"}
+        ],
+        "theological_distinctions": [
+            "Đức Thánh Linh là một Thân Vị thiêng liêng có lý trí, tình cảm và ý chí - không phải là một lực vô nhân vị.",
+            "Báp-têm bằng Thánh Linh (gia nhập thân thể Đấng Christ) đi đôi với sự đầy dẫy Thánh Linh liên tục.",
+            "Trái Thánh Linh (bản tính Đấng Christ) quan trọng hơn ân tứ thuộc linh bên ngoài."
+        ]
     },
     "salvation": {
         "name_vi": "Sự Cứu Rỗi",
         "name_en": "Salvation",
-        "roots": ["G4991"],
+        "roots": ["G4991", "H3444"],
         "concept": "Công cuộc giải cứu toàn diện của Ba Ngôi Đức Chúa Trời: xưng công bình khỏi án phạt tội lỗi, nên thánh trong đời sống hằng ngày, và vinh hiển hóa trong ngày Chúa tái lâm.",
-        "scriptures": ["Rô-ma 1:16", "Công-vụ 4:12", "Ê-phê-sô 2:8-10", "Phi-líp 2:12-13"]
+        "scriptures": ["Rô-ma 1:16", "Công-vụ 4:12", "Ê-phê-sô 2:8-10", "Phi-líp 2:12-13"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Mục đích ban đầu: con người sống đời đời trong sự vinh quang và quản trị tạo vật cho Chúa.", "scripture_ref": "Sáng-thế Ký 1:26-31"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Tiền án của tội lỗi là sự chết; lời hứa cứu chuộc đầu tiên (Protoevangelium) về Dòng Dõi Người Nữ.", "scripture_ref": "Sáng-thế Ký 3:15; Rô-ma 6:23"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Hệ thống sinh tế Lễ Vượt Qua và Ngày Chuộc Tội tiên báo sự cứu chuộc bằng huyết báu.", "scripture_ref": "Xuất Ê-díp-tô Ký 12; Lê-vi Ký 16"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu đắc thắng tội lỗi và sự chết qua Thập Tự Giá: 'Mọi sự đã được trọn!'.", "scripture_ref": "Giăng 19:30; 1 Cô-rinh-tô 15:3-4"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Tiến trình cứu chuộc 3 thì: Đã được cứu (xưng nghĩa), Đang được cứu (nên thánh), Sẽ được cứu (vinh hiển).", "scripture_ref": "Ê-phê-sô 2:8; Phi-líp 2:12; Rô-ma 8:30"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Sự cứu chuộc trọn vẹn cả linh hồn và thể xác khi Đấng Christ tái lâm trong uy quyền.", "scripture_ref": "Rô-ma 8:23; Khải Huyền 7:9-10"}
+        ],
+        "theological_distinctions": [
+            "Ordo Salutis (Trật tự cứu rỗi): Kêu gọi hiệu quả -> Tái sinh -> Ăn năn & Đức tin -> Xưng nghĩa -> Nhận làm con -> Nên thánh -> Vinh hiển hóa.",
+            "Cứu rỗi duy bởi Đấng Christ (Solus Christus) - không có danh nào khác dưới trời ban cho loài người để được cứu.",
+            "Sự cứu rỗi có tính vĩnh cửu trong tay Đức Chúa Trời gìn giữ."
+        ]
+    },
+    "kingdom": {
+        "name_vi": "Nước Đức Chúa Trời",
+        "name_en": "Kingdom of God",
+        "roots": ["G0932", "H4438"],
+        "concept": "Chủ quyền tối thượng và sự cai trị thánh khiết của Đức Chúa Trời trên lòng người tin và toàn thể vũ trụ, được hiện thực hóa qua Đấng Christ.",
+        "scriptures": ["Ma-thi-ơ 6:33", "Mác 1:15", "Lu-ca 17:21", "Khải Huyền 11:15"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Đức Chúa Trời là Vua Tối Cao sáng tạo vũ trụ và ủy quyền cai trị đất cho con người.", "scripture_ref": "Thi-thiên 103:19"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Con người phản loạn, trao quyền lực trần thế vào tay kẻ cầm quyền chốn không trung.", "scripture_ref": "1 Giăng 5:19; Ê-phê-sô 2:2"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Vương quyền Y-sơ-ra-ên và ngai vàng Đa-vít tiên trưng cho Nước Trời đời đời không hề rúng động.", "scripture_ref": "2 Sa-mu-ên 7:16; Đa-ni-ên 7:14"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu khai mở Vương Quốc: 'Kỳ đã trọn, Nước Đức Chúa Trời đã đến gần; hãy ăn năn và tin Tin Lành'.", "scripture_ref": "Mác 1:15; Ma-thi-ơ 12:28"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Nước Trời 'Đã đến nhưng Chưa trọn vẹn' (Already and Not Yet); trị vì trong tâm linh người công bình.", "scripture_ref": "Rô-ma 14:17; Lu-ca 17:21"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Nước của thế gian trở nên Nước của Chúa chúng ta và của Đấng Christ Ngài, và Ngài sẽ trị vì đời đời.", "scripture_ref": "Khải Huyền 11:15; 1 Cô-rinh-tô 15:24-28"}
+        ],
+        "theological_distinctions": [
+            "Nước Đức Chúa Trời không thuộc về thế gian hữu hình mang tính chính trị trần thế.",
+            "Quy luật Nước Trời đảo ngược giá trị đời này: kẻ đầu sẽ nên rốt, kẻ phục vụ sẽ là người lớn nhất.",
+            "Cánh chung luận Hiện thực hóa (Inaugurated Eschatology): Vương quốc đã bắt đầu trong Đấng Christ và sẽ hoàn tất khi Ngài tái lâm."
+        ]
+    },
+    "holiness": {
+        "name_vi": "Sự Thánh Khiết",
+        "name_en": "Holiness",
+        "roots": ["G0040", "H6944"],
+        "concept": "Bản tính biệt riêng tuyệt đối khỏi tội lỗi và ô uế của Đức Chúa Trời, đồng thời là lời kêu gọi tuyển dân phải nên thánh như Ngài là thánh.",
+        "scriptures": ["Lê-vi Ký 19:2", "Ê-sai 6:3", "1 Phi-e-rơ 1:15-16", "Hê-bơ-rơ 12:14"],
+        "redemptive_stages": [
+            {"stage": "creation", "stage_name_vi": "Sáng Tạo", "description": "Trời đất nguyên thủy hoàn toàn tốt lành, thánh sạch và không tì vết trước mắt Chúa.", "scripture_ref": "Sáng-thế Ký 1:31"},
+            {"stage": "fall", "stage_name_vi": "Sa Ngã", "description": "Sự ô uế của tội lỗi xâm nhập, làm mất đi sự thánh sạch nguyên bản và con người bị trục xuất khỏi sự hiện diện thánh.", "scripture_ref": "Sáng-thế Ký 3:24"},
+            {"stage": "covenant_ot", "stage_name_vi": "Cựu Ước & Giao Ước", "description": "Luật Pháp Lê-vi và Nơi Chí Thánh thiết lập ranh giới nghiêm ngặt giữa điều thánh và điều phàm.", "scripture_ref": "Lê-vi Ký 11:44-45; Ê-sai 6:3"},
+            {"stage": "christ_cross", "stage_name_vi": "Đấng Christ & Cứu Chuộc", "description": "Chúa Giê-xu là Đấng Thánh của Đức Chúa Trời; huyết Ngài tẩy sạch mọi lương tâm khỏi việc chết.", "scripture_ref": "Hê-bơ-rơ 9:14; 10:10"},
+            {"stage": "church_living", "stage_name_vi": "Hội Thánh & Đời Sống Hiện Tại", "description": "Người tin Chúa được gọi là 'thánh đồ', bước đi trong sự nên thánh tiến triển bởi Đức Thánh Linh.", "scripture_ref": "1 Phi-e-rơ 1:15-16; 1 Tê-sa-lô-ni-ca 4:3"},
+            {"stage": "consummation", "stage_name_vi": "Khải Hoàn Cánh Chung", "description": "Thành Thánh Giê-ru-sa-lem Mới từ trời xuống, không một điều gì ô uế hay giả dối được phép vào.", "scripture_ref": "Khải Huyền 21:2, 27"}
+        ],
+        "theological_distinctions": [
+            "Sự thánh khiết địa vị (Positional Sanctification - được xưng thánh ngay khi tin Chúa) vs Sự thánh khiết tiến triển (Progressive Sanctification).",
+            "Biệt riêng khỏi thế gian không có nghĩa là cô lập khỏi xã hội, mà là chiếu sáng giữa bóng tối tăm.",
+            "Nếu không có sự thánh khiết, không ai được thấy Đức Chúa Trời."
+        ]
     }
 }
 
@@ -799,7 +1168,8 @@ async def study_theme(req: ThemeStudyRequest, db: Session = Depends(get_db)):
     Produce systematic biblical theology study on a major biblical theme:
     - Lexicon root analysis (Greek/Hebrew Strong entries)
     - Old Testament typological roots & New Testament Christ-centered fulfillment
-    - Practical Christian application synthesized via Ollama Qwen
+    - 6-Stage Redemptive Revelation Arc (§17)
+    - Doctrinal distinctions & practical discipleship application
     """
     theme_k = req.theme_key.strip().lower()
     config = THEMES_CONFIG.get(theme_k)
@@ -838,7 +1208,7 @@ async def study_theme(req: ThemeStudyRequest, db: Session = Depends(get_db)):
             v_text = ""
         key_scriptures.append({"ref": sref, "text": v_text})
 
-    # 3. Synthesize via Ollama Qwen
+    # 3. Synthesize via Ollama Qwen with 15s resilient timeout
     ot_development = f"Trong Cựu Ước, chủ đề {config['name_vi']} được đặt nền tảng qua các giao ước lịch sử và sự tể trị của Đức Chúa Trời. Mọi hình bóng và của lễ đều hướng về sự cứu rỗi trọn vẹn trong tương lai."
     nt_fulfillment = f"Trong Tân Ước, {config['name_vi']} tìm thấy sự ứng nghiệm tối hậu và vinh hiển nơi thân vị và công cuộc cứu chuộc của Đức Chúa Giê-xu Christ trên thập tự giá và sự sống lại."
     practical_application = f"Đối với đời sống người tin Chúa hôm nay, sự hiểu biết sâu sắc về {config['name_vi']} biến đổi cách chúng ta cầu nguyện, thờ phượng và bước đi trong ân điển hằng ngày."
@@ -853,7 +1223,7 @@ Hãy viết 3 phần ngắn gọn, súc tích, đầy ơn:
 3. Ứng dụng thực tiễn cho đời sống thuộc linh cơ đốc nhân (1 đoạn).
 """
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/generate",
                 json={
@@ -864,7 +1234,6 @@ Hãy viết 3 phần ngắn gọn, súc tích, đầy ơn:
             )
             if resp.status_code == 200:
                 raw_ai = resp.json().get("response", "").strip()
-                # If generated successfully, we can store in practical application
                 if raw_ai:
                     practical_application = raw_ai
     except Exception:
@@ -874,6 +1243,18 @@ Hãy viết 3 phần ngắn gọn, súc tích, đầy ơn:
         f"Lẽ thật về {config['name_vi']} thách thức quan điểm sống hiện tại của tôi như thế nào?",
         f"Làm thế nào để tôi có thể phản chiếu trọn vẹn {config['name_vi']} của Chúa đối với những người xung quanh trong tuần này?"
     ]
+
+    redemptive_stages = [
+        RedemptiveStage(
+            stage=s["stage"],
+            stage_name_vi=s["stage_name_vi"],
+            description=s["description"],
+            scripture_ref=s["scripture_ref"]
+        )
+        for s in config.get("redemptive_stages", [])
+    ]
+
+    theological_distinctions = config.get("theological_distinctions", [])
 
     return ThemeStudyResponse(
         theme_key=theme_k,
@@ -885,7 +1266,9 @@ Hãy viết 3 phần ngắn gọn, súc tích, đầy ơn:
         ot_development=ot_development,
         nt_fulfillment=nt_fulfillment,
         practical_application=practical_application,
-        reflection_questions=reflection_questions
+        reflection_questions=reflection_questions,
+        redemptive_stages=redemptive_stages,
+        theological_distinctions=theological_distinctions
     )
 
 

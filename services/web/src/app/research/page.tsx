@@ -36,7 +36,9 @@ import {
   BarChart3,
   BookA,
   ShieldAlert,
-  Clock
+  Clock,
+  GitCommit,
+  AlertTriangle
 } from "lucide-react";
 
 // --- Context Study Interfaces (§15) ---
@@ -148,6 +150,10 @@ interface CharacterStudyData {
   ai_theological_portrait: string;
   spiritual_lessons: string[];
   reflection_questions: string[];
+  turning_points?: string[];
+  typological_significance?: string;
+  strengths?: string[];
+  weaknesses?: string[];
 }
 
 interface LexiconBrief {
@@ -156,6 +162,13 @@ interface LexiconBrief {
   lemma: string;
   transliteration: string;
   definition: string;
+}
+
+interface RedemptiveStage {
+  stage: string;
+  stage_name_vi: string;
+  description: string;
+  scripture_ref: string;
 }
 
 interface ThemeStudyData {
@@ -169,6 +182,8 @@ interface ThemeStudyData {
   nt_fulfillment: string;
   practical_application: string;
   reflection_questions: string[];
+  redemptive_stages?: RedemptiveStage[];
+  theological_distinctions?: string[];
 }
 
 interface ThemeOption {
@@ -2148,6 +2163,77 @@ export default function ResearchPage() {
                 </div>
               </div>
 
+              {/* Typological Significance to Christ (§16) */}
+              {characterData.typological_significance && (
+                <div className="p-6 md:p-7 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900/80 to-slate-900/90 border border-amber-500/40 shadow-xl flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                      Ý Nghĩa Tiên Trưng Đấng Christ (Typological Significance to Christ §16)
+                    </span>
+                  </div>
+                  <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+                    {characterData.typological_significance}
+                  </p>
+                </div>
+              )}
+
+              {/* Decisive Turning Points (§16) */}
+              {characterData.turning_points && characterData.turning_points.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                    <GitCommit className="w-4 h-4" /> Các Bước Ngoặt Quyết Định &amp; Tiếng Gọi (Decisive Turning Points §16)
+                  </h3>
+                  <div className="flex flex-col gap-2.5">
+                    {characterData.turning_points.map((tp, idx) => (
+                      <div key={idx} className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 font-mono text-xs font-bold shrink-0 mt-0.5">
+                          Bước {idx + 1}
+                        </span>
+                        <span className="text-xs text-slate-200 font-sans leading-relaxed">
+                          {tp}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Strengths & Human Weaknesses (§16) */}
+              {((characterData.strengths && characterData.strengths.length > 0) || (characterData.weaknesses && characterData.weaknesses.length > 0)) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Strengths */}
+                  <div className="p-6 rounded-3xl bg-slate-900/60 border border-emerald-500/20 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Đức Tính Nổi Bật &amp; Đức Tin Kiên Định
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {characterData.strengths?.map((s, idx) => (
+                        <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-emerald-200/90 flex items-start gap-2">
+                          <span className="text-emerald-400 font-bold">•</span>
+                          <span>{s}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Weaknesses */}
+                  <div className="p-6 rounded-3xl bg-slate-900/60 border border-rose-500/20 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" /> Giới Hạn Xác Thịt &amp; Thách Thức Được Biến Đổi
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {characterData.weaknesses?.map((w, idx) => (
+                        <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-rose-200/90 flex items-start gap-2">
+                          <span className="text-rose-400 font-bold">•</span>
+                          <span>{w}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Milestones & Relationships */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Milestones */}
@@ -2248,6 +2334,51 @@ export default function ResearchPage() {
                   {themeData.core_concept}
                 </p>
               </div>
+
+              {/* 6-Stage Redemptive Revelation Arc (§17) */}
+              {themeData.redemptive_stages && themeData.redemptive_stages.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col gap-4">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                      Tiến Trình Mạc Khải Cứu Chuộc 6 Giai Đoạn (Redemptive-Historical Arc §17)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {themeData.redemptive_stages.map((stg, sIdx) => (
+                      <div key={sIdx} className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/30 transition-colors flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+                            Giai đoạn {sIdx + 1}
+                          </span>
+                          <span className="text-[11px] font-mono text-cyan-400">{stg.scripture_ref}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-100">{stg.stage_name_vi}</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">{stg.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Theological Distinctions & Guardrails (§17) */}
+              {themeData.theological_distinctions && themeData.theological_distinctions.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-purple-500/20 flex flex-col gap-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" /> Quy Chuẩn Phân Định &amp; Cảnh Giác Giáo Lý (Theological Guardrails §17)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {themeData.theological_distinctions.map((td, idx) => (
+                      <div key={idx} className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs text-purple-200/90 flex items-start gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed">{td}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Anchor Scriptures with Full Text */}
               {themeData.key_scriptures && themeData.key_scriptures.length > 0 && (
