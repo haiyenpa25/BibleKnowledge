@@ -64,6 +64,13 @@ class StudyNoteCreate(BaseModel):
     tags: List[str] = []
 
 
+class StudyNoteUpdate(BaseModel):
+    title: Optional[str] = Field(None, max_length=200)
+    scripture_ref: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
 class StudyNoteItem(BaseModel):
     id: str
     title: str
@@ -72,6 +79,42 @@ class StudyNoteItem(BaseModel):
     tags: List[str]
     created_at: str
     updated_at: str
+
+
+class StudyNoteSyncItem(BaseModel):
+    id: Optional[str] = None
+    title: str
+    scripture_ref: Optional[str] = None
+    content: str
+    tags: List[str] = []
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class StudyNoteSyncRequest(BaseModel):
+    client_notes: List[StudyNoteSyncItem]
+
+
+class StudyNoteSyncResponse(BaseModel):
+    synced_notes: List[StudyNoteItem]
+    inserted_count: int
+    updated_count: int
+    server_time: str
+
+
+class StudyNoteStatsResponse(BaseModel):
+    total_notes: int
+    total_scriptures_referenced: int
+    categories: Dict[str, int]
+    top_tags: List[Dict[str, Any]]
+    recent_activity: List[Dict[str, str]]
+
+
+class StudyNoteExportResponse(BaseModel):
+    format: str
+    filename: str
+    content: str
+    total_notes: int
 
 
 class BookmarkCreate(BaseModel):
@@ -801,10 +844,35 @@ Chỉ trả về DUY NHẤT một chuỗi JSON hợp lệ, không kèm văn bả
 # ==============================================================================
 
 @router.get("/notes", response_model=List[StudyNoteItem])
-def list_study_notes(db: Session = Depends(get_db)):
-    rows = db.execute(
-        text("SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes ORDER BY updated_at DESC")
-    ).fetchall()
+def list_study_notes(
+    search: Optional[str] = Query(None, description="Search keyword in title, content, or scripture_ref"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    category: Optional[str] = Query(None, description="Filter by template category"),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db)
+):
+    query_str = "SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes"
+    conditions = []
+    params: dict = {"limit": limit}
+
+    if search and search.strip():
+        conditions.append("(title ILIKE :search OR content ILIKE :search OR scripture_ref ILIKE :search)")
+        params["search"] = f"%{search.strip()}%"
+
+    if tag and tag.strip() and tag != "all":
+        conditions.append("tags::text ILIKE :tag")
+        params["tag"] = f"%{tag.strip()}%"
+
+    if category and category.strip() and category != "all":
+        conditions.append("tags::text ILIKE :cat")
+        params["cat"] = f"%{category.strip()}%"
+
+    if conditions:
+        query_str += " WHERE " + " AND ".join(conditions)
+
+    query_str += " ORDER BY updated_at DESC LIMIT :limit"
+
+    rows = db.execute(text(query_str), params).fetchall()
 
     results = []
     for r in rows:
@@ -824,6 +892,139 @@ def list_study_notes(db: Session = Depends(get_db)):
             updated_at=r.updated_at.isoformat() if r.updated_at else ""
         ))
     return results
+
+
+@router.get("/notes/stats", response_model=StudyNoteStatsResponse)
+def get_study_notes_stats(db: Session = Depends(get_db)):
+    rows = db.execute(
+        text("SELECT id, title, scripture_ref, tags, updated_at FROM user_study_notes ORDER BY updated_at DESC")
+    ).fetchall()
+
+    total_notes = len(rows)
+    refs_set = set()
+    category_counts = {
+        "devotional": 0,
+        "exegesis": 0,
+        "sermon_notes": 0,
+        "prayer_journal": 0,
+        "general": 0
+    }
+    tag_counter: Dict[str, int] = {}
+    recent_activity = []
+
+    for r in rows:
+        if r.scripture_ref and r.scripture_ref.strip():
+            refs_set.add(r.scripture_ref.strip())
+
+        raw_tags = r.tags
+        if isinstance(raw_tags, str):
+            try:
+                raw_tags = json.loads(raw_tags)
+            except Exception:
+                raw_tags = [raw_tags]
+        tags_list = raw_tags if isinstance(raw_tags, list) else []
+
+        cat_found = False
+        for c in ["devotional", "exegesis", "sermon_notes", "prayer_journal"]:
+            if c in tags_list or any(c in str(t).lower() for t in tags_list):
+                category_counts[c] += 1
+                cat_found = True
+                break
+        if not cat_found:
+            category_counts["general"] += 1
+
+        for t in tags_list:
+            t_str = str(t).strip()
+            if t_str and t_str not in ["devotional", "exegesis", "sermon_notes", "prayer_journal", "general"]:
+                tag_counter[t_str] = tag_counter.get(t_str, 0) + 1
+
+        if len(recent_activity) < 5:
+            recent_activity.append({
+                "id": str(r.id),
+                "title": r.title,
+                "scripture_ref": r.scripture_ref or "",
+                "updated_at": r.updated_at.isoformat() if r.updated_at else ""
+            })
+
+    top_tags = sorted([{"tag": k, "count": v} for k, v in tag_counter.items()], key=lambda x: x["count"], reverse=True)[:10]
+
+    return StudyNoteStatsResponse(
+        total_notes=total_notes,
+        total_scriptures_referenced=len(refs_set),
+        categories=category_counts,
+        top_tags=top_tags,
+        recent_activity=recent_activity
+    )
+
+
+@router.get("/notes/export", response_model=StudyNoteExportResponse)
+def export_study_notes(
+    format: str = Query("markdown", description="markdown or json"),
+    category: Optional[str] = Query(None, description="Category filter"),
+    db: Session = Depends(get_db)
+):
+    query_str = "SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes"
+    params: dict = {}
+    if category and category != "all":
+        query_str += " WHERE tags::text ILIKE :cat"
+        params["cat"] = f"%{category}%"
+    query_str += " ORDER BY updated_at DESC"
+
+    rows = db.execute(text(query_str), params).fetchall()
+
+    if format.lower() == "json":
+        export_list = []
+        for r in rows:
+            tags = r.tags
+            if isinstance(tags, str):
+                try:
+                    tags = json.loads(tags)
+                except Exception:
+                    tags = [tags]
+            export_list.append({
+                "id": str(r.id),
+                "title": r.title,
+                "scripture_ref": r.scripture_ref,
+                "content": r.content,
+                "tags": tags or [],
+                "created_at": r.created_at.isoformat() if r.created_at else "",
+                "updated_at": r.updated_at.isoformat() if r.updated_at else ""
+            })
+        return StudyNoteExportResponse(
+            format="json",
+            filename="bibleknowledge_notes_backup.json",
+            content=json.dumps(export_list, ensure_ascii=False, indent=2),
+            total_notes=len(rows)
+        )
+    else:
+        lines = [
+            "# SỔ TAY HỌC KINH THÁNH & NHẬT KÝ TÂM LINH",
+            f"> Xuất từ BibleKnowledge Platform vào {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+            f"> Tổng số bản ghi chép: {len(rows)} ghi chú\n",
+            "---",
+            ""
+        ]
+        for r in rows:
+            tags = r.tags
+            if isinstance(tags, str):
+                try:
+                    tags = json.loads(tags)
+                except Exception:
+                    tags = [tags]
+            tag_str = " ".join([f"#{t}" for t in (tags or [])])
+            lines.append(f"## {r.title}")
+            if r.scripture_ref:
+                lines.append(f"**Phân đoạn Kinh Thánh**: `{r.scripture_ref}`")
+            lines.append(f"**Thời gian cập nhật**: {r.updated_at.strftime('%Y-%m-%d %H:%M') if r.updated_at else ''} | {tag_str}\n")
+            lines.append(r.content or "")
+            lines.append("\n---\n")
+
+        return StudyNoteExportResponse(
+            format="markdown",
+            filename="bibleknowledge_study_journal.md",
+            content="\n".join(lines),
+            total_notes=len(rows)
+        )
 
 
 @router.post("/notes", response_model=StudyNoteItem)
@@ -857,11 +1058,188 @@ def create_study_note(req: StudyNoteCreate, db: Session = Depends(get_db)):
     )
 
 
+@router.put("/notes/{note_id}", response_model=StudyNoteItem)
+def update_study_note(note_id: str, req: StudyNoteUpdate, db: Session = Depends(get_db)):
+    curr = db.execute(
+        text("SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes WHERE id = :id"),
+        {"id": note_id}
+    ).fetchone()
+    if not curr:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú.")
+
+    now = datetime.utcnow()
+    new_title = req.title if req.title is not None else curr.title
+    new_ref = req.scripture_ref if req.scripture_ref is not None else curr.scripture_ref
+    new_content = req.content if req.content is not None else curr.content
+    
+    if req.tags is not None:
+        new_tags = json.dumps(req.tags, ensure_ascii=False)
+    else:
+        new_tags = curr.tags if isinstance(curr.tags, str) else json.dumps(curr.tags or [], ensure_ascii=False)
+
+    db.execute(
+        text("""
+        UPDATE user_study_notes
+        SET title = :title, scripture_ref = :ref, content = :content, tags = :tags, updated_at = :updated_at
+        WHERE id = :id
+        """),
+        {
+            "id": note_id,
+            "title": new_title,
+            "ref": new_ref,
+            "content": new_content,
+            "tags": new_tags,
+            "updated_at": now
+        }
+    )
+    db.commit()
+
+    raw_tags = json.loads(new_tags) if isinstance(new_tags, str) else new_tags
+    return StudyNoteItem(
+        id=str(note_id),
+        title=new_title,
+        scripture_ref=new_ref,
+        content=new_content,
+        tags=raw_tags if isinstance(raw_tags, list) else [],
+        created_at=curr.created_at.isoformat() if curr.created_at else now.isoformat(),
+        updated_at=now.isoformat()
+    )
+
+
 @router.delete("/notes/{note_id}")
 def delete_study_note(note_id: str, db: Session = Depends(get_db)):
     db.execute(text("DELETE FROM user_study_notes WHERE id = :id"), {"id": note_id})
     db.commit()
     return {"message": "Đã xóa ghi chú thành công."}
+
+
+@router.post("/notes/sync", response_model=StudyNoteSyncResponse)
+def sync_study_notes(req: StudyNoteSyncRequest, db: Session = Depends(get_db)):
+    """
+    Bidirectional offline-first sync engine (§2.1, §4, §50).
+    Reconciles client offline notes with PostgreSQL user_study_notes using timestamp-based Last-Write-Wins.
+    """
+    now = datetime.utcnow()
+    inserted = 0
+    updated = 0
+
+    for client_note in req.client_notes:
+        c_title = client_note.title.strip()
+        if not c_title:
+            continue
+        c_ref = client_note.scripture_ref.strip() if client_note.scripture_ref else None
+        c_content = client_note.content or ""
+        c_tags = json.dumps(client_note.tags or [], ensure_ascii=False)
+        c_updated = None
+        if client_note.updated_at:
+            try:
+                c_updated = datetime.fromisoformat(client_note.updated_at.replace("Z", "+00:00"))
+            except Exception:
+                c_updated = None
+
+        if client_note.id:
+            existing = db.execute(
+                text("SELECT id, updated_at FROM user_study_notes WHERE id = :id"),
+                {"id": client_note.id}
+            ).fetchone()
+
+            if existing:
+                should_update = True
+                if existing.updated_at and c_updated:
+                    server_ts = existing.updated_at.replace(tzinfo=None) if existing.updated_at.tzinfo else existing.updated_at
+                    client_ts = c_updated.replace(tzinfo=None) if c_updated.tzinfo else c_updated
+                    if client_ts <= server_ts:
+                        should_update = False
+
+                if should_update:
+                    db.execute(
+                        text("""
+                        UPDATE user_study_notes
+                        SET title = :title, scripture_ref = :ref, content = :content, tags = :tags, updated_at = :now
+                        WHERE id = :id
+                        """),
+                        {
+                            "id": client_note.id,
+                            "title": c_title,
+                            "ref": c_ref,
+                            "content": c_content,
+                            "tags": c_tags,
+                            "now": now
+                        }
+                    )
+                    updated += 1
+            else:
+                try:
+                    import uuid
+                    uuid.UUID(client_note.id)
+                    target_id = client_note.id
+                except ValueError:
+                    import uuid
+                    target_id = str(uuid.uuid4())
+
+                db.execute(
+                    text("""
+                    INSERT INTO user_study_notes (id, title, scripture_ref, content, tags, created_at, updated_at)
+                    VALUES (:id, :title, :ref, :content, :tags, :created_at, :updated_at)
+                    """),
+                    {
+                        "id": target_id,
+                        "title": c_title,
+                        "ref": c_ref,
+                        "content": c_content,
+                        "tags": c_tags,
+                        "created_at": c_updated or now,
+                        "updated_at": c_updated or now
+                    }
+                )
+                inserted += 1
+        else:
+            db.execute(
+                text("""
+                INSERT INTO user_study_notes (title, scripture_ref, content, tags, created_at, updated_at)
+                VALUES (:title, :ref, :content, :tags, :created_at, :updated_at)
+                """),
+                {
+                    "title": c_title,
+                    "ref": c_ref,
+                    "content": c_content,
+                    "tags": c_tags,
+                    "created_at": now,
+                    "updated_at": now
+                }
+            )
+            inserted += 1
+
+    db.commit()
+
+    rows = db.execute(
+        text("SELECT id, title, scripture_ref, content, tags, created_at, updated_at FROM user_study_notes ORDER BY updated_at DESC")
+    ).fetchall()
+
+    all_notes = []
+    for r in rows:
+        tags = r.tags
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except Exception:
+                tags = [tags]
+        all_notes.append(StudyNoteItem(
+            id=str(r.id),
+            title=r.title,
+            scripture_ref=r.scripture_ref,
+            content=r.content,
+            tags=tags or [],
+            created_at=r.created_at.isoformat() if r.created_at else "",
+            updated_at=r.updated_at.isoformat() if r.updated_at else ""
+        ))
+
+    return StudyNoteSyncResponse(
+        synced_notes=all_notes,
+        inserted_count=inserted,
+        updated_count=updated,
+        server_time=now.isoformat()
+    )
 
 
 @router.get("/bookmarks", response_model=List[BookmarkItem])

@@ -42,7 +42,12 @@ import {
   Award,
   ShieldCheck,
   Heart,
-  Send
+  Send,
+  Edit3,
+  RefreshCw,
+  Cloud,
+  CloudOff,
+  Database
 } from "lucide-react";
 
 interface ExpositoryPoint {
@@ -135,6 +140,15 @@ interface StudyNote {
   tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+
+interface StudyNoteStats {
+  total_notes: number;
+  total_scriptures_referenced: number;
+  categories: Record<string, number>;
+  top_tags: Array<{ tag: string; count: number }>;
+  recent_activity: Array<{ id: string; title: string; scripture_ref: string; updated_at: string }>;
 }
 
 interface ProjectNote {
@@ -276,6 +290,29 @@ export default function StudyPage() {
   const [savingNote, setSavingNote] = useState(false);
   const [noteSuccess, setNoteSuccess] = useState<string | null>(null);
 
+  // Enhanced Notes & Offline Journaling State (§2.1, §4, §50)
+  const [noteCategoryFilter, setNoteCategoryFilter] = useState<string>("all");
+  const [noteSearchQuery, setNoteSearchQuery] = useState<string>("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("freeform");
+  const [notesStats, setNotesStats] = useState<StudyNoteStats | null>(null);
+  const [isSyncingNotes, setIsSyncingNotes] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [editingNote, setEditingNote] = useState<StudyNote | null>(null);
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editRef, setEditRef] = useState<string>("");
+  const [editContent, setEditContent] = useState<string>("");
+  const [editTags, setEditTags] = useState<string>("");
+  const [updatingNote, setUpdatingNote] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<"markdown" | "json">("markdown");
+  const [exportLoading, setExportLoading] = useState<boolean>(false);
+  const [exportData, setExportData] = useState<{ filename: string; content: string; total_notes: number } | null>(null);
+  const [copiedExport, setCopiedExport] = useState<boolean>(false);
+  const [fetchingScripture, setFetchingScripture] = useState<boolean>(false);
+  const [lookupVerseText, setLookupVerseText] = useState<string | null>(null);
+
+
   // Projects State
   const [projects, setProjects] = useState<StudyProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -404,19 +441,253 @@ export default function StudyPage() {
     }
   };
 
-  // Fetch Notes
-  const fetchNotes = async () => {
+  // Fetch Notes with optional filtering & local storage caching (§2.1, §50)
+  const fetchNotes = async (search?: string, cat?: string, tag?: string) => {
     setLoadingNotes(true);
     try {
-      const res = await fetch(`${apiUrl}/api/study/notes`);
+      const s = search !== undefined ? search : noteSearchQuery;
+      const c = cat !== undefined ? cat : noteCategoryFilter;
+      let url = `${apiUrl}/api/study/notes?limit=100`;
+      if (s.trim()) url += `&search=${encodeURIComponent(s.trim())}`;
+      if (c && c !== "all") url += `&category=${encodeURIComponent(c)}`;
+      if (tag && tag !== "all") url += `&tag=${encodeURIComponent(tag)}`;
+
+      const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
+        const data: StudyNote[] = await res.json();
         setNotes(data);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("bible_cached_study_notes_v2", JSON.stringify(data));
+        }
+      } else {
+        // Offline fallback
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("bible_cached_study_notes_v2");
+          if (cached) setNotes(JSON.parse(cached));
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch notes:", err);
+      console.warn("Offline or fetch failure, loading local cache:", err);
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("bible_cached_study_notes_v2");
+        if (cached) setNotes(JSON.parse(cached));
+      }
     } finally {
       setLoadingNotes(false);
+    }
+  };
+
+  // Fetch Notes Stats (§50)
+  const fetchNotesStats = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/study/notes/stats`);
+      if (res.ok) {
+        const data: StudyNoteStats = await res.json();
+        setNotesStats(data);
+      }
+    } catch (err) {
+      console.warn("Could not fetch notes stats:", err);
+    }
+  };
+
+  // Bidirectional Offline-First Sync Engine (§2.1, §4, §50)
+  const handleSyncNotes = async () => {
+    setIsSyncingNotes(true);
+    try {
+      let clientNotes: any[] = [];
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("bible_cached_study_notes_v2");
+        if (raw) {
+          try { clientNotes = JSON.parse(raw); } catch (e) {}
+        }
+      }
+
+      const res = await fetch(`${apiUrl}/api/study/notes/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_notes: clientNotes })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.synced_notes);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("bible_cached_study_notes_v2", JSON.stringify(data.synced_notes));
+        }
+        const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        setLastSyncTime(timeStr);
+        setNoteSuccess(`Đã đồng bộ thành công! (Thêm: ${data.inserted_count}, Cập nhật: ${data.updated_count})`);
+        setTimeout(() => setNoteSuccess(null), 4000);
+        fetchNotesStats();
+      }
+    } catch (err) {
+      console.error("Sync failed:", err);
+      setNoteSuccess("Đang ngoại tuyến. Ghi chú được lưu an toàn tại bộ nhớ thiết bị.");
+      setTimeout(() => setNoteSuccess(null), 4000);
+    } finally {
+      setIsSyncingNotes(false);
+    }
+  };
+
+  // Apply Guided Journaling Templates (§2.1, §50)
+  const handleApplyTemplate = (templateKey: "soap" | "exegesis" | "sermon" | "prayer" | "freeform") => {
+    setSelectedTemplate(templateKey);
+    if (templateKey === "soap") {
+      setNewTitle("Tĩnh Nguyện S.O.A.P: ");
+      setNewContent(
+`### S — Scripture (Lời Chúa)
+> "Trích dẫn phân đoạn hoặc bấm 'Tra Cứu Nhanh' bên trên để tự động nạp câu gốc..."
+
+### O — Observation (Quan Sát Văn Mạch & Lẽ Thật)
+- Bối cảnh lịch sử, tác giả, người nhận:
+- Lẽ thật trọng tâm được khải thị:
+
+### A — Application (Ứng Dụng Đời Sống)
+- Bài học thực tế cho nếp sống & tấm lòng hôm nay:
+- Quyết định vâng phục hoặc thay đổi:
+
+### P — Prayer (Lời Cầu Nguyện)
+Lạy Chúa... Con tạ ơn Ngài... Xin Thánh Linh dẫn dắt con... Amen.`
+      );
+      setNewTags("devotional, soap");
+    } else if (templateKey === "exegesis") {
+      setNewTitle("Khảo Luận Giải Kinh: ");
+      setNewContent(
+`### 1. Bối Cảnh Lịch Sử & Văn Mạch
+- Niên đại, tác giả, cấu trúc phân đoạn:
+
+### 2. Phân Tích Căn Từ & Cú Pháp
+- Từ ngữ Hê-bơ-rơ / Hy Lạp then chốt:
+
+### 3. Dàn Ý & Luận Điểm Thần Học
+1. Luận điểm I:
+2. Luận điểm II:
+3. Luận điểm III:
+
+### 4. Đối Chiếu Phân Đoạn & Ứng Dụng Mục Vụ
+- Tham chiếu chéo chính kinh liên đới:`
+      );
+      setNewTags("exegesis, than_hoc");
+    } else if (templateKey === "sermon") {
+      setNewTitle("Ghi Chú Bài Giảng: ");
+      setNewContent(
+`### Thông Tin Buổi Thờ Phượng
+- Diễn giả:
+- Phân đoạn nền tảng:
+- Luận đề trung tâm (Big Idea):
+
+### 3 Điểm Triển Khai Chính
+1. Điểm I:
+2. Điểm II:
+3. Điểm III:
+
+### Cam Kết Hành Động Đức Tin
+- Điều Chúa cáo trách hoặc soi dẫn:`
+      );
+      setNewTags("sermon_notes, bai_giang");
+    } else if (templateKey === "prayer") {
+      setNewTitle("Nhật Ký Cầu Nguyện: ");
+      setNewContent(
+`### Lời Hứa Kinh Thánh Nương Cậy
+> "Lời Chúa làm nền tảng cho sự nài xin hôm nay..."
+
+### Các Vấn Đề Cầu Thay Hiện Tại
+- Cho gia đình, công việc & mục vụ:
+- Cho người thân chưa biết Chúa:
+
+### Lời Tạ Ơn & Sự Nhậm Lời Của Chúa
+- Ghi nhận ơn phước và những lời cầu xin Chúa đã đáp lời:`
+      );
+      setNewTags("prayer_journal, cau_nguyen");
+    } else {
+      setNewTitle("");
+      setNewContent("");
+      setNewTags("");
+    }
+  };
+
+  // Instant Scripture Lookup Helper
+  const handleLookupScripture = async (ref: string) => {
+    if (!ref.trim()) return;
+    setFetchingScripture(true);
+    setLookupVerseText(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/bible/passage?ref=${encodeURIComponent(ref.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.passage_text) {
+          setLookupVerseText(data.passage_text);
+        } else if (data.verses && data.verses.length > 0) {
+          const fullText = data.verses.map((v: any) => `[${v.chapter}:${v.verse}] ${v.text}`).join(" ");
+          setLookupVerseText(fullText);
+        }
+      }
+    } catch (e) {
+      console.warn("Scripture lookup failed:", e);
+    } finally {
+      setFetchingScripture(false);
+    }
+  };
+
+  // Open Edit Note Modal
+  const handleOpenEditNote = (note: StudyNote) => {
+    setEditingNote(note);
+    setEditTitle(note.title);
+    setEditRef(note.scripture_ref || "");
+    setEditContent(note.content);
+    setEditTags(note.tags.join(", "));
+    setIsEditModalOpen(true);
+  };
+
+  // Update Note Submit
+  const handleUpdateNoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNote || !editTitle.trim() || !editContent.trim()) return;
+    setUpdatingNote(true);
+    try {
+      const tagsArray = editTags.split(",").map(t => t.trim()).filter(Boolean);
+      const res = await fetch(`${apiUrl}/api/study/notes/${editingNote.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          scripture_ref: editRef.trim() || undefined,
+          content: editContent,
+          tags: tagsArray
+        })
+      });
+      if (res.ok) {
+        const updated: StudyNote = await res.json();
+        setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
+        setIsEditModalOpen(false);
+        setEditingNote(null);
+        setNoteSuccess("Đã cập nhật ghi chú thành công!");
+        setTimeout(() => setNoteSuccess(null), 3000);
+        fetchNotesStats();
+      }
+    } catch (err) {
+      console.error("Failed to update note:", err);
+    } finally {
+      setUpdatingNote(false);
+    }
+  };
+
+  // Export Notes Modal Handler
+  const handleExportNotes = async (fmt: "markdown" | "json") => {
+    setExportFormat(fmt);
+    setIsExportModalOpen(true);
+    setExportLoading(true);
+    setCopiedExport(false);
+    try {
+      const res = await fetch(`${apiUrl}/api/study/notes/export?format=${fmt}`);
+      if (res.ok) {
+        const data = await res.json();
+        setExportData(data);
+      }
+    } catch (err) {
+      console.error("Failed to export notes:", err);
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -3314,126 +3585,631 @@ ${sermonResult.introduction_and_hook}
       )}
 
       {/* ===================================================================== */}
-      {/* 4. PERSONAL STUDY NOTES */}
+      {/* 4. PERSONAL STUDY NOTES & OFFLINE JOURNALING ENGINE (§2.1, §4, §50) */}
       {/* ===================================================================== */}
       {activeTab === "notes" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col gap-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <Plus className="w-4 h-4 text-emerald-400" /> Thêm Ghi Chú Cá Nhân Mới
-            </h2>
-            <form onSubmit={handleCreateNote} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-slate-400 font-medium">Tiêu đề ghi chú *</label>
-                <input
-                  required
-                  type="text"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ví dụ: Bài học về đức tin trong cơn bão"
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
+        <div className="flex flex-col gap-6">
+          {/* Top Control & Sync Banner */}
+          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    Sổ Tay Khảo Luận &amp; Nhật Ký Tâm Linh (§2.1, §4, §50)
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Ghi chép có cấu trúc (SOAP, Giải Kinh, Bài Giảng, Cầu Nguyện), đối chiếu câu gốc tức thời và đồng bộ ngoại tuyến hai chiều.
+                  </p>
+                </div>
               </div>
+            </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-slate-400 font-medium">Câu Kinh Thánh liên quan</label>
-                <input
-                  type="text"
-                  value={newRef}
-                  onChange={(e) => setNewRef(e.target.value)}
-                  placeholder="Ví dụ: Ma-thi-ơ 14:28-31"
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-slate-400 font-medium">Nội dung ghi chú *</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="Nhập suy ngẫm thuộc linh, bài học thực tế..."
-                  className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-sans resize-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-slate-400 font-medium">Thẻ phân loại (ngăn cách dấu phẩy)</label>
-                <input
-                  type="text"
-                  value={newTags}
-                  onChange={(e) => setNewTags(e.target.value)}
-                  placeholder="ductin, phero, galile"
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0 text-xs">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 font-mono text-[11px]">
+                <Cloud className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{lastSyncTime ? `Đã đồng bộ: ${lastSyncTime}` : "Lưu trữ cục bộ & đám mây"}</span>
               </div>
 
               <button
-                type="submit"
-                disabled={savingNote}
-                className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2 mt-1"
+                type="button"
+                onClick={handleSyncNotes}
+                disabled={isSyncingNotes}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/30 disabled:opacity-50"
+                title="Đồng bộ hai chiều giữa bộ nhớ máy và cơ sở dữ liệu"
               >
-                {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                <span>Lưu Ghi Chú</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingNotes ? "animate-spin" : ""}`} />
+                <span>{isSyncingNotes ? "Đang đồng bộ..." : "Đồng Bộ Ngay (§50)"}</span>
               </button>
 
-              {noteSuccess && (
-                <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs">
-                  {noteSuccess}
-                </div>
-              )}
-            </form>
+              <button
+                type="button"
+                onClick={() => handleExportNotes("markdown")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-semibold transition-all"
+                title="Xuất trọn gói sổ tay ra định dạng Markdown hoặc JSON"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Xuất Sổ Tay (.md / .json)</span>
+              </button>
+            </div>
           </div>
 
-          <div className="lg:col-span-2 flex flex-col gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Danh sách ghi chú ({notes.length}):
-            </span>
-            {loadingNotes ? (
-              <div className="p-8 text-center text-xs text-slate-400">Đang tải ghi chú...</div>
-            ) : notes.length === 0 ? (
-              <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-500">
-                Chưa có ghi chú nào. Hãy thêm ghi chú đầu tiên ở bảng bên trái!
+          {/* Analytics Overview Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-slate-400 font-medium">Tổng Ghi Chép</span>
+                <span className="text-xl font-bold text-white font-mono">{notesStats?.total_notes || notes.length}</span>
               </div>
-            ) : (
-              notes.map((n) => (
-                <div key={n.id} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-xs text-white">{n.title}</h4>
-                      {n.scripture_ref && (
-                        <span className="text-[10px] text-blue-400 font-mono">⚓ {n.scripture_ref}</span>
-                      )}
-                    </div>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <FileText className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-slate-400 font-medium">Câu Gốc Khảo Luận</span>
+                <span className="text-xl font-bold text-cyan-300 font-mono">{notesStats?.total_scriptures_referenced || 0}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <BookOpen className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-slate-400 font-medium">Tĩnh Nguyện &amp; SOAP</span>
+                <span className="text-xl font-bold text-amber-300 font-mono">
+                  {(notesStats?.categories?.devotional || 0) + (notesStats?.categories?.sermon_notes || 0)}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-slate-400 font-medium">Giải Kinh &amp; Tín Lý</span>
+                <span className="text-xl font-bold text-purple-300 font-mono">
+                  {notesStats?.categories?.exegesis || 0}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Main 2-Column Responsive Workspace */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column (5 Cols): Create Note with Templates */}
+            <div className="lg:col-span-5 p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col gap-5 shadow-xl">
+              <div className="flex flex-col gap-1.5">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-emerald-400" /> Tạo Ghi Chú / Nhật Ký Mới
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Chọn mẫu định dạng có sẵn hoặc viết tự do bằng Markdown.
+                </p>
+              </div>
+
+              {/* Template Selector Pills */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                  Mẫu Soạn Thảo Hướng Dẫn:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {[
+                    { id: "soap", label: "🌟 Tĩnh Nguyện SOAP", desc: "Scripture, Observation, Application, Prayer" },
+                    { id: "exegesis", label: "📖 Khảo Luận Giải Kinh", desc: "Bối cảnh, Căn từ, Dàn ý, Ứng dụng" },
+                    { id: "sermon", label: "🎙️ Ghi Chú Bài Giảng", desc: "Diễn giả, Đại ý, Luận điểm" },
+                    { id: "prayer", label: "🙏 Nhật Ký Cầu Nguyện", desc: "Cầu thay & Lời Chúa nhậm" },
+                    { id: "freeform", label: "📝 Tự Do (Markdown)", desc: "Trống" }
+                  ].map((t) => (
                     <button
+                      key={t.id}
                       type="button"
-                      onClick={() => handleDeleteNote(n.id)}
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-                      title="Xóa ghi chú"
+                      onClick={() => handleApplyTemplate(t.id as any)}
+                      className={`p-2 rounded-xl text-left text-xs font-semibold transition-all border ${
+                        selectedTemplate === t.id
+                          ? "bg-emerald-600/30 border-emerald-500 text-emerald-200 shadow-sm"
+                          : "bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/60"
+                      }`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <div className="truncate">{t.label}</div>
                     </button>
-                  </div>
-                  <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
-                    {n.content}
-                  </p>
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
-                    <span>{new Date(n.created_at).toLocaleDateString("vi-VN")}</span>
-                    {n.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {n.tags.map((t, i) => (
-                          <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-                            #{t}
-                          </span>
-                        ))}
-                      </div>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateNote} className="flex flex-col gap-3.5">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-slate-400 font-medium">Tiêu đề ghi chú *</label>
+                  <input
+                    required
+                    type="text"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="Ví dụ: Tĩnh Nguyện S.O.A.P: Đức Giê-hô-va Là Đấng Chăn Giữ Tôi"
+                    className="bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-sans"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] text-slate-400 font-medium">Câu / Phân đoạn Kinh Thánh liên quan</label>
+                    {newRef.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => handleLookupScripture(newRef)}
+                        disabled={fetchingScripture}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 transition-colors"
+                      >
+                        {fetchingScripture ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                        <span>Tra Cứu Lời Chúa 1925</span>
+                      </button>
                     )}
                   </div>
+                  <input
+                    type="text"
+                    value={newRef}
+                    onChange={(e) => setNewRef(e.target.value)}
+                    placeholder="Ví dụ: Thi Thiên 23:1-3 hoặc Giăng 3:16"
+                    className="bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                  {lookupVerseText && (
+                    <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs font-serif leading-relaxed flex flex-col gap-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between text-[10px] font-sans text-amber-400/80 font-bold">
+                        <span>📖 Trích dẫn BTT 1925 ({newRef}):</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewContent(prev => prev ? `${prev}\n\n> "${lookupVerseText}" (${newRef} BTT 1925)` : `> "${lookupVerseText}" (${newRef} BTT 1925)\n\n`);
+                          }}
+                          className="hover:underline text-cyan-300"
+                        >
+                          + Chèn vào nội dung
+                        </button>
+                      </div>
+                      <p className="italic">"{lookupVerseText}"</p>
+                    </div>
+                  )}
                 </div>
-              ))
-            )}
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] text-slate-400 font-medium">Nội dung ghi chú &amp; khảo luận *</label>
+                    <span className="text-[10px] text-slate-500">Hỗ trợ định dạng Markdown</span>
+                  </div>
+                  <textarea
+                    required
+                    rows={10}
+                    value={newContent}
+                    onChange={(e) => setNewContent(e.target.value)}
+                    placeholder="Nhập suy ngẫm thuộc linh, bài học thực tế, giải nghĩa nguyên ngữ..."
+                    className="bg-slate-950 border border-slate-700/80 rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-slate-400 font-medium">Thẻ phân loại (ngăn cách bởi dấu phẩy)</label>
+                  <input
+                    type="text"
+                    value={newTags}
+                    onChange={(e) => setNewTags(e.target.value)}
+                    placeholder="devotional, soap, psalm23, ductin"
+                    className="bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingNote}
+                  className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2 mt-1"
+                >
+                  {savingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  <span>Lưu Ghi Chú &amp; Tự Động Đồng Bộ</span>
+                </button>
+
+                {noteSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-800/70 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{noteSuccess}</span>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Right Column (7 Cols): Search, Filter & Notes Directory */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
+              {/* Search & Category Filter Bar */}
+              <div className="p-4 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col gap-3 shadow-md">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={noteSearchQuery}
+                    onChange={(e) => {
+                      setNoteSearchQuery(e.target.value);
+                      fetchNotes(e.target.value, noteCategoryFilter);
+                    }}
+                    placeholder="Tìm kiếm theo tiêu đề, câu Kinh Thánh, từ khóa trong ghi chú..."
+                    className="w-full bg-slate-950 border border-slate-700/70 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                  <span className="text-slate-400 font-medium whitespace-nowrap text-[11px]">Danh mục:</span>
+                  {[
+                    { id: "all", label: "Tất Cả" },
+                    { id: "devotional", label: "🌟 Tĩnh Nguyện (SOAP)" },
+                    { id: "exegesis", label: "📖 Giải Kinh" },
+                    { id: "sermon_notes", label: "🎙️ Bài Giảng" },
+                    { id: "prayer_journal", label: "🙏 Cầu Nguyện" },
+                    { id: "general", label: "📝 Tự Do" }
+                  ].map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setNoteCategoryFilter(c.id);
+                        fetchNotes(noteSearchQuery, c.id);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+                        noteCategoryFilter === c.id
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                          : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                  <span className="font-semibold">
+                    Kết quả ghi chú: <span className="font-mono text-white font-bold">{notes.length}</span> bản ghi
+                  </span>
+                  <span className="text-[11px] text-slate-500">Sắp xếp theo cập nhật mới nhất</span>
+                </div>
+
+                {loadingNotes ? (
+                  <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 className="w-7 h-7 animate-spin text-blue-400" />
+                    <p className="text-xs">Đang tải danh mục ghi chú...</p>
+                  </div>
+                ) : notes.length === 0 ? (
+                  <div className="p-16 rounded-3xl glass-panel text-center flex flex-col items-center gap-3">
+                    <FileText className="w-10 h-10 text-slate-600" />
+                    <h4 className="text-sm font-bold text-slate-300">Không tìm thấy ghi chú phù hợp</h4>
+                    <p className="text-xs text-slate-500 max-w-sm">
+                      Chưa có bản ghi nào theo bộ lọc này. Hãy chọn một mẫu hướng dẫn ở cột bên trái để bắt đầu ghi chép!
+                    </p>
+                  </div>
+                ) : (
+                  notes.map((n) => {
+                    const isSoap = n.tags.some(t => t.includes("soap") || t.includes("devotional"));
+                    const isExegesis = n.tags.some(t => t.includes("exegesis") || t.includes("giai_kinh"));
+                    const isSermon = n.tags.some(t => t.includes("sermon") || t.includes("bai_giang"));
+                    const isPrayer = n.tags.some(t => t.includes("prayer") || t.includes("cau_nguyen"));
+
+                    return (
+                      <div
+                        key={n.id}
+                        className="p-5 rounded-3xl bg-slate-900/85 border border-slate-800 hover:border-slate-700 transition-all flex flex-col gap-3 shadow-lg group"
+                      >
+                        {/* Note Top Bar */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                                isSoap
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : isExegesis
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                  : isSermon
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                  : isPrayer
+                                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                  : "bg-slate-800 text-slate-300 border-slate-700"
+                              }`}>
+                                {isSoap && "🌟 Tĩnh Nguyện SOAP"}
+                                {isExegesis && "📖 Khảo Luận Giải Kinh"}
+                                {isSermon && "🎙️ Ghi Chú Bài Giảng"}
+                                {isPrayer && "🙏 Nhật Ký Cầu Nguyện"}
+                                {!isSoap && !isExegesis && !isSermon && !isPrayer && "📝 Ghi Chú"}
+                              </span>
+
+                              {n.scripture_ref && (
+                                <Link
+                                  href={`/bible?passage=${encodeURIComponent(n.scripture_ref)}`}
+                                  className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono font-bold flex items-center gap-1 hover:underline"
+                                  title="Xem phân đoạn Kinh Thánh này"
+                                >
+                                  <span>⚓ {n.scripture_ref}</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                              )}
+                            </div>
+
+                            <h4 className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors">
+                              {n.title}
+                            </h4>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`# ${n.title}\n${n.scripture_ref ? `**Phân đoạn**: ${n.scripture_ref}\n\n` : ''}${n.content}`);
+                                setNoteSuccess("Đã sao chép nội dung ghi chú vào clipboard!");
+                                setTimeout(() => setNoteSuccess(null), 3000);
+                              }}
+                              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                              title="Sao chép nội dung"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditNote(n)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+                              title="Chỉnh sửa ghi chú"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteNote(n.id)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                              title="Xóa ghi chú"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Note Body Content */}
+                        <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap max-h-72 overflow-y-auto">
+                          {n.content}
+                        </div>
+
+                        {/* Note Footer */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-800/60">
+                          <span className="font-mono text-[10px]">
+                            {new Date(n.updated_at || n.created_at).toLocaleDateString("vi-VN", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </span>
+
+                          {n.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {n.tags.map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  onClick={() => {
+                                    setNoteCategoryFilter("all");
+                                    setNoteSearchQuery(t);
+                                    fetchNotes(t, "all");
+                                  }}
+                                  className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer transition-colors text-[10px]"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Modal: Edit Existing Note */}
+          {isEditModalOpen && editingNote && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-[#0f172a] border border-slate-700 max-w-xl w-full rounded-3xl p-6 flex flex-col gap-4 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Edit3 className="w-4 h-4 text-cyan-400" /> Chỉnh Sửa Ghi Chú Cá Nhân
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingNote(null);
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateNoteSubmit} className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-400 font-medium">Tiêu đề ghi chú *</label>
+                    <input
+                      required
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-400 font-medium">Phân đoạn Kinh Thánh</label>
+                    <input
+                      type="text"
+                      value={editRef}
+                      onChange={(e) => setEditRef(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-400 font-medium">Nội dung ghi chú *</label>
+                    <textarea
+                      required
+                      rows={8}
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 leading-relaxed font-sans resize-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-slate-400 font-medium">Thẻ phân loại (ngăn cách dấu phẩy)</label>
+                    <input
+                      type="text"
+                      value={editTags}
+                      onChange={(e) => setEditTags(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        setEditingNote(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+                    >
+                      Hủy Bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updatingNote}
+                      className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/30 transition-all"
+                    >
+                      {updatingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Lưu Thay Đổi</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Export Sổ Tay */}
+          {isExportModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-[#0f172a] border border-slate-700 max-w-2xl w-full rounded-3xl p-6 flex flex-col gap-4 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-sm font-bold text-white">Xuất Sổ Tay Học Kinh Thánh &amp; Nhật Ký</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-400">Định dạng xuất:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleExportNotes("markdown")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                      exportFormat === "markdown"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Markdown Bundle (.md)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportNotes("json")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                      exportFormat === "json"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    JSON Backup Archive (.json)
+                  </button>
+                </div>
+
+                {exportLoading ? (
+                  <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400 text-xs">
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                    <span>Đang trích xuất toàn bộ sổ tay...</span>
+                  </div>
+                ) : exportData ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Tên tệp: <strong className="text-white font-mono">{exportData.filename}</strong></span>
+                      <span>Tổng cộng: <strong className="text-emerald-400">{exportData.total_notes}</strong> ghi chú</span>
+                    </div>
+
+                    <textarea
+                      readOnly
+                      rows={10}
+                      value={exportData.content}
+                      className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 leading-relaxed resize-none focus:outline-none"
+                    />
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(exportData.content);
+                          setCopiedExport(true);
+                          setTimeout(() => setCopiedExport(false), 3000);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        {copiedExport ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedExport ? "Đã Sao Chép!" : "Sao Chép Toàn Bộ"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([exportData.content], {
+                            type: exportFormat === "json" ? "application/json" : "text/markdown;charset=utf-8"
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = exportData.filename;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Tải Xuống Tệp ({exportFormat === "json" ? ".json" : ".md"})</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

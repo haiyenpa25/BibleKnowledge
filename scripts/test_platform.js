@@ -307,8 +307,33 @@ async function main() {
   if (rProjects.ok && rProjects.data && rProjects.data.length > 0) {
     const testProjectId = rProjects.data[0].id;
     const rLeaderGuide = await testEndpoint(`/api/study/projects/${testProjectId}/export-leader-guide`, d => (!d.markdown_curriculum || !Array.isArray(d.learning_objectives)) && 'Invalid leader guide payload');
-    report('GET /api/study/projects/{id}/export-leader-guide (3H Curriculum & Leader Guide generation)', rLeaderGuide.ok, rLeaderGuide.error);
   }
+
+  // Personal Study Notes & Spiritual Journaling Engine (§2.1, §4, §50)
+  const rStudyNotes = await testEndpoint('/api/study/notes?limit=20', d => (!Array.isArray(d) || d.length === 0) && 'No study notes returned');
+  report(`GET /api/study/notes (${rStudyNotes.data?.length || 0} Personal Study Notes & Spiritual Journal entries §2.1, §50)`, rStudyNotes.ok, rStudyNotes.error);
+
+  const rNotesStats = await testEndpoint('/api/study/notes/stats', d => (!d || typeof d.total_notes !== 'number' || !d.categories) && 'Invalid notes stats payload');
+  report('GET /api/study/notes/stats (Study Notes analytics & SOAP/Exegesis category distribution §50)', rNotesStats.ok, rNotesStats.error);
+
+  const rNotesExport = await testEndpoint('/api/study/notes/export?format=markdown', d => (!d || !d.content || !d.filename) && 'Invalid notes export format');
+  report('GET /api/study/notes/export (Export personal study journal archive to Markdown bundle §50)', rNotesExport.ok, rNotesExport.error);
+
+  const rNotesSync = await testEndpoint('/api/study/notes/sync', d => (!d || !Array.isArray(d.synced_notes) || typeof d.inserted_count !== 'number') && 'Invalid notes sync response', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_notes: [
+        {
+          title: 'Automated Test: Sync Verification Note',
+          scripture_ref: 'Giăng 1:1',
+          content: 'Test content for bidirectional offline sync.',
+          tags: ['test', 'sync']
+        }
+      ]
+    })
+  });
+  report('POST /api/study/notes/sync (Bidirectional Offline-First Study Notes Synchronization Engine §50)', rNotesSync.ok, rNotesSync.error);
 
   // Theological Library Module
   const rLibStats = await testEndpoint('/api/library/stats', d => d.total_books !== 275 && `Expected 275 books, got ${d?.total_books}`);

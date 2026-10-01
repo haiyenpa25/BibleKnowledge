@@ -555,6 +555,16 @@ All endpoints follow standard RESTful conventions and return UTF-8 JSON.
   - `POST /api/study/groups/{group_id}/notes/{note_id}/like`: Upvotes/endorses a collaborative note.
   - `GET /api/study/groups/{group_id}/export`: Exports the complete cohort minutes, exegesis dossier, and discussion transcript as formatted Markdown.
 
+### 6.12 Personal Study Notes & Spiritual Journaling Engine with Offline-First Sync (§2.1, §4, §50)
+- **Endpoints**:
+  - `GET /api/study/notes`: Lists personal study notes with optional search query (`search`), tag filter (`tag`), category filter (`category`: `devotional`, `exegesis`, `sermon_notes`, `prayer_journal`, `general`), and paginated limit (`limit`, default 100).
+  - `GET /api/study/notes/stats`: Returns analytics including total notes count, distinct scripture references count, category breakdown, top tags, and recent activity timeline.
+  - `GET /api/study/notes/export`: Exports the user's personal journal archive as formatted Markdown bundle (`.md`) or JSON backup (`.json`).
+  - `POST /api/study/notes`: Creates a new study note with title, scripture reference, markdown content, and tags.
+  - `PUT /api/study/notes/{note_id}`: Updates existing note title, scripture reference, content, and tags.
+  - `DELETE /api/study/notes/{note_id}`: Deletes a study note.
+  - `POST /api/study/notes/sync`: Bidirectional offline-first sync engine reconciling local client notes array (`localStorage`) with PostgreSQL `user_study_notes` using timestamp-based Last-Write-Wins conflict resolution. Returns authoritative merged list and counts.
+
 ---
 
 ## 7. Theological Library & Document Engine (`/api/library`)
