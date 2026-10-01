@@ -74,6 +74,37 @@ interface ChapterData {
   verses: Verse[];
 }
 
+interface ParallelLexiconItem {
+  strong_number: string;
+  language: "greek" | "hebrew";
+  lemma: string;
+  transliteration: string;
+  pronunciation?: string;
+  definition: string;
+  matched_keyword: string;
+}
+
+interface ParallelVerse {
+  global_id: number;
+  verse_code: number;
+  chapter: number;
+  verse: number;
+  section_title: string;
+  text_vi: string;
+  text_target: string;
+  cross_references: string[];
+  lexicon: ParallelLexiconItem[];
+}
+
+interface ParallelChapterData {
+  book: BookMeta;
+  chapter: number;
+  total_verses: number;
+  source_translation: { id: string; name: string; language: string };
+  target_translation: { id: string; name: string; language: string };
+  verses: ParallelVerse[];
+}
+
 interface SearchResult {
   global_id: number;
   verse_code: number;
@@ -218,7 +249,9 @@ export default function BibleReaderPage() {
   const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
 
   // Reader Settings States (§2.1 & §2.2)
-  const [viewMode, setViewMode] = useState<"verse" | "paragraph">("verse");
+  const [viewMode, setViewMode] = useState<"verse" | "paragraph" | "parallel" | "interlinear">("verse");
+  const [parallelData, setParallelData] = useState<ParallelChapterData | null>(null);
+  const [parallelLoading, setParallelLoading] = useState(false);
   const [fontFamily, setFontFamily] = useState<"serif" | "sans">("serif");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg" | "xl">("md");
   const [readerTheme, setReaderTheme] = useState<"midnight" | "sepia" | "pure-black">("midnight");
@@ -320,6 +353,32 @@ export default function BibleReaderPage() {
     }
     loadChapter();
   }, [currentBookCode, currentChapter, apiUrl]);
+
+  // Load parallel chapter data when parallel or interlinear view is active (§2.1 & §31)
+  useEffect(() => {
+    if (viewMode !== "parallel" && viewMode !== "interlinear") return;
+
+    let isMounted = true;
+    async function loadParallel() {
+      setParallelLoading(true);
+      try {
+        const res = await fetch(`${apiUrl}/api/bible/parallel-chapter?book=${currentBookCode}&chapter=${currentChapter}&target_translation=kjv`);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setParallelData(data);
+        }
+      } catch (e) {
+        console.error("Failed to load parallel chapter:", e);
+      } finally {
+        if (isMounted) setParallelLoading(false);
+      }
+    }
+    loadParallel();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentBookCode, currentChapter, viewMode, apiUrl]);
 
   // Cleanup speech on unmount
   useEffect(() => {
@@ -878,6 +937,48 @@ export default function BibleReaderPage() {
             </button>
           )}
 
+          {/* Quick View Mode Switcher */}
+          <div className="hidden lg:flex items-center bg-slate-900/90 p-0.5 rounded-xl border border-slate-800 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setViewMode("verse")}
+              className={`px-2.5 py-1 rounded-lg transition-all ${
+                viewMode === "verse"
+                  ? "bg-blue-600 text-white font-semibold shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Chế độ đọc từng câu đơn"
+            >
+              Đơn Cột
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("parallel")}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                viewMode === "parallel"
+                  ? "bg-blue-600 text-white font-semibold shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Chế độ song song đối chiếu KJV"
+            >
+              <Languages className="w-3 h-3 text-emerald-400" />
+              <span>Song Song KJV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("interlinear")}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                viewMode === "interlinear"
+                  ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Chế độ liên dòng từ gốc Strong"
+            >
+              <Layers className="w-3 h-3 text-amber-400" />
+              <span>Liên Dòng Strong</span>
+            </button>
+          </div>
+
           {/* Reading Options Trigger */}
           <button
             type="button"
@@ -1170,6 +1271,288 @@ export default function BibleReaderPage() {
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* View Mode 3: PARALLEL DUAL TRANSLATION MODE (§2.1 & §31) */}
+            {viewMode === "parallel" && (
+              <div className="flex flex-col gap-4">
+                {/* Column Headers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 border-b border-slate-800 text-xs font-bold tracking-wider">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-blue-300">
+                    <span className="flex items-center gap-1.5">
+                      <span>🇻🇳</span> Bản Dịch Truyền Thống 1925 (Tiếng Việt)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      Gốc 1925
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-emerald-300">
+                    <span className="flex items-center gap-1.5">
+                      <span>🇬🇧</span> King James Version — KJV 1611 (English)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Kinh Điển
+                    </span>
+                  </div>
+                </div>
+
+                {parallelLoading ? (
+                  <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+                    <p className="text-sm font-medium">Đang chuẩn bị bản dịch đối chiếu song song KJV...</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {(parallelData?.verses || chapterData.verses.map(v => ({
+                      global_id: v.global_id,
+                      verse_code: v.verse_code,
+                      chapter: v.chapter,
+                      verse: v.verse,
+                      section_title: v.section_title,
+                      text_vi: v.text,
+                      text_target: "",
+                      cross_references: v.cross_references,
+                      lexicon: []
+                    }))).map((v, idx) => {
+                      const isNewSection = v.section_title && (idx === 0 || (parallelData?.verses[idx - 1]?.section_title !== v.section_title));
+                      const isSelected = selectedVerse?.global_id === v.global_id;
+                      const isBookmarked = bookmarkedVerses.includes(v.verse_code);
+                      const isBeingNarrated = narratingVerse === v.verse;
+
+                      return (
+                        <React.Fragment key={v.global_id}>
+                          {isNewSection && (
+                            <div className="pt-4 pb-1">
+                              <div className={`inline-block text-xs md:text-sm font-sans font-bold uppercase tracking-wider px-3 py-1 rounded-md border ${themeStyles.accentBadge}`}>
+                                § {v.section_title}
+                              </div>
+                            </div>
+                          )}
+
+                          <div
+                            id={`verse-row-${v.verse}`}
+                            onClick={() => {
+                              const baseVerse: Verse = {
+                                global_id: v.global_id,
+                                verse_code: v.verse_code,
+                                chapter: v.chapter,
+                                verse: v.verse,
+                                section_title: v.section_title,
+                                text: v.text_vi,
+                                cross_references: v.cross_references
+                              };
+                              setSelectedVerse(baseVerse);
+                              setActiveDrawerTab("insight");
+                            }}
+                            className={`group grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 border ${
+                              isSelected
+                                ? themeStyles.cardSelected
+                                : isBeingNarrated
+                                ? themeStyles.cardActiveAudio
+                                : isBookmarked
+                                ? "bg-amber-950/20 border-amber-500/40 hover:border-amber-400/60"
+                                : themeStyles.card
+                            }`}
+                          >
+                            {/* Left Column: Vietnamese 1925 */}
+                            <div className="flex items-start gap-3">
+                              <span className={`select-none text-xs font-sans font-bold pt-1 min-w-[1.75rem] text-right ${
+                                isSelected ? themeStyles.verseNumSelected : themeStyles.verseNum
+                              }`}>
+                                {v.verse}
+                              </span>
+                              <div className={`flex-1 leading-relaxed ${fontFamily === "serif" ? "font-serif" : "font-sans"} ${
+                                fontSize === "sm" ? "text-sm md:text-base" : fontSize === "lg" ? "text-lg md:text-xl" : "text-base md:text-lg"
+                              }`}>
+                                {renderVerseBody(v.text_vi)}
+                                {v.cross_references && v.cross_references.length > 0 && (
+                                  <span className="inline-flex flex-wrap gap-1 ml-2 select-none">
+                                    {v.cross_references.slice(0, 2).map(ref => (
+                                      <button
+                                        key={ref}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenCrossReference(ref);
+                                        }}
+                                        className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 hover:text-blue-300"
+                                        title={`Xem nhanh: ${ref}`}
+                                      >
+                                        ⚓ {ref}
+                                      </button>
+                                    ))}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Right Column: English KJV */}
+                            <div className="flex items-start gap-3 md:border-l md:border-slate-800/80 md:pl-4 pt-2 md:pt-0 border-t border-slate-800/60 md:border-t-0">
+                              <span className="select-none text-xs font-sans font-semibold pt-1 min-w-[1.5rem] text-right text-emerald-400/80">
+                                {v.verse}
+                              </span>
+                              <div className="flex-1 leading-relaxed font-serif text-slate-300 text-sm md:text-base italic">
+                                {v.text_target || <span className="text-slate-600 font-sans text-xs">Đang tải câu đối chiếu...</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* View Mode 4: INTERLINEAR ORIGINAL LANGUAGE STRONG'S LEXICON MODE (§31) */}
+            {viewMode === "interlinear" && (
+              <div className="flex flex-col gap-4">
+                {/* Mode Intro Header */}
+                <div className="p-4 rounded-2xl glass-panel border border-amber-500/30 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Chế Độ Liên Dòng Ngữ Căn Nguyên Văn Strong (§31)</h4>
+                      <p className="text-xs text-slate-400">
+                        Phân tích trực tiếp các từ ngữ căn {currentBook?.testament === "OT" ? "Hê-bơ-rơ (Cựu Ước)" : "Hy Lạp (Tân Ước)"} dưới từng câu Kinh Thánh.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                    {currentBook?.testament === "OT" ? "Hê-bơ-rơ (Hebrew)" : "Hy Lạp (Greek)"}
+                  </span>
+                </div>
+
+                {parallelLoading ? (
+                  <div className="p-16 rounded-3xl glass-panel flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+                    <p className="text-sm font-medium">Đang tra cứu hệ thống từ điển ngữ căn Strong...</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {(parallelData?.verses || []).map((v, idx) => {
+                      const isNewSection = v.section_title && (idx === 0 || (parallelData?.verses[idx - 1]?.section_title !== v.section_title));
+                      const isSelected = selectedVerse?.global_id === v.global_id;
+                      const isBookmarked = bookmarkedVerses.includes(v.verse_code);
+
+                      return (
+                        <React.Fragment key={v.global_id}>
+                          {isNewSection && (
+                            <div className="pt-4 pb-1">
+                              <div className={`inline-block text-xs md:text-sm font-sans font-bold uppercase tracking-wider px-3 py-1 rounded-md border ${themeStyles.accentBadge}`}>
+                                § {v.section_title}
+                              </div>
+                            </div>
+                          )}
+
+                          <div
+                            id={`verse-row-${v.verse}`}
+                            onClick={() => {
+                              const baseVerse: Verse = {
+                                global_id: v.global_id,
+                                verse_code: v.verse_code,
+                                chapter: v.chapter,
+                                verse: v.verse,
+                                section_title: v.section_title,
+                                text: v.text_vi,
+                                cross_references: v.cross_references
+                              };
+                              setSelectedVerse(baseVerse);
+                              setActiveDrawerTab("lexicon");
+                            }}
+                            className={`p-5 rounded-2xl cursor-pointer transition-all duration-200 border flex flex-col gap-3 ${
+                              isSelected
+                                ? themeStyles.cardSelected
+                                : isBookmarked
+                                ? "bg-amber-950/20 border-amber-500/40 hover:border-amber-400/60"
+                                : themeStyles.card
+                            }`}
+                          >
+                            {/* Main Vietnamese Verse */}
+                            <div className="flex items-start gap-3">
+                              <span className={`select-none text-xs font-sans font-bold pt-0.5 min-w-[1.75rem] text-right ${
+                                isSelected ? themeStyles.verseNumSelected : "text-amber-400"
+                              }`}>
+                                {v.verse}
+                              </span>
+                              <div className="flex-1 font-serif text-base md:text-lg leading-relaxed text-slate-100">
+                                {renderVerseBody(v.text_vi)}
+                              </div>
+                            </div>
+
+                            {/* English KJV Translation Subtitle */}
+                            {v.text_target && (
+                              <div className="pl-8 text-xs text-slate-400 font-serif italic border-l-2 border-slate-800 ml-2">
+                                {v.text_target}
+                              </div>
+                            )}
+
+                            {/* Interlinear Strong Lexemes Chips */}
+                            {v.lexicon && v.lexicon.length > 0 && (
+                              <div className="pt-2 border-t border-slate-800/80 flex flex-wrap gap-2 items-center">
+                                <span className="text-[10px] uppercase font-bold text-amber-400/80 select-none mr-1">
+                                  Từ gốc:
+                                </span>
+                                {v.lexicon.map(lex => (
+                                  <div
+                                    key={lex.strong_number}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const baseVerse: Verse = {
+                                        global_id: v.global_id,
+                                        verse_code: v.verse_code,
+                                        chapter: v.chapter,
+                                        verse: v.verse,
+                                        section_title: v.section_title,
+                                        text: v.text_vi,
+                                        cross_references: v.cross_references
+                                      };
+                                      setSelectedVerse(baseVerse);
+                                      setActiveDrawerTab("lexicon");
+                                    }}
+                                    className="group/chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-all text-xs"
+                                    title={`${lex.lemma} (${lex.transliteration}) — ${lex.definition}`}
+                                  >
+                                    <span className="font-mono text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1 rounded">
+                                      {lex.strong_number}
+                                    </span>
+                                    <span className="font-bold text-amber-200 text-sm" dir={lex.language === "hebrew" ? "rtl" : "ltr"}>
+                                      {lex.lemma}
+                                    </span>
+                                    <span className="italic text-slate-400 text-[11px]">
+                                      ({lex.transliteration})
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                                          window.speechSynthesis.cancel();
+                                          const utt = new SpeechSynthesisUtterance(lex.lemma);
+                                          utt.lang = lex.language === "greek" ? "el-GR" : "he-IL";
+                                          utt.rate = 0.85;
+                                          window.speechSynthesis.speak(utt);
+                                        }
+                                      }}
+                                      className="p-0.5 rounded text-slate-500 hover:text-amber-300 transition-colors"
+                                      title="Nghe phát âm"
+                                    >
+                                      <Volume2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1840,6 +2223,30 @@ export default function BibleReaderPage() {
                   >
                     <AlignJustify className="w-4 h-4" />
                     <span>Đoạn văn liên tục</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("parallel")}
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                      viewMode === "parallel"
+                        ? "bg-blue-600/30 border-blue-500 text-blue-300 font-bold"
+                        : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Languages className="w-4 h-4 text-emerald-400" />
+                    <span>Song song KJV (§2.1)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("interlinear")}
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                      viewMode === "interlinear"
+                        ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                        : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    <span>Liên dòng Strong (§31)</span>
                   </button>
                 </div>
               </div>

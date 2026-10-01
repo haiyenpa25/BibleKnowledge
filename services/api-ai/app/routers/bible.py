@@ -4,9 +4,48 @@ from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 import re
 import json
+import urllib.request
+import urllib.parse
 from app.db.session import get_db
 
 router = APIRouter(prefix="/bible", tags=["Bible Core"])
+
+# Global in-memory cache for parallel translations (e.g. KJV)
+PARALLEL_CACHE: Dict[str, Dict[int, str]] = {}
+
+# Canonical keyword mappings to Strong numbers for accurate original language matching
+KEYWORD_MAP: Dict[str, List[str]] = {
+    "yêu thương": ["G0026", "H2617"],
+    "yêu": ["G0026", "H2617"],
+    "ân điển": ["G5485"],
+    "ơn": ["G5485"],
+    "đức tin": ["G4102", "H0539"],
+    "tin": ["G4102", "H0539"],
+    "lời": ["G3056"],
+    "đạo": ["G3056"],
+    "thánh linh": ["G4151", "H7307"],
+    "thần": ["G4151", "H7307"],
+    "thông công": ["G2842"],
+    "ban đầu": ["H7225"],
+    "dựng nên": ["H1254"],
+    "sáng tạo": ["H1254"],
+    "nhân từ": ["H2617"],
+    "thương xót": ["H2617"],
+    "bình an": ["H7965"],
+    "giao ước": ["H1285"],
+    "đức chúa trời": ["H0430", "G2316"],
+    "giê-hô-va": ["H3068"],
+    "chúa": ["G2962", "H3068"],
+    "chủ": ["G2962"],
+    "đấng christ": ["G5547"],
+    "mê-si-a": ["G5547"],
+    "tin lành": ["G2098"],
+    "phúc âm": ["G2098"],
+    "ăn năn": ["G3341"],
+    "cứu rỗi": ["G4991"],
+    "cứu": ["G4991"],
+    "thánh": ["H6944"]
+}
 
 
 @router.get("/books")
@@ -527,43 +566,9 @@ def get_verse_details(
     matched_lexicon = []
     v_text_lower = v_row.text.lower()
 
-    # Keyword mappings to Strong numbers for accurate matching
-    keyword_map = {
-        "yêu thương": ["G0026", "H2617"],
-        "yêu": ["G0026", "H2617"],
-        "ân điển": ["G5485"],
-        "ơn": ["G5485"],
-        "đức tin": ["G4102", "H0539"],
-        "tin": ["G4102", "H0539"],
-        "lời": ["G3056"],
-        "đạo": ["G3056"],
-        "thánh linh": ["G4151", "H7307"],
-        "thần": ["G4151", "H7307"],
-        "thông công": ["G2842"],
-        "ban đầu": ["H7225"],
-        "dựng nên": ["H1254"],
-        "sáng tạo": ["H1254"],
-        "nhân từ": ["H2617"],
-        "thương xót": ["H2617"],
-        "bình an": ["H7965"],
-        "giao ước": ["H1285"],
-        "đức chúa trời": ["H0430", "G2316"],
-        "giê-hô-va": ["H3068"],
-        "chúa": ["G2962", "H3068"],
-        "chủ": ["G2962"],
-        "đấng christ": ["G5547"],
-        "mê-si-a": ["G5547"],
-        "tin lành": ["G2098"],
-        "phúc âm": ["G2098"],
-        "ăn năn": ["G3341"],
-        "cứu rỗi": ["G4991"],
-        "cứu": ["G4991"],
-        "thánh": ["H6944"]
-    }
-
     matched_strong_nums = set()
 
-    for kw, s_nums in keyword_map.items():
+    for kw, s_nums in KEYWORD_MAP.items():
         if kw in v_text_lower:
             for sn in s_nums:
                 matched_strong_nums.add(sn)
@@ -874,6 +879,184 @@ def get_concordance(
             }
             for r in v_rows
         ]
+    }
+
+
+_KJV_DATA = None
+
+def get_kjv_data():
+    global _KJV_DATA
+    if _KJV_DATA is None:
+        import os
+        kjv_path = "/app/data/bible/en_kjv.json"
+        if os.path.exists(kjv_path):
+            try:
+                with open(kjv_path, "r", encoding="utf-8") as f:
+                    _KJV_DATA = json.load(f)
+            except Exception:
+                _KJV_DATA = []
+        else:
+            _KJV_DATA = []
+    return _KJV_DATA
+
+def get_kjv_chapter_verses(book_order: int, chapter: int) -> Dict[int, str]:
+    data = get_kjv_data()
+    result = {}
+    if data and 1 <= book_order <= len(data):
+        b = data[book_order - 1]
+        chaps = b.get("chapters", [])
+        if 1 <= chapter <= len(chaps):
+            verse_list = chaps[chapter - 1]
+            for idx, text_str in enumerate(verse_list, start=1):
+                result[idx] = text_str
+    return result
+
+
+@router.get("/parallel-chapter")
+def get_parallel_chapter(
+    book: str = Query(..., description="Book code, OSIS, or name (e.g. 'mat', 'sa', 'Gen')"),
+    chapter: int = Query(1, ge=1, description="Chapter number (1..N)"),
+    target_translation: str = Query("kjv", description="Target translation code, e.g. kjv"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get parallel text for a chapter comparing Vietnamese 1925 with a target translation (e.g. English KJV).
+    Also includes original language Strong's Lexicon entries for Interlinear study mode.
+    Reference: ROADMAP1.md Section 2.1 & Section 31.
+    """
+    clean = book.strip().lower()
+    sql_book = text("""
+        SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+        FROM bible_books
+        WHERE LOWER(code) = :c OR LOWER(osis) = :c OR LOWER(name_vi) = :c OR LOWER(name_en) = :c
+        LIMIT 1
+    """)
+    b = db.execute(sql_book, {"c": clean}).fetchone()
+    if not b:
+        sql_fallback = text("""
+            SELECT id, testament, book_order, code, osis, name_vi, name_en, total_chapters
+            FROM bible_books
+            WHERE LOWER(name_vi) LIKE :c
+            LIMIT 1
+        """)
+        b = db.execute(sql_fallback, {"c": f"%{clean}%"}).fetchone()
+
+    if not b:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy sách: '{book}'")
+
+    if chapter > b.total_chapters:
+        raise HTTPException(status_code=400, detail=f"Sách {b.name_vi} chỉ có {b.total_chapters} đoạn.")
+
+    # 1. Fetch Vietnamese 1925 verses
+    sql_verses = text("""
+        SELECT global_id, verse_code, chapter, verse, section_title, text, cross_references
+        FROM bible_verses
+        WHERE book_id = :book_id AND chapter = :chapter
+        ORDER BY verse ASC
+    """)
+    rows = db.execute(sql_verses, {"book_id": b.id, "chapter": chapter}).fetchall()
+
+    # 2. Fetch parallel translation (e.g. KJV)
+    target_clean = target_translation.strip().lower()
+    target_verses: Dict[int, str] = {}
+
+    if target_clean == "kjv":
+        target_verses = get_kjv_chapter_verses(b.book_order, chapter)
+
+    # Fallback to cache / bible-api if not found from local file
+    if not target_verses:
+        cache_key = f"{b.name_en.lower()}_{chapter}_{target_clean}"
+        if cache_key in PARALLEL_CACHE:
+            target_verses = PARALLEL_CACHE[cache_key]
+        else:
+            try:
+                clean_book_en = b.name_en.replace(" ", "+")
+                url = f"https://bible-api.com/{clean_book_en}+{chapter}?translation={urllib.parse.quote(target_clean)}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BibleKnowledge/1.0"})
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    if response.status == 200:
+                        api_data = json.loads(response.read().decode('utf-8'))
+                        for v_item in api_data.get("verses", []):
+                            v_num = v_item.get("verse")
+                            v_txt = v_item.get("text", "").strip()
+                            if v_num and v_txt:
+                                target_verses[v_num] = v_txt
+                        if target_verses:
+                            PARALLEL_CACHE[cache_key] = target_verses
+            except Exception:
+                pass
+
+    # 3. Fetch Strong's Lexicon entries for Interlinear mode
+    lang_filter = "greek" if b.testament == "NT" else "hebrew"
+    lex_rows = db.execute(
+        text("SELECT id, strong_number, language, lemma, transliteration, pronunciation, part_of_speech, definition, theological_significance, key_verses FROM strong_lexicon WHERE language = :lang"),
+        {"lang": lang_filter}
+    ).fetchall()
+
+    lex_by_strong = {lr.strong_number: lr for lr in lex_rows}
+
+    # Build response verses
+    combined_verses = []
+    for r in rows:
+        v_num = r.verse
+        v_text_lower = r.text.lower()
+
+        # Find matching lexicon items
+        verse_lexicon = []
+        seen_strongs = set()
+
+        for kw, s_nums in KEYWORD_MAP.items():
+            if kw in v_text_lower:
+                for sn in s_nums:
+                    if sn in lex_by_strong and sn not in seen_strongs:
+                        seen_strongs.add(sn)
+                        lr = lex_by_strong[sn]
+                        verse_lexicon.append({
+                            "strong_number": lr.strong_number,
+                            "language": lr.language,
+                            "lemma": lr.lemma,
+                            "transliteration": lr.transliteration,
+                            "pronunciation": lr.pronunciation or "",
+                            "definition": lr.definition,
+                            "matched_keyword": kw
+                        })
+
+        combined_verses.append({
+            "global_id": r.global_id,
+            "verse_code": r.verse_code,
+            "chapter": r.chapter,
+            "verse": r.verse,
+            "section_title": r.section_title or "",
+            "text_vi": r.text,
+            "text_target": target_verses.get(v_num, ""),
+            "cross_references": r.cross_references or [],
+            "lexicon": verse_lexicon
+        })
+
+    return {
+        "book": {
+            "id": b.id,
+            "order": b.book_order,
+            "code": b.code,
+            "osis": b.osis,
+            "name_vi": b.name_vi,
+            "name_en": b.name_en,
+            "testament": b.testament,
+            "total_chapters": b.total_chapters
+        },
+        "chapter": chapter,
+        "total_verses": len(rows),
+        "source_translation": {
+            "id": "vi_1934",
+            "name": "Bản Dịch Truyền Thống 1925",
+            "language": "Tiếng Việt"
+        },
+        "target_translation": {
+            "id": target_clean,
+            "name": "King James Version (KJV 1611)" if target_clean == "kjv" else target_clean.upper(),
+            "language": "English"
+        },
+        "verses": combined_verses
     }
 
 
