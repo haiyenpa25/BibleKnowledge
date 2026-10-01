@@ -355,6 +355,39 @@ def list_biblical_journeys():
                 {"order": 6, "name": "Lít-trơ (Lystra)", "modern": "Hatunsaray, Thổ Nhĩ Kỳ", "lat": 37.5683, "lng": 32.2283, "scripture": "Công vụ 14:8-20", "notes": "Chữa lành người què bẩm sinh; dân chúng tưởng là thần; sau đó Phao-lô bị ném đá tưởng chết."},
                 {"order": 7, "name": "Đẹt-bơ (Derbe)", "modern": "Kerti Huyuk, Thổ Nhĩ Kỳ", "lat": 37.3486, "lng": 33.3614, "scripture": "Công vụ 14:20-21", "notes": "Giảng Tin Lành và môn đệ hóa nhiều người trước khi quay lại thăm các Hội Thánh."}
             ]
+        },
+        {
+            "id": "journey-paul-2",
+            "title": "Chuyến Truyền Giáo Thứ Hai Của Phao-lô (Tiếng Gọi Ma-xê-đoan)",
+            "period": "Early Church (khoảng 49 - 52 SCN)",
+            "description": "Tiếng gọi Ma-xê-đoan đưa Phúc Âm từ Á Châu sang Âu Châu; thành lập các Hội Thánh Phi-líp, Tê-sa-lô-ni-ca, Bê-rê và Cô-rinh-tô.",
+            "color": "#8b5cf6",
+            "waypoints": [
+                {"order": 1, "name": "An-ti-ốt xứ Sy-ri (Antioch)", "modern": "Antakya, Thổ Nhĩ Kỳ", "lat": 36.2021, "lng": 36.1606, "scripture": "Công vụ 15:36-41", "notes": "Phao-lô cùng Si-la lên đường củng cố các Hội Thánh xứ Sy-ri và Si-li-si."},
+                {"order": 2, "name": "Trô-ách (Troas)", "modern": "Canakkale, Thổ Nhĩ Kỳ", "lat": 39.7525, "lng": 26.1611, "scripture": "Công vụ 16:8-10", "notes": "Khải tượng người Ma-xê-đoan: 'Hãy qua xứ Ma-xê-đoan mà giúp chúng tôi!' Bác sĩ Lu-ca gia nhập đoàn."},
+                {"order": 3, "name": "Phi-líp (Philippi)", "modern": "Kavala, Hy Lạp", "lat": 41.0131, "lng": 24.2864, "scripture": "Công vụ 16:11-40", "notes": "Bà Ly-đi tin Chúa; Phao-lô và Si-la ca ngợi Chúa trong ngục lúc nửa đêm; người cai ngục tin nhận Đấng Christ."},
+                {"order": 4, "name": "Tê-sa-lô-ni-ca (Thessalonica)", "modern": "Thessaloniki, Hy Lạp", "lat": 40.6401, "lng": 22.9444, "scripture": "Công vụ 17:1-9", "notes": "Giảng giải Kinh Thánh 3 ngày Sa-bát chứng minh Đấng Christ phải chịu chết và sống lại."},
+                {"order": 5, "name": "Bê-rê (Berea)", "modern": "Veria, Hy Lạp", "lat": 40.5217, "lng": 22.2033, "scripture": "Công vụ 17:10-15", "notes": "Các tín hữu Bê-rê có tâm tình cao quý, ngày nào cũng tra xem Kinh Thánh xem lời giảng có thật chăng."},
+                {"order": 6, "name": "A-thên (Athens)", "modern": "Athens, Hy Lạp", "lat": 37.9838, "lng": 23.7275, "scripture": "Công vụ 17:16-34", "notes": "Biện giáo trên đồi A-rê-ô-ba về 'ĐỨC CHÚA TRỜI KHÔNG BIẾT', kêu gọi mọi người ăn năn."},
+                {"order": 7, "name": "Cô-rinh-tô (Corinth)", "modern": "Korinthos, Hy Lạp", "lat": 37.9386, "lng": 22.9322, "scripture": "Công vụ 18:1-18", "notes": "Ở lại 18 tháng dạy dỗ đạo Đức Chúa Trời; dệt trại cùng A-qui-la và Bê-rít-sin; viết thư 1 & 2 Tê-sa-lô-ni-ca."},
+                {"order": 8, "name": "Giê-ru-sa-lem (Jerusalem)", "modern": "Jerusalem, Israel", "lat": 31.7683, "lng": 35.2137, "scripture": "Công vụ 18:19-22", "notes": "Ghé thăm Ê-phê-sô rồi trở về chào thăm Hội Thánh Giê-ru-sa-lem và An-ti-ốt."}
+            ]
+        },
+        {
+            "id": "journey-paul-rome",
+            "title": "Chuyến Đi La-mã & Chìm Tàu Tại Đảo Man-tơ",
+            "period": "Early Church (khoảng 59 - 62 SCN)",
+            "description": "Phao-lô bị giải đi La-mã vì kháng cáo lên Sê-sa, trải qua bão biển kinh hoàng Ê-ra-cơ-líp, đắm tàu tại Man-tơ và giảng Tin Lành trong sự giam lỏng tại thủ đô Đế quốc.",
+            "color": "#ec4899",
+            "waypoints": [
+                {"order": 1, "name": "Sê-sa-rê (Caesarea)", "modern": "Caesarea, Israel", "lat": 32.5000, "lng": 34.8900, "scripture": "Công vụ 25:11-12; 27:1", "notes": "Phao-lô công bố: 'Tôi kháng án lên Sê-sa!' và được giao cho quan đội trưởng Giu-li-út giải đi bằng đường biển."},
+                {"order": 2, "name": "Si-đôn (Sidon)", "modern": "Saida, Li-băng", "lat": 33.5631, "lng": 35.3689, "scripture": "Công vụ 27:3", "notes": "Ghé cảng Si-đôn; Phao-lô được phép thăm bạn bè và nhận sự chăm sóc."},
+                {"order": 3, "name": "Mỹ Cảng & Bão Biển (Fair Havens / Crete)", "modern": "Kaloi Limenes, Đảo Crete", "lat": 34.9333, "lng": 24.8000, "scripture": "Công vụ 27:8-20", "notes": "Thuyền gặp bão bấc dữ dội trôi dạt 14 đêm ngày; thiên sứ hiện đến hứa cứu mạng tất cả 276 người trên tàu."},
+                {"order": 4, "name": "Chìm Tàu Tại Đảo Man-tơ (Malta)", "modern": "St. Paul's Bay, Malta", "lat": 35.9483, "lng": 14.4000, "scripture": "Công vụ 28:1-10", "notes": "Tàu vỡ tan; toàn bộ 276 người bơi vào bờ an toàn; rắn độc cắn Phao-lô không hề hấn gì; chữa lành cha quan Búp-li-út."},
+                {"order": 5, "name": "Si-ra-cu-sơ (Syracuse, Sicily)", "modern": "Siracusa, Ý", "lat": 37.0755, "lng": 15.2866, "scripture": "Công vụ 28:12", "notes": "Đổi thuyền A-léc-xăng-tri có hiệu Song Thần; lưu lại 3 ngày."},
+                {"order": 6, "name": "Bô-xô-lơ (Pozzuoli / Puteoli)", "modern": "Pozzuoli, Ý", "lat": 40.8267, "lng": 14.1206, "scripture": "Công vụ 28:13-14", "notes": "Cập bến nước Ý; các anh em Cơ Đốc đón tiếp nồng hậu suốt 7 ngày."},
+                {"order": 7, "name": "La-mã (Rome)", "modern": "Rome, Ý", "lat": 41.9028, "lng": 12.4964, "scripture": "Công vụ 28:16-31", "notes": "Phao-lô ở nhà thuê riêng có lính canh trong 2 năm trọn; dạn dĩ rao truyền Nước Đức Chúa Trời và viết các Thư Tín Ngục Tù."}
+            ]
         }
     ]
     return journeys

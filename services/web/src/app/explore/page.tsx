@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { 
   Network, 
@@ -22,7 +22,11 @@ import {
   Map as MapIcon,
   Navigation,
   Milestone,
-  CheckCircle2
+  CheckCircle2,
+  Play,
+  Pause,
+  Volume2,
+  ArrowRight
 } from "lucide-react";
 
 interface GraphNode {
@@ -133,6 +137,8 @@ export default function ExplorePage() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string>("journey-jesus");
   const [activeWaypoint, setActiveWaypoint] = useState<Waypoint | null>(null);
   const [loadingMap, setLoadingMap] = useState(true);
+  const [isPlayingTour, setIsPlayingTour] = useState(false);
+  const tourTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -264,11 +270,11 @@ export default function ExplorePage() {
   };
 
   // Project Geographic coordinates (lat, lng) to SVG space (900x600)
-  // Region bounds: Lat 26..39, Lng 29..48
+  // Region bounds: Lat 26..43.5, Lng 11..48 (covers Rome, Greece, Asia Minor, Canaan, Egypt, Mesopotamia)
   const projectCoordinates = (lat: number, lng: number) => {
     const minLat = 26.0;
-    const maxLat = 39.0;
-    const minLng = 29.0;
+    const maxLat = 43.5;
+    const minLng = 11.0;
     const maxLng = 48.0;
 
     const x = ((lng - minLng) / (maxLng - minLng)) * 820 + 40;
@@ -277,6 +283,87 @@ export default function ExplorePage() {
   };
 
   const currentJourney = journeys.find((j) => j.id === selectedJourneyId);
+
+  // Guided Journey Tour Controllers
+  const speakWaypoint = (wp: Waypoint) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(
+        `Trạm ${wp.order}: ${wp.name}. Vị trí hiện đại: ${wp.modern}. Kinh Thánh: ${wp.scripture}. ${wp.notes}`
+      );
+      utterance.lang = "vi-VN";
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const stopTour = () => {
+    if (tourTimerRef.current) {
+      clearInterval(tourTimerRef.current);
+      tourTimerRef.current = null;
+    }
+    setIsPlayingTour(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const startTour = () => {
+    if (!currentJourney || currentJourney.waypoints.length === 0) return;
+    setIsPlayingTour(true);
+    let currentIndex = 0;
+    if (activeWaypoint) {
+      const idx = currentJourney.waypoints.findIndex((w) => w.order === activeWaypoint.order);
+      if (idx !== -1 && idx < currentJourney.waypoints.length - 1) {
+        currentIndex = idx + 1;
+      }
+    }
+    const wp = currentJourney.waypoints[currentIndex];
+    setActiveWaypoint(wp);
+    speakWaypoint(wp);
+
+    if (tourTimerRef.current) clearInterval(tourTimerRef.current);
+
+    tourTimerRef.current = setInterval(() => {
+      currentIndex++;
+      if (!currentJourney || currentIndex >= currentJourney.waypoints.length) {
+        stopTour();
+      } else {
+        const nextWp = currentJourney.waypoints[currentIndex];
+        setActiveWaypoint(nextWp);
+        speakWaypoint(nextWp);
+      }
+    }, 6500);
+  };
+
+  const toggleTour = () => {
+    if (isPlayingTour) {
+      stopTour();
+    } else {
+      startTour();
+    }
+  };
+
+  const handleSelectJourney = (journeyId: string) => {
+    stopTour();
+    setSelectedJourneyId(journeyId);
+    const j = journeys.find((item) => item.id === journeyId);
+    if (j && j.waypoints.length > 0) {
+      setActiveWaypoint(j.waypoints[0]);
+    }
+  };
+
+  // Cleanup speech/tour timer on unmount
+  useEffect(() => {
+    return () => {
+      if (tourTimerRef.current) {
+        clearInterval(tourTimerRef.current);
+      }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   return (
     <main className="min-h-screen px-4 py-8 md:px-12 lg:px-20 max-w-7xl mx-auto flex flex-col gap-8">
@@ -685,26 +772,49 @@ export default function ExplorePage() {
       {/* ===================================================================== */}
       {activeTab === "map" && (
         <div className="flex flex-col gap-6">
-          {/* Journeys Selector Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-            <span className="text-slate-400 whitespace-nowrap">Chọn hành trình:</span>
-            {journeys.map((j) => (
+          {/* Journeys Selector Bar & Tour Action */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-slate-400 whitespace-nowrap">Chọn hành trình:</span>
+              {journeys.map((j) => (
+                <button
+                  key={j.id}
+                  onClick={() => handleSelectJourney(j.id)}
+                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    selectedJourneyId === j.id
+                      ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
+                      : "bg-slate-800/80 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>{j.title}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Guided Tour Play/Pause button */}
+            {currentJourney && (
               <button
-                key={j.id}
-                onClick={() => {
-                  setSelectedJourneyId(j.id);
-                  setActiveWaypoint(j.waypoints[0] || null);
-                }}
-                className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                  selectedJourneyId === j.id
-                    ? "bg-rose-600 text-white font-semibold shadow-md shadow-rose-600/30"
-                    : "bg-slate-800/80 text-slate-400 hover:text-white"
+                onClick={toggleTour}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                  isPlayingTour
+                    ? "bg-amber-600 text-white shadow-lg shadow-amber-600/40 animate-pulse"
+                    : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/20"
                 }`}
               >
-                <Navigation className="w-3.5 h-3.5" />
-                <span>{j.title}</span>
+                {isPlayingTour ? (
+                  <>
+                    <Pause className="w-3.5 h-3.5" />
+                    <span>Tạm Dừng Mô Phỏng</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Mô Phỏng Tự Động (Guided Tour)</span>
+                  </>
+                )}
               </button>
-            ))}
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -732,17 +842,23 @@ export default function ExplorePage() {
                   <rect width="900" height="600" fill="#090d16" />
 
                   {/* Decorative Ancient Geography Lines & Names */}
-                  <text x="120" y="240" fill="rgba(59, 130, 246, 0.2)" fontSize="18" fontWeight="bold" fontFamily="serif" letterSpacing="4">
+                  <text x="70" y="110" fill="rgba(168, 85, 247, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                    Ý & LA-MÃ (ITALY / ROME)
+                  </text>
+                  <text x="270" y="140" fill="rgba(59, 130, 246, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                    HY LẠP & MA-XÊ-ĐOAN
+                  </text>
+                  <text x="250" y="270" fill="rgba(59, 130, 246, 0.2)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="4">
                     ĐỊA TRUNG HẢI (MEDITERRANEAN SEA)
                   </text>
-                  <text x="210" y="520" fill="rgba(239, 68, 68, 0.2)" fontSize="14" fontWeight="bold" fontFamily="serif" letterSpacing="2">
+                  <text x="540" y="370" fill="rgba(16, 185, 129, 0.25)" fontSize="13" fontWeight="bold" fontFamily="serif">
+                    CA-NA-AN (ĐẤT HỨA)
+                  </text>
+                  <text x="480" y="520" fill="rgba(239, 68, 68, 0.2)" fontSize="13" fontWeight="bold" fontFamily="serif" letterSpacing="2">
                     BIỂN ĐỎ (RED SEA)
                   </text>
-                  <text x="680" y="320" fill="rgba(245, 158, 11, 0.15)" fontSize="16" fontWeight="bold" fontFamily="serif" letterSpacing="3">
+                  <text x="700" y="340" fill="rgba(245, 158, 11, 0.15)" fontSize="15" fontWeight="bold" fontFamily="serif" letterSpacing="3">
                     LƯỠNG HÀ (MESOPOTAMIA)
-                  </text>
-                  <text x="360" y="290" fill="rgba(16, 185, 129, 0.3)" fontSize="13" fontWeight="bold" fontFamily="serif">
-                    CA-NA-AN (ĐẤT HỨA)
                   </text>
 
                   {/* Grid latitude lines */}
@@ -886,11 +1002,21 @@ export default function ExplorePage() {
 
                   {/* Waypoint Detail Highlight */}
                   {activeWaypoint && (
-                    <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 flex flex-col gap-2">
+                    <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 flex flex-col gap-3">
                       <div className="flex justify-between items-center">
-                        <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold">
-                          {activeWaypoint.order}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow">
+                            {activeWaypoint.order}
+                          </span>
+                          <button
+                            onClick={() => speakWaypoint(activeWaypoint)}
+                            title="Nghe thuyết minh âm thanh trạm này"
+                            className="px-2 py-0.5 rounded-lg bg-rose-900/50 hover:bg-rose-800 border border-rose-700/60 text-rose-200 text-[11px] flex items-center gap-1 transition-colors"
+                          >
+                            <Volume2 className="w-3 h-3 text-rose-300" />
+                            <span>Đọc Thuyết Minh</span>
+                          </button>
+                        </div>
                         <Link
                           href={`/bible?ref=${encodeURIComponent(activeWaypoint.scripture)}`}
                           className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
@@ -900,17 +1026,52 @@ export default function ExplorePage() {
                         </Link>
                       </div>
 
-                      <h4 className="text-base font-bold text-white mt-1">
-                        {activeWaypoint.name}
-                      </h4>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-emerald-400" />
-                        <span>Vị trí hiện đại: {activeWaypoint.modern}</span>
+                      <div>
+                        <h4 className="text-base font-bold text-white">
+                          {activeWaypoint.name}
+                        </h4>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-emerald-400" />
+                          <span>Vị trí hiện đại: {activeWaypoint.modern}</span>
+                        </div>
                       </div>
 
                       <p className="text-xs text-slate-200 leading-relaxed font-serif pt-1">
                         {activeWaypoint.notes}
                       </p>
+
+                      {/* Previous / Next Stepper Controls */}
+                      <div className="flex items-center justify-between pt-2 border-t border-rose-900/40 text-xs">
+                        <button
+                          disabled={activeWaypoint.order <= 1}
+                          onClick={() => {
+                            const prev = currentJourney.waypoints.find(w => w.order === activeWaypoint.order - 1);
+                            if (prev) {
+                              setActiveWaypoint(prev);
+                              if (isPlayingTour) speakWaypoint(prev);
+                            }
+                          }}
+                          className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        >
+                          ← Chặng trước
+                        </button>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {activeWaypoint.order} / {currentJourney.waypoints.length}
+                        </span>
+                        <button
+                          disabled={activeWaypoint.order >= currentJourney.waypoints.length}
+                          onClick={() => {
+                            const next = currentJourney.waypoints.find(w => w.order === activeWaypoint.order + 1);
+                            if (next) {
+                              setActiveWaypoint(next);
+                              if (isPlayingTour) speakWaypoint(next);
+                            }
+                          }}
+                          className="text-[11px] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        >
+                          Chặng sau →
+                        </button>
+                      </div>
                     </div>
                   )}
 
